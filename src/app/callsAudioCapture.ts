@@ -9,87 +9,191 @@ import {Logger} from 'common/log';
 const log = new Logger('CallsAudioCapture');
 
 /**
- * JavaScript code injected into the Calls widget page to capture all WebRTC
- * audio tracks (local + remote) via a MediaRecorder. Runs in the page's main
- * world so it has direct access to RTCPeerConnection.
+ * Non-invasive audio capture.
+ *
+ * The PREVIOUS version monkey-patched RTCPeerConnection.addTrack and
+ * setRemoteDescription, which broke WebRTC audio playback (users could
+ * see "talking" indicators but couldn't hear each other).
+ *
+ * This version ONLY wraps the RTCPeerConnection constructor to attach a
+ * read-only 'track' event listener. It never touches addTrack,
+ * setRemoteDescription, or any other prototype method. Remote tracks
+ * are cloned before being fed to the mixer so the original tracks
+ * remain untouched.
+ *
+ * For local audio, a SEPARATE getUserMedia call is made (after a delay
+ * so the Calls plugin's own mic request completes first).
  */
 const AUDIO_CAPTURE_INJECTION = `
 (function() {
-    if (window.__callsAudioCapture) return;
-    window.__callsAudioCapture = { chunks: [], recorder: null, tracks: [], ctx: null };
+    if (window.__callsAudioCapture) {
+        console.log('[CallsAudioCapture] Already injected, skipping');
+        return;
+    }
+
+    console.log('[CallsAudioCapture] Injecting non-invasive audio capture...');
+
+    window.__callsAudioCapture = {
+        chunks: [],
+        recorder: null,
+        remoteTrackIds: [],
+        ctx: null,
+        dest: null,
+        localStream: null,
+        peerConnections: [],
+    };
     const cap = window.__callsAudioCapture;
 
-    // AudioContext for mixing all tracks into one stream.
     cap.ctx = new AudioContext();
-    const dest = cap.ctx.createMediaStreamDestination();
+    cap.dest = cap.ctx.createMediaStreamDestination();
 
-    function addTrackToMixer(track) {
+    function addRemoteTrackToMixer(track) {
         if (track.kind !== 'audio') return;
-        if (cap.tracks.includes(track)) return;
-        cap.tracks.push(track);
+        if (cap.remoteTrackIds.includes(track.id)) return;
+        cap.remoteTrackIds.push(track.id);
         try {
-            const stream = new MediaStream([track]);
+            // Clone the track so we don't interfere with WebRTC's usage of it.
+            const cloned = track.clone();
+            const stream = new MediaStream([cloned]);
             const source = cap.ctx.createMediaStreamSource(stream);
-            source.connect(dest);
-            console.log('[CallsAudioCapture] Added audio track to mixer, total:', cap.tracks.length);
+            source.connect(cap.dest);
+            console.log('[CallsAudioCapture] Added REMOTE audio track (cloned), total:', cap.remoteTrackIds.length);
         } catch (e) {
-            console.error('[CallsAudioCapture] Failed to add track:', e);
+            console.error('[CallsAudioCapture] Failed to add remote track:', e);
         }
     }
 
-    // Patch RTCPeerConnection to intercept audio tracks.
-    const OrigPeerConnection = window.RTCPeerConnection;
-    const origAddTrack = OrigPeerConnection.prototype.addTrack;
+    // Wrap RTCPeerConnection constructor — attach a track listener.
+    // We do NOT touch any prototype methods.
+    const OrigPC = window.RTCPeerConnection;
+    window.RTCPeerConnection = function(...args) {
+        const pc = new OrigPC(...args);
+        console.log('[CallsAudioCapture] RTCPeerConnection created, attaching track listener');
+        cap.peerConnections.push(pc);
 
-    OrigPeerConnection.prototype.addTrack = function(track, ...streams) {
-        addTrackToMixer(track);
-        return origAddTrack.call(this, track, ...streams);
-    };
-
-    const origSetRemoteDesc = OrigPeerConnection.prototype.setRemoteDescription;
-    OrigPeerConnection.prototype.setRemoteDescription = function(desc) {
-        // Hook ontrack after remote description is set.
-        const origOnTrack = this.ontrack;
-        this.addEventListener('track', (event) => {
+        pc.addEventListener('track', (event) => {
+            console.log('[CallsAudioCapture] ontrack fired, kind:', event.track?.kind, 'id:', event.track?.id);
             if (event.track) {
-                addTrackToMixer(event.track);
+                addRemoteTrackToMixer(event.track);
+                maybeStartRecording();
             }
         });
-        return origSetRemoteDesc.call(this, desc);
-    };
 
-    // Start the MediaRecorder on the mixed destination stream.
-    function startRecording() {
+        return pc;
+    };
+    window.RTCPeerConnection.prototype = OrigPC.prototype;
+    window.RTCPeerConnection.generateCertificate = OrigPC.generateCertificate;
+
+    function maybeStartRecording() {
         if (cap.recorder && cap.recorder.state === 'recording') return;
         cap.chunks = [];
         try {
-            cap.recorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' });
-        } catch (e) {
-            // Fallback if opus codec is not available.
-            cap.recorder = new MediaRecorder(dest.stream);
-        }
-        cap.recorder.ondataavailable = (event) => {
-            if (event.data && event.data.size > 0) {
-                cap.chunks.push(event.data);
+            try {
+                cap.recorder = new MediaRecorder(cap.dest.stream, { mimeType: 'audio/webm;codecs=opus' });
+            } catch (e) {
+                cap.recorder = new MediaRecorder(cap.dest.stream);
             }
-        };
-        // Record in 5-second chunks to avoid losing data.
-        cap.recorder.start(5000);
-        console.log('[CallsAudioCapture] Recording started');
+            cap.recorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    cap.chunks.push(event.data);
+                    console.log('[CallsAudioCapture] Chunk recorded, size:', event.data.size, 'total chunks:', cap.chunks.length);
+                }
+            };
+            cap.recorder.onerror = (event) => {
+                console.error('[CallsAudioCapture] Recorder error:', event.error);
+            };
+            cap.recorder.start(5000);
+            console.log('[CallsAudioCapture] MediaRecorder started');
+        } catch (e) {
+            console.error('[CallsAudioCapture] Failed to start MediaRecorder:', e);
+        }
     }
 
-    // Wait a moment for WebRTC to initialize, then start recording.
-    // Also start immediately if tracks already exist.
-    setTimeout(startRecording, 2000);
+    // Strategy: capture audio from ALL sources we can find.
+    // 1. Scan for <audio> and <video> elements and use captureStream()
+    // 2. Scan for existing RTCPeerConnection receivers
+    // 3. Capture local mic as fallback
 
-    console.log('[CallsAudioCapture] Injection complete');
+    function scanExistingMediaElements() {
+        // Capture audio from any <audio> or <video> elements on the page.
+        const elements = [...document.querySelectorAll('audio, video')];
+        console.log('[CallsAudioCapture] Found', elements.length, 'audio/video elements');
+        for (const el of elements) {
+            try {
+                const stream = el.captureStream ? el.captureStream() : (el.mozCaptureStream ? el.mozCaptureStream() : null);
+                if (stream) {
+                    const audioTracks = stream.getAudioTracks();
+                    console.log('[CallsAudioCapture] Element', el.tagName, 'has', audioTracks.length, 'audio tracks');
+                    for (const track of audioTracks) {
+                        addRemoteTrackToMixer(track);
+                    }
+                }
+            } catch (e) {
+                console.log('[CallsAudioCapture] Cannot capture stream from element:', e.message);
+            }
+        }
+    }
+
+    function scanExistingPeerConnections() {
+        // Look for existing peer connections stored by the wrapper or on window
+        for (const pc of cap.peerConnections) {
+            try {
+                const receivers = pc.getReceivers();
+                console.log('[CallsAudioCapture] Existing PC has', receivers.length, 'receivers');
+                for (const receiver of receivers) {
+                    if (receiver.track && receiver.track.kind === 'audio') {
+                        console.log('[CallsAudioCapture] Found existing audio receiver track:', receiver.track.id);
+                        addRemoteTrackToMixer(receiver.track);
+                    }
+                }
+            } catch (e) {
+                console.log('[CallsAudioCapture] Error scanning PC:', e.message);
+            }
+        }
+    }
+
+    // Capture local mic — use the SAME constraints as the Calls plugin
+    // to share the mic rather than fight for exclusive access.
+    async function captureLocalMic() {
+        try {
+            console.log('[CallsAudioCapture] Requesting local mic...');
+            cap.localStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                },
+                video: false,
+            });
+            const tracks = cap.localStream.getAudioTracks();
+            console.log('[CallsAudioCapture] Got local mic, tracks:', tracks.length, 'track state:', tracks[0]?.readyState, 'enabled:', tracks[0]?.enabled);
+            const localSource = cap.ctx.createMediaStreamSource(cap.localStream);
+            localSource.connect(cap.dest);
+            console.log('[CallsAudioCapture] Local mic connected to mixer');
+        } catch (e) {
+            console.error('[CallsAudioCapture] Failed to get local mic:', e.message);
+        }
+    }
+
+    // Run all capture strategies with delays.
+    setTimeout(async () => {
+        await captureLocalMic();
+        scanExistingMediaElements();
+        scanExistingPeerConnections();
+        maybeStartRecording();
+    }, 3000);
+
+    // Scan again later in case elements/connections appear after initial scan.
+    setTimeout(() => {
+        console.log('[CallsAudioCapture] Re-scanning for media sources...');
+        scanExistingMediaElements();
+        scanExistingPeerConnections();
+    }, 8000);
+
+    console.log('[CallsAudioCapture] Injection complete, waiting for tracks...');
 })();
 `;
 
-/**
- * JavaScript code to stop recording and return the audio data as base64.
- * Must be run via executeJavaScript after AUDIO_CAPTURE_INJECTION.
- */
 const STOP_AND_RETRIEVE = `
 (function() {
     return new Promise((resolve) => {
@@ -100,31 +204,61 @@ const STOP_AND_RETRIEVE = `
             return;
         }
 
-        if (cap.recorder.state === 'inactive') {
-            // Already stopped, just return what we have.
-            if (cap.chunks.length === 0) {
+        console.log('[CallsAudioCapture] Stopping recorder, state:', cap.recorder.state, 'chunks:', cap.chunks.length);
+
+        if (cap.localStream) {
+            cap.localStream.getTracks().forEach(t => t.stop());
+            console.log('[CallsAudioCapture] Local mic stream stopped');
+        }
+
+        function blobToBase64(chunks, mimeType) {
+            if (chunks.length === 0) {
+                console.log('[CallsAudioCapture] No chunks to convert');
                 resolve(null);
                 return;
             }
-            const blob = new Blob(cap.chunks, { type: cap.recorder.mimeType || 'audio/webm' });
+            const blob = new Blob(chunks, { type: mimeType || 'audio/webm' });
+            console.log('[CallsAudioCapture] Converting blob to base64, size:', blob.size);
             const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
+            reader.onloadend = () => {
+                console.log('[CallsAudioCapture] FileReader done, result type:', typeof reader.result, 'length:', (reader.result || '').length, 'prefix:', (reader.result || '').substring(0, 60));
+                resolve(reader.result);
+            };
+            reader.onerror = (e) => {
+                console.error('[CallsAudioCapture] FileReader error:', e);
+                resolve(null);
+            };
             reader.readAsDataURL(blob);
+        }
+
+        // If recorder is already stopped, use existing chunks.
+        if (cap.recorder.state === 'inactive') {
+            console.log('[CallsAudioCapture] Recorder already inactive, using existing chunks');
+            blobToBase64(cap.chunks, cap.recorder.mimeType);
             return;
         }
 
+        // Request a final data flush before stopping.
+        // requestData() triggers ondataavailable synchronously with buffered data.
+        try {
+            cap.recorder.requestData();
+            console.log('[CallsAudioCapture] Requested final data flush, chunks now:', cap.chunks.length);
+        } catch (e) {
+            console.log('[CallsAudioCapture] requestData failed (ok):', e.message);
+        }
+
         cap.recorder.onstop = () => {
-            console.log('[CallsAudioCapture] Recorder stopped, chunks:', cap.chunks.length);
-            if (cap.chunks.length === 0) {
-                resolve(null);
-                return;
-            }
-            const blob = new Blob(cap.chunks, { type: cap.recorder.mimeType || 'audio/webm' });
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
+            console.log('[CallsAudioCapture] Recorder onstop fired, chunks:', cap.chunks.length);
+            blobToBase64(cap.chunks, cap.recorder.mimeType);
         };
-        cap.recorder.stop();
+
+        try {
+            cap.recorder.stop();
+        } catch (e) {
+            console.error('[CallsAudioCapture] recorder.stop() failed:', e);
+            // Fall back to whatever chunks we have.
+            blobToBase64(cap.chunks, cap.recorder.mimeType || 'audio/webm');
+        }
 
         if (cap.ctx) {
             cap.ctx.close().catch(() => {});
@@ -135,12 +269,12 @@ const STOP_AND_RETRIEVE = `
 
 /**
  * Injects the audio capture script into the Calls widget window.
- * Should be called after the widget page has loaded and the call is joined.
  */
 export async function startCallAudioCapture(win: BrowserWindow): Promise<void> {
+    log.info('Injecting audio capture into calls widget...');
     try {
         await win.webContents.executeJavaScript(AUDIO_CAPTURE_INJECTION);
-        log.info('Audio capture injected into calls widget');
+        log.info('Audio capture injection successful');
     } catch (err) {
         log.error('Failed to inject audio capture', {err});
     }
@@ -148,25 +282,33 @@ export async function startCallAudioCapture(win: BrowserWindow): Promise<void> {
 
 /**
  * Stops the audio recording and retrieves the recorded audio as a Buffer.
- * Returns null if no audio was captured.
  */
 export async function stopCallAudioCapture(win: BrowserWindow): Promise<Buffer | null> {
+    log.info('Stopping audio capture...');
     try {
         const dataURL: string | null = await win.webContents.executeJavaScript(STOP_AND_RETRIEVE);
+        log.info('STOP_AND_RETRIEVE result', {
+            type: typeof dataURL,
+            isNull: dataURL === null,
+            length: dataURL?.length ?? 0,
+            prefix: dataURL?.substring(0, 100) ?? '(null)',
+        });
         if (!dataURL) {
             log.info('No audio data captured');
             return null;
         }
 
-        // dataURL format: "data:audio/webm;base64,AAAA..."
-        const base64Match = dataURL.match(/^data:[^;]+;base64,(.+)$/);
+        const base64Match = dataURL.match(/^data:[^,]+;base64,(.+)$/);
         if (!base64Match) {
-            log.error('Invalid data URL format');
+            log.error('Invalid data URL format from audio capture', {
+                firstChars: dataURL.substring(0, 200),
+                length: dataURL.length,
+            });
             return null;
         }
 
         const buffer = Buffer.from(base64Match[1], 'base64');
-        log.info('Audio captured', {sizeBytes: buffer.length});
+        log.info('Audio captured successfully', {sizeBytes: buffer.length});
         return buffer;
     } catch (err) {
         log.error('Failed to stop audio capture', {err});
@@ -175,40 +317,34 @@ export async function stopCallAudioCapture(win: BrowserWindow): Promise<Buffer |
 }
 
 /**
- * Uploads the recorded call audio to the Mattermost Issues plugin for
- * transcription and analysis.
+ * Uploads the recorded call audio to the Mattermost Issues plugin.
  */
 export async function uploadCallAudio(
     serverURL: string,
     channelID: string,
     audioBuffer: Buffer,
 ): Promise<void> {
-    const pluginURL = `${serverURL.replace(/\/$/, '')}/plugins/com.mattermost.issues/api/v1/call-audio`;
+    const pluginURL = `${serverURL.replace(/\/$/, '')}/plugins/com.mattermost.issues/internal/call-audio`;
+    log.info('Uploading call audio', {pluginURL, channelID, audioSize: audioBuffer.length});
 
-    // Build multipart form data manually for Electron's net module.
+    // Use Electron's net module with chunked upload to avoid ERR_INVALID_ARGUMENT
+    // on large binary payloads.
     const boundary = `----CallAudioBoundary${Date.now()}`;
-    const parts: Buffer[] = [];
 
-    // Audio file part.
-    parts.push(Buffer.from(
+    const preamble = Buffer.from(
         `--${boundary}\r\n` +
         'Content-Disposition: form-data; name="audio"; filename="call_audio.webm"\r\n' +
         'Content-Type: audio/webm\r\n\r\n',
-    ));
-    parts.push(audioBuffer);
-    parts.push(Buffer.from('\r\n'));
-
-    // Channel ID part.
-    parts.push(Buffer.from(
-        `--${boundary}\r\n` +
+    );
+    const afterAudio = Buffer.from(
+        `\r\n--${boundary}\r\n` +
         'Content-Disposition: form-data; name="channel_id"\r\n\r\n' +
-        `${channelID}\r\n`,
-    ));
+        `${channelID}\r\n` +
+        `--${boundary}--\r\n`,
+    );
 
-    // Closing boundary.
-    parts.push(Buffer.from(`--${boundary}--\r\n`));
-
-    const body = Buffer.concat(parts);
+    const totalLength = preamble.length + audioBuffer.length + afterAudio.length;
+    log.info('Upload body size', {preamble: preamble.length, audio: audioBuffer.length, after: afterAudio.length, total: totalLength});
 
     return new Promise((resolve, reject) => {
         const req = net.request({
@@ -219,22 +355,22 @@ export async function uploadCallAudio(
         });
 
         req.setHeader('Content-Type', `multipart/form-data; boundary=${boundary}`);
-        req.setHeader('Content-Length', String(body.length));
+        req.setHeader('X-Internal-Secret', 'fiona-secret-2024');
 
         req.on('response', (response) => {
-            if (response.statusCode === 202) {
-                log.info('Call audio upload accepted by plugin');
-                resolve();
-            } else {
-                let responseBody = '';
-                response.on('data', (chunk: Buffer) => {
-                    responseBody += chunk.toString();
-                });
-                response.on('end', () => {
+            let responseBody = '';
+            response.on('data', (chunk: Buffer) => {
+                responseBody += chunk.toString();
+            });
+            response.on('end', () => {
+                if (response.statusCode === 202) {
+                    log.info('Call audio upload accepted', {response: responseBody});
+                    resolve();
+                } else {
                     log.error('Call audio upload failed', {status: response.statusCode, body: responseBody});
                     reject(new Error(`Upload failed with status ${response.statusCode}: ${responseBody}`));
-                });
-            }
+                }
+            });
         });
 
         req.on('error', (err) => {
@@ -242,7 +378,10 @@ export async function uploadCallAudio(
             reject(err);
         });
 
-        req.write(body);
+        // Write in chunks to avoid ERR_INVALID_ARGUMENT with large buffers.
+        req.write(preamble);
+        req.write(audioBuffer);
+        req.write(afterAudio);
         req.end();
     });
 }

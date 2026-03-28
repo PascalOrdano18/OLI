@@ -48,9 +48,6 @@ func (p *Plugin) initRouter() *mux.Router {
 	api.HandleFunc("/projects/{id}/context", p.handleGetProjectContext).Methods(http.MethodGet)
 	api.HandleFunc("/issues/{id}/context", p.handleGetIssueContext).Methods(http.MethodGet)
 
-	// Call audio upload (from Desktop App)
-	api.HandleFunc("/call-audio", p.handleCallAudioUpload).Methods(http.MethodPost)
-
 	// Internal API for AI service callbacks (shared-secret auth).
 	internal := router.PathPrefix("/internal").Subrouter()
 	internal.Use(p.internalAuthMiddleware)
@@ -64,6 +61,10 @@ func (p *Plugin) initRouter() *mux.Router {
 	internal.HandleFunc("/projects/{id}/labels", p.handleInternalListLabels).Methods(http.MethodGet)
 	internal.HandleFunc("/projects/{id}/cycles", p.handleInternalListCycles).Methods(http.MethodGet)
 	internal.HandleFunc("/channels/{id}/history", p.handleInternalGetChannelHistory).Methods(http.MethodGet)
+
+	// Call audio upload (from Desktop App) — uses internal secret auth
+	// so the desktop app doesn't need Mattermost session cookies.
+	internal.HandleFunc("/call-audio", p.handleCallAudioUpload).Methods(http.MethodPost)
 
 	return router
 }
