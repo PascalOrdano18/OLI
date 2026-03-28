@@ -94,6 +94,8 @@ ${existingIssuesSection}
 
 Analyze this conversation and take appropriate action. If the conversation seems to reference earlier context or is unclear without prior messages, use get_channel_history with the channel ID above.`;
 
+    console.log(`[AI Agent] Prompt:\n${prompt}`);
+
     const result = await generateText({
         model: openai('gpt-4o-mini'),
         tools,
@@ -104,16 +106,28 @@ Analyze this conversation and take appropriate action. If the conversation seems
         onStepFinish: (step) => {
             if (step.toolCalls?.length) {
                 for (const tc of step.toolCalls) {
-                    console.log(`[AI Agent] Tool call: ${tc.toolName}(${JSON.stringify(tc.args).substring(0, 200)})`);
+                    console.log(`[AI Agent] Tool call: ${tc.toolName}(${JSON.stringify(tc.args).substring(0, 500)})`);
                 }
+            }
+            if (step.toolResults?.length) {
+                for (const tr of step.toolResults) {
+                    console.log(`[AI Agent] Tool result [${tr.toolName}]: ${JSON.stringify(tr.result).substring(0, 500)}`);
+                }
+            }
+            if (step.text) {
+                console.log(`[AI Agent] AI text: ${step.text.substring(0, 500)}`);
             }
         },
     });
+
+    console.log(`[AI Agent] Final response: ${result.text?.substring(0, 500)}`);
 
     const actionsTaken = result.steps
         .flatMap((s) => s.toolCalls || [])
         .filter((tc) => tc.toolName === 'create_issue' || tc.toolName === 'update_issue')
         .length;
+
+    console.log(`[AI Agent] Actions taken: ${actionsTaken}`);
 
     return {
         summary: result.text,

@@ -230,6 +230,35 @@ type UpdateCycleRequest struct {
 	IsActive  *bool   `json:"is_active,omitempty"`
 }
 
+// CompanyInfo holds high-level metadata about the company, repository, and current state.
+type CompanyInfo struct {
+	Company    CompanyDetails    `json:"company"`
+	Repository RepositoryDetails `json:"repository"`
+	State      CurrentState      `json:"current_state"`
+}
+
+type CompanyDetails struct {
+	Name        string   `json:"name"`
+	Mission     string   `json:"mission"`
+	Description string   `json:"description"`
+	TeamMembers []string `json:"team_members"`
+}
+
+type RepositoryDetails struct {
+	URL         string   `json:"url"`
+	Description string   `json:"description"`
+	TechStack   []string `json:"tech_stack"`
+	MainBranch  string   `json:"main_branch"`
+}
+
+type CurrentState struct {
+	Summary        string `json:"summary"`
+	Phase          string `json:"phase"`
+	ActiveProjects int    `json:"active_projects"`
+	TotalIssues    int    `json:"total_issues"`
+	OpenIssues     int    `json:"open_issues"`
+}
+
 func nowMillis() int64 {
 	return time.Now().UnixMilli()
 }
