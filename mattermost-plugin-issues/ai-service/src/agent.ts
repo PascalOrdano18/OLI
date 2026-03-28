@@ -144,18 +144,17 @@ Analyze this conversation and take appropriate action. If the conversation seems
             }
             if (step.toolResults?.length) {
                 for (const tr of step.toolResults) {
-                    console.log(`[AI Agent] Tool result for ${tr.toolName}: ${JSON.stringify(tr.result).substring(0, 500)}`);
+                    console.log(`[AI Agent] Tool result [${tr.toolName}]: ${JSON.stringify(tr.result).substring(0, 500)}`);
                 }
+            }
+            if (step.text) {
+                console.log(`[AI Agent] AI text: ${step.text.substring(0, 500)}`);
             }
         },
     });
 
-    console.log(`[AI Agent] GPT response text: ${result.text?.substring(0, 500)}`);
+    console.log(`[AI Agent] Final response: ${result.text?.substring(0, 500)}`);
     console.log(`[AI Agent] Total steps: ${result.steps.length}`);
-    for (let i = 0; i < result.steps.length; i++) {
-        const s = result.steps[i];
-        console.log(`[AI Agent] Step ${i}: toolCalls=${s.toolCalls?.length || 0}, text=${s.text?.substring(0, 100) || '(none)'}`);
-    }
 
     const allToolCalls = result.steps.flatMap((s) => s.toolCalls || []);
     console.log(`[AI Agent] All tool calls: ${allToolCalls.map(tc => tc.toolName).join(', ') || 'NONE'}`);

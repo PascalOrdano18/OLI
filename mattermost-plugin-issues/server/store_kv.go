@@ -21,6 +21,7 @@ const (
 	keyCyclePrefix    = "cycle:"
 	keyCycleIndex     = "cycle_index:"
 	keyProjectCounter = "project_counter:"
+	keyCompanyInfo    = "company_info"
 
 	maxAtomicRetries = 5
 )
@@ -183,6 +184,24 @@ func (s *KVStore) nextIssueNumber(projectID string) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("nextIssueNumber %s: max retries exceeded", projectID)
+}
+
+// --- Company Info ---
+
+func (s *KVStore) GetCompanyInfo() (*CompanyInfo, error) {
+	var info CompanyInfo
+	found, err := s.get(keyCompanyInfo, &info)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return &info, nil
+}
+
+func (s *KVStore) SetCompanyInfo(info *CompanyInfo) error {
+	return s.set(keyCompanyInfo, info)
 }
 
 // --- Projects ---
