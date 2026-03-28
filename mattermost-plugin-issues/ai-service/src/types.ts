@@ -84,3 +84,16 @@ export interface IssueListResponse {
     issues: Issue[];
     total_count: number;
 }
+
+export interface ChannelHistoryMessage {
+    user_id: string;
+    username: string;
+    message: string;
+    create_at: number;
+}
+
+export interface ChannelHistoryResponse {
+    channel_id: string;
+    messages: ChannelHistoryMessage[];
+    count: number;
+}

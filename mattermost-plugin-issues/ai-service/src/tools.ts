@@ -137,6 +137,27 @@ export function createTools(client: PluginClient) {
             }),
         }),
 
+        get_channel_history: tool({
+            description: 'Fetch previous messages from the same channel where the conversation happened. Use this when the conversation transcript seems to reference earlier context that you don\'t have — for example, if people say "like we discussed earlier", "as I said before", or the topic doesn\'t make sense without prior context. Returns messages in chronological order.',
+            parameters: z.object({
+                channel_id: z.string().describe('The channel ID (provided in the conversation metadata)'),
+                limit: z.number().optional().default(30).describe('Number of messages to fetch (default 30, max 200)'),
+                before: z.number().optional().describe('Only return messages created before this epoch-ms timestamp. Use the earliest timestamp from the current transcript to get messages that came before it.'),
+            }),
+            execute: safe(async ({ channel_id, limit, before }) => {
+                const result = await client.getChannelHistory(channel_id, limit, before);
+                return {
+                    channel_id: result.channel_id,
+                    count: result.count,
+                    messages: result.messages.map((m) => ({
+                        username: m.username,
+                        message: m.message,
+                        timestamp: m.create_at,
+                    })),
+                };
+            }),
+        }),
+
         update_issue: tool({
             description: 'Update an existing issue with new information from the conversation. Use this to append details, change status, or adjust priority.',
             parameters: z.object({
