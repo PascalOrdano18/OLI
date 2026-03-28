@@ -54,6 +54,7 @@ func (p *Plugin) initRouter() *mux.Router {
 	internal.HandleFunc("/issues/{id}", p.handleInternalUpdateIssue).Methods(http.MethodPut)
 	internal.HandleFunc("/projects/{id}/labels", p.handleInternalListLabels).Methods(http.MethodGet)
 	internal.HandleFunc("/projects/{id}/cycles", p.handleInternalListCycles).Methods(http.MethodGet)
+	internal.HandleFunc("/channels/{id}/history", p.handleInternalGetChannelHistory).Methods(http.MethodGet)
 
 	return router
 }

@@ -14,11 +14,16 @@ When a conversation ends, you review the transcript and determine if any actiona
 
 Your workflow:
 1. Read the conversation carefully.
-2. If there's nothing actionable (casual chat, greetings, etc.), respond with a brief note and take no action.
-3. If there are actionable items, first list_projects to see what projects exist.
-4. Then search_all_issues to check if related issues already exist.
-5. If a related issue exists, get its full details with get_issue and update it with new information using update_issue. When updating descriptions, preserve existing content and append the new information.
-6. If no related issue exists, create a new one with create_issue.
+2. If the conversation references earlier context you don't have (e.g. "like we said", "continuing from before", pronouns without antecedents, or the topic is unclear), use get_channel_history to fetch prior messages from the same channel. Pass the earliest message timestamp as the "before" parameter to get messages that preceded this conversation.
+3. If there's nothing actionable (casual chat, greetings, etc.), respond with a brief note and take no action.
+4. Review the EXISTING ISSUES provided below the transcript. This is the complete list of all issues across all projects. You MUST check this list carefully before creating anything.
+5. If an existing issue covers the same TOPIC, AREA, or FEATURE — even if the exact wording differs — update it with update_issue. When updating descriptions, preserve existing content and append the new information under a "---" separator with a date.
+6. Only create a new issue with create_issue if you are CERTAIN that no existing issue is related. Think broadly: "file extension whitelist" is related to "file upload validation"; "token expiry handling" is related to "token lifecycle". When in doubt, update the existing issue rather than creating a duplicate.
+
+CRITICAL RULE — NO DUPLICATES:
+- Two issues about the same feature, component, or area are duplicates even if they describe different aspects.
+- Before creating, ask yourself: "Is there ANY existing issue that a human would consider related?" If yes, update it instead.
+- A new issue should only be created for a genuinely NEW topic not covered by any existing issue.
 
 Guidelines:
 - Be judicious. Only create/update issues for genuinely actionable information.
@@ -51,16 +56,42 @@ export async function analyzeConversation(request: AnalyzeRequest): Promise<Anal
         })
         .join('\n');
 
+    // Pre-fetch all existing issues so the model can see them before deciding.
+    let existingIssuesSection = '';
+    try {
+        const projects = await client.listProjects();
+        const issueLines: string[] = [];
+        for (const project of projects) {
+            const result = await client.listIssues(project.id);
+            for (const issue of result.issues) {
+                const desc = issue.description.length > 150
+                    ? issue.description.substring(0, 150) + '...'
+                    : issue.description;
+                issueLines.push(`- **${issue.identifier}** (id: ${issue.id}, project: ${project.name}): ${issue.title} [${issue.status}] [${issue.priority}]\n  ${desc}`);
+            }
+        }
+        if (issueLines.length > 0) {
+            existingIssuesSection = `\n\n---\n**EXISTING ISSUES (${issueLines.length} total — check these BEFORE creating anything):**\n${issueLines.join('\n')}`;
+        } else {
+            existingIssuesSection = '\n\n---\n**EXISTING ISSUES:** None yet.';
+        }
+    } catch (err) {
+        console.error('[AI Agent] Failed to pre-fetch issues:', err);
+        existingIssuesSection = '\n\n---\n**EXISTING ISSUES:** Could not fetch — use list_projects and search_all_issues to check manually.';
+    }
+
     const prompt = `A ${channelTypeLabel} conversation just ended.
 
+**Channel ID:** ${conversation.channel_id}
 **Participants:** ${participantList}
 **Duration:** ${Math.round(conversation.duration_seconds / 60)} minutes
 **Messages:** ${conversation.messages.length}
 
 **Transcript:**
 ${transcript}
+${existingIssuesSection}
 
-Analyze this conversation and take appropriate action.`;
+Analyze this conversation and take appropriate action. If the conversation seems to reference earlier context or is unclear without prior messages, use get_channel_history with the channel ID above.`;
 
     const result = await generateText({
         model: openai('gpt-4o-mini'),

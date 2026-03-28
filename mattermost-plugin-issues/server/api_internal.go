@@ -5,6 +5,8 @@ package main
 
 import (
 	"net/http"
+	"sort"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -210,4 +212,108 @@ func (p *Plugin) handleInternalListCycles(w http.ResponseWriter, r *http.Request
 		return
 	}
 	respondJSON(w, http.StatusOK, cycles)
+}
+
+// channelHistoryMessage is a single message returned by the channel history endpoint.
+type channelHistoryMessage struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Message  string `json:"message"`
+	// CreateAt is the post creation time in epoch milliseconds.
+	CreateAt int64 `json:"create_at"`
+}
+
+// handleInternalGetChannelHistory returns recent messages from a channel.
+// Query params:
+//   - limit: max messages to return (default 50, max 200)
+//   - before: only return messages created before this epoch‐ms timestamp
+func (p *Plugin) handleInternalGetChannelHistory(w http.ResponseWriter, r *http.Request) {
+	channelID := mux.Vars(r)["id"]
+	q := r.URL.Query()
+
+	limit := 50
+	if l := q.Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	beforeTS := int64(0)
+	if b := q.Get("before"); b != "" {
+		if parsed, err := strconv.ParseInt(b, 10, 64); err == nil {
+			beforeTS = parsed
+		}
+	}
+
+	// Fetch posts. The plugin API returns a PostList which we flatten.
+	postList, appErr := p.API.GetPostsForChannel(channelID, 0, limit*2)
+	if appErr != nil {
+		respondError(w, http.StatusInternalServerError, appErr.Error())
+		return
+	}
+
+	// Build a sorted slice of posts (oldest first).
+	type postEntry struct {
+		id       string
+		createAt int64
+	}
+	entries := make([]postEntry, 0, len(postList.Posts))
+	for id, post := range postList.Posts {
+		entries = append(entries, postEntry{id: id, createAt: post.CreateAt})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].createAt < entries[j].createAt
+	})
+
+	// Resolve usernames in bulk.
+	userIDs := make(map[string]bool)
+	for _, post := range postList.Posts {
+		userIDs[post.UserId] = true
+	}
+	idList := make([]string, 0, len(userIDs))
+	for id := range userIDs {
+		idList = append(idList, id)
+	}
+	usernameMap := make(map[string]string)
+	if users, err := p.API.GetUsersByIds(idList); err == nil {
+		for _, u := range users {
+			usernameMap[u.Id] = u.Username
+		}
+	}
+
+	// Build the response, applying the "before" filter and limit.
+	messages := make([]channelHistoryMessage, 0, limit)
+	for _, entry := range entries {
+		if beforeTS > 0 && entry.createAt >= beforeTS {
+			continue
+		}
+		post := postList.Posts[entry.id]
+		if post.Message == "" {
+			continue
+		}
+		username := usernameMap[post.UserId]
+		if username == "" {
+			username = post.UserId
+		}
+		messages = append(messages, channelHistoryMessage{
+			UserID:   post.UserId,
+			Username: username,
+			Message:  post.Message,
+			CreateAt: post.CreateAt,
+		})
+	}
+
+	// Trim to the requested limit (keep the most recent ones).
+	if len(messages) > limit {
+		messages = messages[len(messages)-limit:]
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"channel_id": channelID,
+		"messages":   messages,
+		"count":      len(messages),
+	})
 }
