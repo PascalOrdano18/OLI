@@ -288,7 +288,7 @@ func (p *Plugin) MessageHasBeenPosted(_ *plugin.Context, post *model.Post) {
 
 	// Handle @oli mentions.
 	if containsOliMention(post.Message) {
-		p.handleOliMention(post)
+		p.handleOliChat(post, true)
 		return
 	}
 
@@ -299,7 +299,7 @@ func (p *Plugin) MessageHasBeenPosted(_ *plugin.Context, post *model.Post) {
 		if membErr == nil {
 			for _, m := range members {
 				if m.UserId == p.oliAgentUserID {
-					p.handleOliMention(post)
+					p.handleOliChat(post, false)
 					return
 				}
 			}
@@ -327,9 +327,11 @@ func containsOliMention(message string) bool {
 	return true
 }
 
-// handleOliMention sends the user's question to the AI service and posts
-// Oli's response back in the same channel/thread.
-func (p *Plugin) handleOliMention(post *model.Post) {
+// handleOliChat sends the user's question to the AI service and posts
+// Oli's response back in the same channel/thread. When stripMention is true,
+// it removes the @oli mention from the message; when false (DMs), it uses
+// the full message as-is.
+func (p *Plugin) handleOliChat(post *model.Post, stripMention bool) {
 	p.configLock.RLock()
 	config := p.config
 	client := p.aiClient
@@ -339,11 +341,13 @@ func (p *Plugin) handleOliMention(post *model.Post) {
 		return
 	}
 
-	// Strip @oli mention from the message to get the question.
 	message := post.Message
-	lower := strings.ToLower(message)
-	if idx := strings.Index(lower, "@oli"); idx >= 0 {
-		message = message[:idx] + message[idx+4:]
+	if stripMention {
+		// Strip @oli mention from the message to get the question.
+		lower := strings.ToLower(message)
+		if idx := strings.Index(lower, "@oli"); idx >= 0 {
+			message = message[:idx] + message[idx+4:]
+		}
 	}
 	message = strings.TrimSpace(message)
 	if message == "" {
@@ -375,8 +379,9 @@ func (p *Plugin) handleOliMention(post *model.Post) {
 	oliUserID := p.oliAgentUserID
 	channelID := post.ChannelId
 	rootID := post.RootId
-	if rootID == "" && post.Id != "" {
-		// If the mention is a top-level post, reply in a thread under it.
+	if stripMention && rootID == "" && post.Id != "" {
+		// If the mention is a top-level post in a channel, reply in a thread under it.
+		// In DMs (!stripMention), reply directly without threading.
 		rootID = post.Id
 	}
 
