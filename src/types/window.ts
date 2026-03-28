@@ -151,6 +151,19 @@ declare global {
                 onToggleLoadingScreenVisibility: (listener: (toggle: boolean) => void) => void;
             };
 
+            ao: {
+                pickRepoPath: (serverId: string, projectId: string) => Promise<string | null>;
+                spawnSession: (projectId: string, projectName: string, sessionPrefix: string, issue: {id: string; identifier: string; title: string; description: string}, userPrompt: string) => Promise<string>;
+                sendMessage: (projectId: string, message: string) => Promise<void>;
+                sendRawInput: (projectId: string, input: string) => Promise<void>;
+                resizeTerminal: (projectId: string, cols: number, rows: number) => Promise<void>;
+                killSession: (projectId: string) => Promise<void>;
+                getSessionStatus: (projectId: string) => Promise<{sessionId: string | null; hasRepoPath: boolean; repoPath: string | null}>;
+                onOutputUpdate: (cb: (data: {screen: string}) => void) => void;
+                offOutputUpdate: (cb: (data: {screen: string}) => void) => void;
+                openTerminal: (projectId: string) => Promise<void>;
+            };
+
             downloadsDropdown: {
                 requestInfo: () => void;
                 sendSize: (width: number, height: number) => void;

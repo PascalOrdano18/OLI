@@ -2,6 +2,9 @@
 // See LICENSE.txt for license information.
 
 import React, {useEffect, useState, useCallback, useRef} from 'react';
+import {Terminal} from 'xterm';
+import {FitAddon} from 'xterm-addon-fit';
+import 'xterm/css/xterm.css';
 
 import './IssuesView.scss';
 
@@ -9,7 +12,7 @@ import './IssuesView.scss';
 
 type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'cancelled';
 type IssuePriority = 'urgent' | 'high' | 'medium' | 'low' | 'none';
-type GroupBy = 'status' | 'priority' | 'cycle' | 'none';
+type GroupBy = 'status' | 'priority' | 'none';
 type SubTab = 'agents' | 'diff' | 'docs';
 
 interface Project { id: string; name: string; prefix: string; next_issue_number: number }
@@ -19,8 +22,7 @@ interface Issue {
     cycle_id: string; estimate_hours: number; sort_order: number;
 }
 interface IssueLabel { id: string; name: string; color: string }
-interface Cycle { id: string; name: string; is_active: boolean }
-interface IssueFilters { status?: IssueStatus; priority?: IssuePriority; cycleId?: string; searchQuery?: string; groupBy: GroupBy }
+interface IssueFilters { status?: IssueStatus; priority?: IssuePriority; searchQuery?: string; groupBy: GroupBy }
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -53,11 +55,7 @@ function api<T>(method: string, path: string, body?: unknown): Promise<T> {
 // ── Sidebar sub-components ─────────────────────────────────────────────────
 
 const PriorityIcon: React.FC<{priority: IssuePriority}> = ({priority}) => (
-    <span
-        className='IV__priorityIcon'
-        title={PRIORITY_LABELS[priority]}
-        style={{color: PRIORITY_COLORS[priority]}}
-    >
+    <span className='IV__priorityIcon' title={PRIORITY_LABELS[priority]} style={{color: PRIORITY_COLORS[priority]}}>
         {PRIORITY_ICONS[priority]}
     </span>
 );
@@ -84,12 +82,38 @@ const LabelPill: React.FC<{label: IssueLabel}> = ({label}) => (
 const ProjectSelector: React.FC<{
     projects: Project[];
     activeProjectId: string;
+    serverId: string;
     onSelect: (id: string) => void;
     onCreate: (data: {name: string; prefix: string}) => void;
-}> = ({projects, activeProjectId, onSelect, onCreate}) => {
+    onRepoPicked: (path: string) => void;
+}> = ({projects, activeProjectId, serverId, onSelect, onCreate, onRepoPicked}) => {
     const [isCreating, setIsCreating] = useState(false);
     const [newName, setNewName] = useState('');
     const [newPrefix, setNewPrefix] = useState('');
+    const [repoPath, setRepoPath] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!activeProjectId) { return; }
+        window.desktop.ao.getSessionStatus(activeProjectId).then((s) => {
+            setRepoPath(s.repoPath);
+        }).catch(() => { /* ignore */ });
+    }, [activeProjectId]);
+
+    const handlePickRepo = async () => {
+        if (!activeProjectId) {
+            alert('Create a project first before linking a git repo.');
+            return;
+        }
+        try {
+            const picked = await window.desktop.ao.pickRepoPath(serverId, activeProjectId);
+            if (picked) {
+                setRepoPath(picked);
+                onRepoPicked(picked);
+            }
+        } catch (err) {
+            alert(`Failed to link repo: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    };
 
     const handleCreate = () => {
         if (newName.trim() && newPrefix.trim()) {
@@ -120,7 +144,12 @@ const ProjectSelector: React.FC<{
                 {projects.length === 0 && <option value=''>{'No projects'}</option>}
                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <button onClick={() => setIsCreating(true)} title='New project' className='IV__iconBtn'>{'+' }</button>
+            <button onClick={() => setIsCreating(true)} title='New project' className='IV__iconBtn'>{'+'}</button>
+            <button
+                onClick={handlePickRepo}
+                title={repoPath ? `Repo: ${repoPath}` : 'Link a local git repo'}
+                className={`IV__iconBtn${repoPath ? ' IV__iconBtn--active' : ''}`}
+            >{'📁'}</button>
         </div>
     );
 };
@@ -169,7 +198,7 @@ const IssueList: React.FC<{
     const getLabel = (key: string) => {
         if (groupBy === 'status') { return STATUS_LABELS[key as IssueStatus] || key; }
         if (groupBy === 'priority') { return PRIORITY_LABELS[key as IssuePriority] || key; }
-        return key === 'no_cycle' ? 'No Cycle' : key;
+        return key;
     };
     const getColor = (key: string) => {
         if (groupBy === 'status') { return STATUS_COLORS[key as IssueStatus] || '#8b95a1'; }
@@ -209,23 +238,128 @@ const IssueList: React.FC<{
     );
 };
 
+// ── IssueSidebar ───────────────────────────────────────────────────────────
+
+interface IssueSidebarProps {
+    projects: Project[];
+    activeProjectId: string;
+    serverId: string;
+    issues: Issue[];
+    labelsMap: Record<string, IssueLabel>;
+    filters: IssueFilters;
+    loading: boolean;
+    activeIssueId: string | null;
+    onSelectProject: (id: string) => void;
+    onCreateProject: (data: {name: string; prefix: string}) => void;
+    onNewIssue: () => void;
+    onClickIssue: (issue: Issue) => void;
+    onFiltersChange: (f: IssueFilters) => void;
+    onRepoPicked: (path: string) => void;
+}
+
+const IssueSidebar: React.FC<IssueSidebarProps> = ({
+    projects, activeProjectId, serverId, issues, labelsMap, filters, loading, activeIssueId,
+    onSelectProject, onCreateProject, onNewIssue, onClickIssue, onFiltersChange, onRepoPicked,
+}) => {
+    const filtered = issues.filter((issue) => {
+        if (filters.status && issue.status !== filters.status) { return false; }
+        if (filters.priority && issue.priority !== filters.priority) { return false; }
+        if (filters.searchQuery) {
+            const q = filters.searchQuery.toLowerCase();
+            if (!issue.title.toLowerCase().includes(q) && !issue.identifier?.toLowerCase().includes(q)) { return false; }
+        }
+        return true;
+    });
+
+    const groupedIssues = (() => {
+        const gb = filters.groupBy || 'status';
+        if (gb === 'none') { return {all: filtered}; }
+        const order = gb === 'status' ? STATUS_ORDER : PRIORITY_ORDER;
+        const map: Record<string, Issue[]> = {};
+        order.forEach((k) => { map[k] = []; });
+        filtered.forEach((issue) => {
+            const key = gb === 'status' ? issue.status : issue.priority;
+            if (!map[key]) { map[key] = []; }
+            map[key].push(issue);
+        });
+        return map;
+    })();
+
+    return (
+        <div className='IV__sidebar'>
+            <div className='IV__sidebarHeader'>
+                <ProjectSelector
+                    projects={projects}
+                    activeProjectId={activeProjectId}
+                    serverId={serverId}
+                    onSelect={onSelectProject}
+                    onCreate={onCreateProject}
+                    onRepoPicked={onRepoPicked}
+                />
+                <button
+                    onClick={onNewIssue}
+                    disabled={!activeProjectId}
+                    className={`IV__btn IV__btn--primary IV__btn--sm${!activeProjectId ? ' IV__btn--disabled' : ''}`}
+                >{'+ New'}</button>
+            </div>
+            <div className='IV__sidebarFilters'>
+                <input
+                    type='text'
+                    placeholder='Search issues...'
+                    value={filters.searchQuery || ''}
+                    onChange={(e) => onFiltersChange({...filters, searchQuery: e.target.value})}
+                    className='IV__input IV__input--search'
+                />
+                <div className='IV__filterRow'>
+                    <select value={filters.status || ''} onChange={(e) => onFiltersChange({...filters, status: (e.target.value || undefined) as IssueStatus | undefined})} className='IV__filterSelect'>
+                        <option value=''>{'All stati'}</option>
+                        {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                    <select value={filters.priority || ''} onChange={(e) => onFiltersChange({...filters, priority: (e.target.value || undefined) as IssuePriority | undefined})} className='IV__filterSelect'>
+                        <option value=''>{'All prio'}</option>
+                        {Object.entries(PRIORITY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                    <label className='IV__groupByLabel'>
+                        {'Group:'}
+                        <select value={filters.groupBy} onChange={(e) => onFiltersChange({...filters, groupBy: e.target.value as GroupBy})} className='IV__filterSelect'>
+                            <option value='status'>{'Status'}</option>
+                            <option value='priority'>{'Priority'}</option>
+                            <option value='none'>{'None'}</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+            <div className='IV__sidebarList'>
+                {loading ? (
+                    <div className='IV__loading'>{'Loading...'}</div>
+                ) : (
+                    <IssueList
+                        groupedIssues={groupedIssues}
+                        labels={labelsMap}
+                        filters={filters}
+                        activeIssueId={activeIssueId}
+                        onClickIssue={onClickIssue}
+                    />
+                )}
+            </div>
+        </div>
+    );
+};
+
 // ── CreateIssueModal ───────────────────────────────────────────────────────
 
 const CreateIssueModal: React.FC<{
     issue?: Issue | null;
     labels: IssueLabel[];
-    cycles: Cycle[];
     onSave: (data: Partial<Issue>) => void;
     onDelete?: () => void;
     onClose: () => void;
-}> = ({issue, labels, cycles, onSave, onDelete, onClose}) => {
+}> = ({issue, labels, onSave, onDelete, onClose}) => {
     const [title, setTitle] = useState(issue?.title ?? '');
     const [description, setDescription] = useState(issue?.description ?? '');
     const [status, setStatus] = useState<IssueStatus>(issue?.status ?? 'backlog');
     const [priority, setPriority] = useState<IssuePriority>(issue?.priority ?? 'none');
     const [labelIds, setLabelIds] = useState<string[]>(issue?.label_ids ?? []);
-    const [cycleId, setCycleId] = useState(issue?.cycle_id ?? '');
-    const [estimateHours, setEstimateHours] = useState(issue?.estimate_hours ? String(issue.estimate_hours) : '');
 
     return (
         <div className='IV__modalBackdrop' onClick={onClose}>
@@ -257,21 +391,6 @@ const CreateIssueModal: React.FC<{
                             </select>
                         </div>
                     </div>
-                    <div className='IV__fieldRow'>
-                        <div className='IV__field'>
-                            <label className='IV__label'>{'Estimate (h)'}</label>
-                            <input type='number' value={estimateHours} onChange={(e) => setEstimateHours(e.target.value)} placeholder='0' min='0' step='0.5' className='IV__input'/>
-                        </div>
-                        {cycles.length > 0 && (
-                            <div className='IV__field'>
-                                <label className='IV__label'>{'Cycle'}</label>
-                                <select value={cycleId} onChange={(e) => setCycleId(e.target.value)} className='IV__input'>
-                                    <option value=''>{'None'}</option>
-                                    {cycles.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
-                            </div>
-                        )}
-                    </div>
                     {labels.length > 0 && (
                         <div className='IV__field'>
                             <label className='IV__label'>{'Labels'}</label>
@@ -295,7 +414,7 @@ const CreateIssueModal: React.FC<{
                     <div className='IV__modalActions'>
                         <button onClick={onClose} className='IV__btn IV__btn--ghost'>{'Cancel'}</button>
                         <button
-                            onClick={() => title.trim() && onSave({title: title.trim(), description, status, priority, label_ids: labelIds, cycle_id: cycleId || undefined, estimate_hours: estimateHours ? parseFloat(estimateHours) : undefined})}
+                            onClick={() => title.trim() && onSave({title: title.trim(), description, status, priority, label_ids: labelIds})}
                             disabled={!title.trim()}
                             className={`IV__btn IV__btn--primary${!title.trim() ? ' IV__btn--disabled' : ''}`}
                         >{issue ? 'Save' : 'Create'}</button>
@@ -306,308 +425,79 @@ const CreateIssueModal: React.FC<{
     );
 };
 
-// ── AgentsTab (chat + git + terminal) ─────────────────────────────────────
+// ── EmbeddedTerminal ───────────────────────────────────────────────────────
 
-const AgentsTab: React.FC<{activeIssue: Issue | null}> = ({activeIssue}) => (
-    <div className='IV__agentsTab'>
-        {/* Chat */}
-        <div className='IV__chat'>
-            <div className='IV__chatHeader'>
-                {activeIssue ? (
-                    <>
-                        <span className='IV__chatIssueId'>{activeIssue.identifier}</span>
-                        <span className='IV__chatIssueName'>{activeIssue.title}</span>
-                        <span className='IV__chatStatusBadge' style={{background: STATUS_COLORS[activeIssue.status] + '22', color: STATUS_COLORS[activeIssue.status], border: `1px solid ${STATUS_COLORS[activeIssue.status]}44`}}>
-                            {STATUS_LABELS[activeIssue.status]}
-                        </span>
-                    </>
-                ) : <span className='IV__chatPlaceholder'>{'Select an issue'}</span>}
-            </div>
-            <div className='IV__chatMessages'>
-                <div className='IV__chatWelcome'>
-                    {activeIssue ? (
-                        <>
-                            <div className='IV__chatWelcomeIcon'>{'💬'}</div>
-                            <div className='IV__chatWelcomeText'>{'Start the conversation about '}<strong>{activeIssue.identifier}</strong></div>
-                            {activeIssue.description && <div className='IV__chatDescription'>{activeIssue.description}</div>}
-                        </>
-                    ) : (
-                        <>
-                            <div className='IV__chatWelcomeIcon'>{'📋'}</div>
-                            <div className='IV__chatWelcomeText'>{'Select an issue from the sidebar to view its thread'}</div>
-                        </>
-                    )}
-                </div>
-            </div>
-            <div className='IV__chatInputRow'>
-                <input className='IV__chatInput' placeholder={activeIssue ? `Ask to make changes to ${activeIssue.identifier}...` : 'Select an issue to start...'} disabled={!activeIssue}/>
-                <div className='IV__chatInputMeta'><span className='IV__chatModel'>{'⌘L to focus'}</span></div>
-            </div>
-        </div>
+const EmbeddedTerminal: React.FC<{projectId: string}> = ({projectId}) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const termRef = useRef<Terminal | null>(null);
+    const fitRef = useRef<FitAddon | null>(null);
 
-        {/* Right column: git + terminal */}
-        <div className='IV__right'>
-            <div className='IV__git'>
-                <div className='IV__panelHeader'>
-                    <span className='IV__panelTitle'>{'Git status'}</span>
-                    <button className='IV__panelAction'>{'Create PR'}</button>
-                </div>
-                <div className='IV__gitBody'>
-                    <div className='IV__gitItem'><span className='IV__gitDot IV__gitDot--muted'/><span className='IV__gitItemLabel'>{'No PR open'}</span><button className='IV__gitLink'>{'Create PR'}</button></div>
-                    <div className='IV__gitItem'><span className='IV__gitDot IV__gitDot--warn'/><span className='IV__gitItemLabel'>{'Uncommitted changes'}</span><button className='IV__gitLink'>{'Commit'}</button></div>
-                    <div className='IV__gitItem'><span className='IV__gitDot IV__gitDot--info'/><span className='IV__gitItemLabel'>{'Behind master'}</span><button className='IV__gitLink'>{'Pull'}</button></div>
-                    <div className='IV__gitSection'><span className='IV__gitSectionLabel'>{'Your todos'}</span><button className='IV__gitLink'>{'+ Add'}</button></div>
-                    <div className='IV__gitEmpty'>{'No todos yet'}</div>
-                </div>
-            </div>
-            <div className='IV__terminal'>
-                <div className='IV__panelHeader'>
-                    <div className='IV__terminalTabs'>
-                        <button className='IV__terminalTab'>{'Setup'}</button>
-                        <button className='IV__terminalTab IV__terminalTab--active'>{'Run'}</button>
-                        <button className='IV__terminalTab'>{'Terminal'}</button>
-                        <button className='IV__terminalTab'>{'+'}</button>
-                    </div>
-                    <button className='IV__panelAction IV__panelAction--run'>{'▶ Run'}</button>
-                </div>
-                <div className='IV__terminalBody'>
-                    <span className='IV__terminalPrompt'>{'$'}</span>
-                    <span className='IV__terminalCursor'/>
-                </div>
-            </div>
-        </div>
-    </div>
-);
-
-// ── DiffTab ────────────────────────────────────────────────────────────────
-
-interface DiffFile {
-    path: string;
-    additions: number;
-    deletions: number;
-    collapsed: boolean;
-    hunks: DiffHunk[];
-}
-
-interface DiffHunk {
-    header: string;
-    lines: DiffLine[];
-}
-
-interface DiffLine {
-    type: 'context' | 'add' | 'remove' | 'hunk';
-    oldNum?: number;
-    newNum?: number;
-    content: string;
-}
-
-const HARDCODED_DIFF: DiffFile[] = [
-    {
-        path: 'src/renderer/components/IssuesView/IssuesView.tsx',
-        additions: 47,
-        deletions: 12,
-        collapsed: false,
-        hunks: [
-            {
-                header: '@@ -1,7 +1,7 @@ import React from \'react\';',
-                lines: [
-                    {type: 'context', oldNum: 1, newNum: 1, content: ' // Copyright (c) 2016-present Mattermost, Inc.'},
-                    {type: 'context', oldNum: 2, newNum: 2, content: ' // See LICENSE.txt for license information.'},
-                    {type: 'context', oldNum: 3, newNum: 3, content: ''},
-                    {type: 'remove', oldNum: 4, content: "-import React, { useState } from 'react';"},
-                    {type: 'add', newNum: 4, content: "+import React, { useEffect, useState, useCallback } from 'react';"},
-                    {type: 'context', oldNum: 5, newNum: 5, content: ''},
-                    {type: 'context', oldNum: 6, newNum: 6, content: " import './IssuesView.scss';"},
-                ],
+    useEffect(() => {
+        if (!containerRef.current) { return; }
+        const term = new Terminal({
+            theme: {
+                background: '#1e1e2e',
+                foreground: '#cdd6f4',
+                cursor: '#f5e0dc',
+                selectionBackground: '#45475a',
+                black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
+                blue: '#89b4fa', magenta: '#f5c2e7', cyan: '#94e2d5', white: '#bac2de',
+                brightBlack: '#585b70', brightRed: '#f38ba8', brightGreen: '#a6e3a1',
+                brightYellow: '#f9e2af', brightBlue: '#89b4fa', brightMagenta: '#f5c2e7',
+                brightCyan: '#94e2d5', brightWhite: '#a6adc8',
             },
-            {
-                header: '@@ -28,6 +28,24 @@ const STATUS_COLORS = {',
-                lines: [
-                    {type: 'context', oldNum: 28, newNum: 28, content: ' const STATUS_COLORS = {'},
-                    {type: 'remove', oldNum: 29, content: "-    backlog: '#909399',"},
-                    {type: 'remove', oldNum: 30, content: "-    in_progress: '#E6A23C',"},
-                    {type: 'add', newNum: 29, content: "+    backlog: '#8b95a1',"},
-                    {type: 'add', newNum: 30, content: "+    in_progress: '#f5a623',"},
-                    {type: 'context', oldNum: 31, newNum: 31, content: "     done: '#3dc779',"},
-                    {type: 'context', oldNum: 32, newNum: 32, content: ' };'},
-                    {type: 'context', oldNum: 33, newNum: 33, content: ''},
-                    {type: 'add', newNum: 34, content: '+const SubTabBar: React.FC<{active: SubTab; onChange: (t: SubTab) => void}> = ({active, onChange}) => ('},
-                    {type: 'add', newNum: 35, content: '+    <div className=\'IV__subTabs\'>'},
-                    {type: 'add', newNum: 36, content: '+        {([\'agents\', \'diff\', \'docs\'] as SubTab[]).map((t) => ('},
-                    {type: 'add', newNum: 37, content: '+            <button key={t} className={`IV__subTab${active === t ? \' IV__subTab--active\' : \'\'}`}'},
-                    {type: 'add', newNum: 38, content: '+                onClick={() => onChange(t)}>{t}</button>'},
-                    {type: 'add', newNum: 39, content: '+        ))}'},
-                    {type: 'add', newNum: 40, content: '+    </div>'},
-                    {type: 'add', newNum: 41, content: '+);'},
-                ],
-            },
-        ],
-    },
-    {
-        path: 'src/renderer/components/IssuesView/IssuesView.scss',
-        additions: 83,
-        deletions: 5,
-        collapsed: false,
-        hunks: [
-            {
-                header: '@@ -1,10 +1,18 @@ .IssuesView {',
-                lines: [
-                    {type: 'context', oldNum: 1, newNum: 1, content: ' .IssuesView {'},
-                    {type: 'context', oldNum: 2, newNum: 2, content: '     display: flex;'},
-                    {type: 'remove', oldNum: 3, content: '-    flex: 1;'},
-                    {type: 'add', newNum: 3, content: '+    flex: 1;  // fill parent height'},
-                    {type: 'context', oldNum: 4, newNum: 4, content: '     height: 100%;'},
-                    {type: 'context', oldNum: 5, newNum: 5, content: '     overflow: hidden;'},
-                    {type: 'add', newNum: 6, content: '+    background: var(--center-channel-bg);'},
-                    {type: 'add', newNum: 7, content: '+    color: var(--center-channel-color);'},
-                    {type: 'context', oldNum: 6, newNum: 8, content: ' }'},
-                ],
-            },
-        ],
-    },
-    {
-        path: 'src/common/communication.ts',
-        additions: 3,
-        deletions: 0,
-        collapsed: true,
-        hunks: [],
-    },
-];
+            fontFamily: '"Menlo", "Monaco", "Courier New", monospace',
+            fontSize: 13,
+            lineHeight: 1.3,
+            cursorBlink: true,
+            scrollback: 5000,
+            disableStdin: false,
+            allowTransparency: false,
+        });
+        const fit = new FitAddon();
+        term.loadAddon(fit);
+        term.open(containerRef.current);
+        fit.fit();
+        termRef.current = term;
+        fitRef.current = fit;
 
-const DiffFileBlock: React.FC<{file: DiffFile}> = ({file}) => {
-    const [collapsed, setCollapsed] = useState(file.collapsed);
+        // Sync terminal size to tmux on resize
+        const syncSize = () => {
+            if (!fitRef.current || !termRef.current) { return; }
+            fitRef.current.fit();
+            window.desktop.ao.resizeTerminal(projectId, termRef.current.cols, termRef.current.rows).catch(() => { /* ignore */ });
+        };
+        term.onResize(({cols, rows}) => {
+            window.desktop.ao.resizeTerminal(projectId, cols, rows).catch(() => { /* ignore */ });
+        });
 
-    const addBar = Math.min(5, file.additions);
-    const delBar = Math.min(5, file.deletions);
+        // Forward keystrokes to tmux
+        const inputDisposable = term.onData((input) => {
+            window.desktop.ao.sendRawInput(projectId, input).catch(() => { /* ignore */ });
+        });
 
-    return (
-        <div className='IV__diffFile'>
-            <div className='IV__diffFileHeader' onClick={() => setCollapsed((c) => !c)}>
-                <span className='IV__diffFileCaret'>{collapsed ? '▸' : '▾'}</span>
-                <span className='IV__diffFilePath'>{file.path}</span>
-                <div className='IV__diffFileMeta'>
-                    <span className='IV__diffAdd'>+{file.additions}</span>
-                    <span className='IV__diffDel'>-{file.deletions}</span>
-                    <div className='IV__diffBar'>
-                        {Array.from({length: 5}).map((_, i) => (
-                            <span key={i} className={`IV__diffBarCell ${i < addBar ? 'IV__diffBarCell--add' : i < addBar + delBar ? 'IV__diffBarCell--del' : 'IV__diffBarCell--empty'}`}/>
-                        ))}
-                    </div>
-                </div>
-                <div className='IV__diffFileActions'>
-                    <button className='IV__diffFileBtn' onClick={(e) => e.stopPropagation()}>{'⧉'}</button>
-                    <button className='IV__diffFileBtn' onClick={(e) => e.stopPropagation()}>{'⤢'}</button>
-                    <label className='IV__diffViewed' onClick={(e) => e.stopPropagation()}>
-                        <input type='checkbox'/>
-                        {'Viewed'}
-                    </label>
-                    <button className='IV__diffFileBtn' onClick={(e) => e.stopPropagation()}>{'💬'}</button>
-                    <button className='IV__diffFileBtn' onClick={(e) => e.stopPropagation()}>{'···'}</button>
-                </div>
-            </div>
-            {!collapsed && (
-                <div className='IV__diffHunks'>
-                    {file.hunks.map((hunk, hi) => (
-                        <div key={hi} className='IV__diffHunk'>
-                            <div className='IV__diffHunkHeader'>
-                                <span className='IV__diffHunkExpand'>{'⇡'}</span>
-                                <span className='IV__diffHunkHeaderText'>{hunk.header}</span>
-                                <span className='IV__diffHunkExpand'>{'⇣'}</span>
-                            </div>
-                            {hunk.lines.map((line, li) => (
-                                <div key={li} className={`IV__diffLine IV__diffLine--${line.type}`}>
-                                    <span className='IV__diffLineNum'>{line.oldNum ?? ''}</span>
-                                    <span className='IV__diffLineNum'>{line.newNum ?? ''}</span>
-                                    <span className='IV__diffLineSign'>
-                                        {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-                                    </span>
-                                    <span className='IV__diffLineContent'>{line.content}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
+        // Receive screen snapshot from main process
+        const handleOutput = (data: {screen: string}) => {
+            term.write('\x1b[H\x1b[J'); // cursor home + clear to end of screen (no scrollback wipe)
+            term.write(data.screen);
+        };
+        window.desktop.ao.onOutputUpdate(handleOutput);
 
-const DiffTab: React.FC = () => (
-    <div className='IV__diffTab'>
-        <div className='IV__diffHeader'>
-            <span className='IV__diffSummary'>{'3 files changed'}</span>
-            <span className='IV__diffSummaryAdd'>{'+133'}</span>
-            <span className='IV__diffSummaryDel'>{'-17'}</span>
-        </div>
-        <div className='IV__diffBody'>
-            {HARDCODED_DIFF.map((file) => <DiffFileBlock key={file.path} file={file}/>)}
-        </div>
-    </div>
-);
+        const ro = new ResizeObserver(syncSize);
+        if (containerRef.current) { ro.observe(containerRef.current); }
 
-// ── DocsTab ────────────────────────────────────────────────────────────────
+        // Initial size sync
+        syncSize();
 
-const DocsTab: React.FC<{issue: Issue | null; labelsMap: Record<string, IssueLabel>}> = ({issue, labelsMap}) => {
-    if (!issue) {
-        return (
-            <div className='IV__docsEmpty'>
-                <div className='IV__docsEmptyIcon'>{'📄'}</div>
-                <div className='IV__docsEmptyText'>{'Select an issue to view its document'}</div>
-            </div>
-        );
-    }
+        return () => {
+            inputDisposable.dispose();
+            window.desktop.ao.offOutputUpdate(handleOutput);
+            ro.disconnect();
+            term.dispose();
+        };
+    }, [projectId]);
 
-    const issueLabels = (issue.label_ids || []).map((id) => labelsMap[id]).filter(Boolean);
-
-    return (
-        <div className='IV__docs'>
-            <div className='IV__docsContent'>
-                <div className='IV__docsMeta'>
-                    <span className='IV__docsMetaItem IV__docsMetaItem--status' style={{background: STATUS_COLORS[issue.status] + '22', color: STATUS_COLORS[issue.status], border: `1px solid ${STATUS_COLORS[issue.status]}44`}}>
-                        {STATUS_LABELS[issue.status]}
-                    </span>
-                    <span className='IV__docsMetaItem IV__docsMetaItem--priority' style={{color: PRIORITY_COLORS[issue.priority]}}>
-                        {PRIORITY_ICONS[issue.priority]} {PRIORITY_LABELS[issue.priority]}
-                    </span>
-                    <span className='IV__docsMetaItem IV__docsMetaItem--id'>{issue.identifier}</span>
-                    {issueLabels.map((label) => (
-                        <span key={label.id} className='IV__docsMetaItem' style={{background: label.color + '22', color: label.color, border: `1px solid ${label.color}44`}}>{label.name}</span>
-                    ))}
-                    {issue.estimate_hours > 0 && (
-                        <span className='IV__docsMetaItem IV__docsMetaItem--estimate'>{'⏱ '}{issue.estimate_hours}{'h estimate'}</span>
-                    )}
-                </div>
-
-                <h1 className='IV__docsTitle'>{issue.title}</h1>
-
-                {issue.description ? (
-                    <div className='IV__docsSection'>
-                        <h2 className='IV__docsH2'>{'Overview'}</h2>
-                        <p className='IV__docsText'>{issue.description}</p>
-                    </div>
-                ) : (
-                    <div className='IV__docsSection'>
-                        <h2 className='IV__docsH2'>{'Overview'}</h2>
-                        <p className='IV__docsText IV__docsText--placeholder'>{'No description provided. Click to add one...'}</p>
-                    </div>
-                )}
-
-                <div className='IV__docsSection'>
-                    <h2 className='IV__docsH2'>{'Acceptance criteria'}</h2>
-                    <ul className='IV__docsList'>
-                        <li className='IV__docsListItem'>{'[ ] Define the expected behavior'}</li>
-                        <li className='IV__docsListItem'>{'[ ] Cover edge cases'}</li>
-                        <li className='IV__docsListItem'>{'[ ] Write tests'}</li>
-                    </ul>
-                </div>
-
-                <div className='IV__docsSection'>
-                    <h2 className='IV__docsH2'>{'Notes'}</h2>
-                    <p className='IV__docsText IV__docsText--placeholder'>{'Add implementation notes, links, or context here...'}</p>
-                </div>
-            </div>
-        </div>
-    );
+    return <div ref={containerRef} className='IV__terminal'/>;
 };
 
 // ── SubTabBar ──────────────────────────────────────────────────────────────
@@ -626,108 +516,259 @@ const SubTabBar: React.FC<{active: SubTab; onChange: (t: SubTab) => void}> = ({a
     </div>
 );
 
-// ── IssueSidebar (left panel, always visible) ─────────────────────────────
+// ── DiffTab ────────────────────────────────────────────────────────────────
 
-interface IssueSidebarProps {
-    projects: Project[];
-    activeProjectId: string;
-    issues: Issue[];
-    labelsMap: Record<string, IssueLabel>;
-    filters: IssueFilters;
-    loading: boolean;
-    activeIssueId: string | null;
-    onSelectProject: (id: string) => void;
-    onCreateProject: (data: {name: string; prefix: string}) => void;
-    onNewIssue: () => void;
-    onClickIssue: (issue: Issue) => void;
-    onFiltersChange: (f: IssueFilters) => void;
-    cycles: Cycle[];
-}
+interface DiffFile { path: string; additions: number; deletions: number; collapsed: boolean; hunks: DiffHunk[] }
+interface DiffHunk { header: string; lines: DiffLine[] }
+interface DiffLine { type: 'context' | 'add' | 'remove'; oldNum?: number; newNum?: number; content: string }
 
-const IssueSidebar: React.FC<IssueSidebarProps> = ({
-    projects, activeProjectId, issues, labelsMap, filters, loading, activeIssueId,
-    onSelectProject, onCreateProject, onNewIssue, onClickIssue, onFiltersChange, cycles,
-}) => {
-    const filtered = issues.filter((issue) => {
-        if (filters.status && issue.status !== filters.status) { return false; }
-        if (filters.priority && issue.priority !== filters.priority) { return false; }
-        if (filters.cycleId && issue.cycle_id !== filters.cycleId) { return false; }
-        if (filters.searchQuery) {
-            const q = filters.searchQuery.toLowerCase();
-            if (!issue.title.toLowerCase().includes(q) && !issue.identifier?.toLowerCase().includes(q)) { return false; }
-        }
-        return true;
-    });
+const HARDCODED_DIFF: DiffFile[] = [
+    {
+        path: 'src/renderer/components/IssuesView/IssuesView.tsx',
+        additions: 47, deletions: 12, collapsed: false,
+        hunks: [{
+            header: "@@ -1,7 +1,7 @@ import React from 'react';",
+            lines: [
+                {type: 'context', oldNum: 1, newNum: 1, content: ' // Copyright (c) 2016-present Mattermost, Inc.'},
+                {type: 'remove', oldNum: 4, content: "-import React, { useState } from 'react';"},
+                {type: 'add', newNum: 4, content: "+import React, { useEffect, useState, useCallback } from 'react';"},
+            ],
+        }],
+    },
+    {
+        path: 'src/common/communication.ts',
+        additions: 3, deletions: 0, collapsed: true, hunks: [],
+    },
+];
 
-    const groupedIssues = (() => {
-        const gb = filters.groupBy || 'status';
-        if (gb === 'none') { return {all: filtered}; }
-        const order = gb === 'status' ? STATUS_ORDER : gb === 'priority' ? PRIORITY_ORDER : [];
-        const map: Record<string, Issue[]> = {};
-        order.forEach((k) => { map[k] = []; });
-        filtered.forEach((issue) => {
-            const key = gb === 'status' ? issue.status : gb === 'priority' ? issue.priority : gb === 'cycle' ? (issue.cycle_id || 'no_cycle') : 'all';
-            if (!map[key]) { map[key] = []; }
-            map[key].push(issue);
-        });
-        return map;
-    })();
-
+const DiffFileBlock: React.FC<{file: DiffFile}> = ({file}) => {
+    const [collapsed, setCollapsed] = useState(file.collapsed);
+    const addBar = Math.min(5, file.additions);
+    const delBar = Math.min(5, file.deletions);
     return (
-        <div className='IV__sidebar'>
-            <div className='IV__sidebarHeader'>
-                <ProjectSelector
-                    projects={projects}
-                    activeProjectId={activeProjectId}
-                    onSelect={onSelectProject}
-                    onCreate={onCreateProject}
-                />
-                <button
-                    onClick={onNewIssue}
-                    disabled={!activeProjectId}
-                    className={`IV__btn IV__btn--primary IV__btn--sm${!activeProjectId ? ' IV__btn--disabled' : ''}`}
-                >{'+ New'}</button>
-            </div>
-            <div className='IV__sidebarFilters'>
-                <input
-                    type='text'
-                    placeholder='Search issues...'
-                    value={filters.searchQuery || ''}
-                    onChange={(e) => onFiltersChange({...filters, searchQuery: e.target.value})}
-                    className='IV__input IV__input--search'
-                />
-                <div className='IV__filterRow'>
-                    <select value={filters.status || ''} onChange={(e) => onFiltersChange({...filters, status: (e.target.value || undefined) as IssueStatus | undefined})} className='IV__filterSelect'>
-                        <option value=''>{'All stati'}</option>
-                        {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </select>
-                    <select value={filters.priority || ''} onChange={(e) => onFiltersChange({...filters, priority: (e.target.value || undefined) as IssuePriority | undefined})} className='IV__filterSelect'>
-                        <option value=''>{'All prio'}</option>
-                        {Object.entries(PRIORITY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </select>
-                    <label className='IV__groupByLabel'>
-                        {'Group:'}
-                        <select value={filters.groupBy} onChange={(e) => onFiltersChange({...filters, groupBy: e.target.value as GroupBy})} className='IV__filterSelect'>
-                            <option value='status'>{'Status'}</option>
-                            <option value='priority'>{'Priority'}</option>
-                            <option value='cycle'>{'Cycle'}</option>
-                            <option value='none'>{'None'}</option>
-                        </select>
-                    </label>
+        <div className='IV__diffFile'>
+            <div className='IV__diffFileHeader' onClick={() => setCollapsed((c) => !c)}>
+                <span className='IV__diffFileCaret'>{collapsed ? '▸' : '▾'}</span>
+                <span className='IV__diffFilePath'>{file.path}</span>
+                <div className='IV__diffFileMeta'>
+                    <span className='IV__diffAdd'>+{file.additions}</span>
+                    <span className='IV__diffDel'>-{file.deletions}</span>
+                    <div className='IV__diffBar'>
+                        {Array.from({length: 5}).map((_, i) => (
+                            <span key={i} className={`IV__diffBarCell ${i < addBar ? 'IV__diffBarCell--add' : i < addBar + delBar ? 'IV__diffBarCell--del' : 'IV__diffBarCell--empty'}`}/>
+                        ))}
+                    </div>
                 </div>
             </div>
-            <div className='IV__sidebarList'>
-                {loading ? (
-                    <div className='IV__loading'>{'Loading...'}</div>
-                ) : (
-                    <IssueList
-                        groupedIssues={groupedIssues}
-                        labels={labelsMap}
-                        filters={filters}
-                        activeIssueId={activeIssueId}
-                        onClickIssue={onClickIssue}
-                    />
-                )}
+            {!collapsed && file.hunks.map((hunk, hi) => (
+                <div key={hi} className='IV__diffHunk'>
+                    <div className='IV__diffHunkHeader'>{hunk.header}</div>
+                    {hunk.lines.map((line, li) => (
+                        <div key={li} className={`IV__diffLine IV__diffLine--${line.type}`}>
+                            <span className='IV__diffLineNum'>{line.oldNum ?? ''}</span>
+                            <span className='IV__diffLineNum'>{line.newNum ?? ''}</span>
+                            <span className='IV__diffLineSign'>{line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}</span>
+                            <span className='IV__diffLineContent'>{line.content}</span>
+                        </div>
+                    ))}
+                </div>
+            ))}
+        </div>
+    );
+};
+
+const DiffTab: React.FC = () => (
+    <div className='IV__diffTab'>
+        <div className='IV__diffHeader'>
+            <span className='IV__diffSummary'>{'2 files changed'}</span>
+            <span className='IV__diffSummaryAdd'>{'+50'}</span>
+            <span className='IV__diffSummaryDel'>{'-12'}</span>
+        </div>
+        <div className='IV__diffBody'>
+            {HARDCODED_DIFF.map((file) => <DiffFileBlock key={file.path} file={file}/>)}
+        </div>
+    </div>
+);
+
+// ── DocsTab ────────────────────────────────────────────────────────────────
+
+const DocsTab: React.FC<{issue: Issue | null; labelsMap: Record<string, IssueLabel>}> = ({issue, labelsMap}) => {
+    if (!issue) {
+        return (
+            <div className='IV__docsEmpty'>
+                <div className='IV__docsEmptyIcon'>{'📄'}</div>
+                <div>{'Select an issue to view its document'}</div>
+            </div>
+        );
+    }
+    const issueLabels = (issue.label_ids || []).map((id) => labelsMap[id]).filter(Boolean);
+    return (
+        <div className='IV__docs'>
+            <div className='IV__docsContent'>
+                <div className='IV__docsMeta'>
+                    <span className='IV__docsMetaItem' style={{background: STATUS_COLORS[issue.status] + '22', color: STATUS_COLORS[issue.status], border: `1px solid ${STATUS_COLORS[issue.status]}44`}}>
+                        {STATUS_LABELS[issue.status]}
+                    </span>
+                    <span className='IV__docsMetaItem' style={{color: PRIORITY_COLORS[issue.priority]}}>
+                        {PRIORITY_ICONS[issue.priority]} {PRIORITY_LABELS[issue.priority]}
+                    </span>
+                    <span className='IV__docsMetaItem IV__docsMetaItem--id'>{issue.identifier}</span>
+                    {issueLabels.map((label) => (
+                        <span key={label.id} className='IV__docsMetaItem' style={{background: label.color + '22', color: label.color, border: `1px solid ${label.color}44`}}>{label.name}</span>
+                    ))}
+                </div>
+                <h1 className='IV__docsTitle'>{issue.title}</h1>
+                <div className='IV__docsSection'>
+                    <h2 className='IV__docsH2'>{'Overview'}</h2>
+                    {issue.description ? (
+                        <p className='IV__docsText'>{issue.description}</p>
+                    ) : (
+                        <p className='IV__docsText IV__docsText--placeholder'>{'No description provided.'}</p>
+                    )}
+                </div>
+                <div className='IV__docsSection'>
+                    <h2 className='IV__docsH2'>{'Acceptance criteria'}</h2>
+                    <ul className='IV__docsList'>
+                        <li className='IV__docsListItem'>{'[ ] Define the expected behavior'}</li>
+                        <li className='IV__docsListItem'>{'[ ] Cover edge cases'}</li>
+                        <li className='IV__docsListItem'>{'[ ] Write tests'}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ── WorkArea ───────────────────────────────────────────────────────────────
+
+type AgentStatus = 'idle' | 'spawning' | 'running';
+
+const WorkArea: React.FC<{
+    activeIssue: Issue | null;
+    activeProjectId: string;
+    activeProject: Project | null;
+    hasRepoPath: boolean;
+}> = ({activeIssue, activeProjectId, activeProject, hasRepoPath}) => {
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
+    const [errorMsg, setErrorMsg] = useState('');
+    const [elapsedSecs, setElapsedSecs] = useState(0);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const spawningRef = useRef(false);
+
+    useEffect(() => {
+        if (!activeProjectId) { return; }
+        window.desktop.ao.getSessionStatus(activeProjectId).then((s) => {
+            if (s.sessionId) {
+                setSessionId(s.sessionId);
+                setAgentStatus('running');
+            }
+        }).catch(() => { /* ignore */ });
+    }, [activeProjectId]);
+
+    useEffect(() => {
+        setErrorMsg('');
+    }, [activeIssue?.id]);
+
+    useEffect(() => {
+        if (agentStatus === 'spawning' || agentStatus === 'running') {
+            setElapsedSecs(0);
+            timerRef.current = setInterval(() => setElapsedSecs((s) => s + 1), 1000);
+        } else {
+            if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+        }
+        return () => { if (timerRef.current) { clearInterval(timerRef.current); } };
+    }, [agentStatus]);
+
+    const handleSpawn = async () => {
+        if (!activeIssue || !activeProjectId || !hasRepoPath || spawningRef.current || sessionId) { return; }
+        spawningRef.current = true;
+        setErrorMsg('');
+        setAgentStatus('spawning');
+        try {
+            const newSessionId = await window.desktop.ao.spawnSession(
+                activeProjectId,
+                activeProject?.name ?? activeProjectId,
+                activeProject?.prefix ?? activeProjectId.slice(0, 4),
+                activeIssue,
+                activeIssue.description || activeIssue.title,
+            );
+            setSessionId(newSessionId);
+            setAgentStatus('running');
+        } catch (err) {
+            setAgentStatus('idle');
+            setErrorMsg(err instanceof Error ? err.message : String(err));
+        } finally {
+            spawningRef.current = false;
+        }
+    };
+
+    const handleKill = async () => {
+        try { await window.desktop.ao.killSession(activeProjectId); } catch { /* ignore */ }
+        setSessionId(null);
+        setAgentStatus('idle');
+    };
+
+    const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+    // No issue selected
+    if (!activeIssue) {
+        return (
+            <div className='IV__workArea'>
+                <div className='IV__workAreaEmpty'>
+                    <div className='IV__workAreaEmptyIcon'>{'←'}</div>
+                    <div>{'Select an issue to get started'}</div>
+                </div>
+            </div>
+        );
+    }
+
+    // No repo linked
+    if (!hasRepoPath) {
+        return (
+            <div className='IV__workArea'>
+                <div className='IV__workAreaEmpty'>
+                    <div className='IV__workAreaEmptyIcon'>{'📁'}</div>
+                    <div>{'Link a local git repo using the 📁 button'}</div>
+                </div>
+            </div>
+        );
+    }
+
+    // Agent running — show terminal
+    if (sessionId) {
+        return (
+            <div className='IV__workArea'>
+                <div className='IV__terminalHeader'>
+                    <span className='IV__terminalSessionId'>{sessionId}</span>
+                    <span className='IV__terminalPulse'>{'● running'}</span>
+                    <span className='IV__terminalTimer'>{fmtTime(elapsedSecs)}</span>
+                    <button className='IV__btn IV__btn--danger IV__btn--sm' onClick={handleKill}>{'■ Kill'}</button>
+                </div>
+                <EmbeddedTerminal projectId={activeProjectId}/>
+            </div>
+        );
+    }
+
+    // Spawn panel
+    return (
+        <div className='IV__workArea'>
+            <div className='IV__spawnPanel'>
+                <div className='IV__spawnIssueCard'>
+                    <span className='IV__spawnIssueId'>{activeIssue.identifier}</span>
+                    <h2 className='IV__spawnIssueTitle'>{activeIssue.title}</h2>
+                    {activeIssue.description && (
+                        <p className='IV__spawnIssueDesc'>{activeIssue.description}</p>
+                    )}
+                </div>
+                {errorMsg && <div className='IV__spawnError'>{errorMsg}</div>}
+                <button
+                    className='IV__btn IV__btn--primary IV__spawnBtn'
+                    onClick={handleSpawn}
+                    disabled={agentStatus === 'spawning'}
+                >
+                    {agentStatus === 'spawning' ? '⟳ Spawning agent...' : '▶ Spawn Agent'}
+                </button>
             </div>
         </div>
     );
@@ -738,14 +779,15 @@ const IssueSidebar: React.FC<IssueSidebarProps> = ({
 const IssuesView: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [activeProjectId, setActiveProjectId] = useState('');
+    const [serverId, setServerId] = useState('');
     const [issues, setIssues] = useState<Issue[]>([]);
     const [labelsMap, setLabelsMap] = useState<Record<string, IssueLabel>>({});
     const [labelsList, setLabelsList] = useState<IssueLabel[]>([]);
-    const [cycles, setCycles] = useState<Cycle[]>([]);
     const [filters, setFilters] = useState<IssueFilters>({groupBy: 'status'});
     const [loading, setLoading] = useState(true);
     const [modalIssue, setModalIssue] = useState<Issue | null | undefined>(undefined);
     const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
+    const [hasRepoPath, setHasRepoPath] = useState(false);
     const [subTab, setSubTab] = useState<SubTab>('agents');
     const initialized = useRef(false);
 
@@ -758,23 +800,33 @@ const IssuesView: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (!initialized.current) { initialized.current = true; fetchProjects(); }
+        if (!initialized.current) {
+            initialized.current = true;
+            fetchProjects();
+            window.desktop.getCurrentServer().then((s) => { if (s.id) { setServerId(s.id); } }).catch(() => { /* ignore */ });
+        }
     }, [fetchProjects]);
+
+    useEffect(() => {
+        if (!activeProjectId) { return; }
+        window.desktop.ao.getSessionStatus(activeProjectId).then((s) => {
+            setHasRepoPath(s.hasRepoPath);
+        }).catch(() => { /* ignore */ });
+    }, [activeProjectId]);
 
     useEffect(() => {
         if (!activeProjectId) { return; }
         (async () => {
             try {
-                const [issueResp, lbls, cycs] = await Promise.all([
+                const [issueResp, lbls] = await Promise.all([
                     api<{issues: Issue[]} | Issue[]>('GET', `/projects/${activeProjectId}/issues`),
                     api<IssueLabel[]>('GET', `/projects/${activeProjectId}/labels`),
-                    api<Cycle[]>('GET', `/projects/${activeProjectId}/cycles`),
                 ]);
                 const issueList = Array.isArray(issueResp) ? issueResp : (issueResp as any).issues || [];
                 setIssues(issueList);
                 const lmap: Record<string, IssueLabel> = {};
                 (lbls || []).forEach((l) => { lmap[l.id] = l; });
-                setLabelsMap(lmap); setLabelsList(lbls || []); setCycles(cycs || []);
+                setLabelsMap(lmap); setLabelsList(lbls || []);
             } catch { /* ignore */ }
         })();
     }, [activeProjectId]);
@@ -802,10 +854,10 @@ const IssuesView: React.FC = () => {
 
     return (
         <div className='IssuesView'>
-            {/* ── Left sidebar (always visible) ── */}
             <IssueSidebar
                 projects={projects}
                 activeProjectId={activeProjectId}
+                serverId={serverId}
                 issues={issues}
                 labelsMap={labelsMap}
                 filters={filters}
@@ -820,24 +872,33 @@ const IssuesView: React.FC = () => {
                 onNewIssue={() => setModalIssue(null)}
                 onClickIssue={(issue) => setActiveIssue((prev) => (prev?.id === issue.id ? null : issue))}
                 onFiltersChange={setFilters}
-                cycles={cycles}
+                onRepoPicked={() => setHasRepoPath(true)}
             />
 
-            {/* ── Main area with subtab bar ── */}
             <div className='IV__main'>
                 <SubTabBar active={subTab} onChange={setSubTab}/>
                 <div className='IV__mainContent'>
-                    {subTab === 'agents' && <AgentsTab activeIssue={activeIssue}/>}
+                    {subTab === 'agents' && (
+                        <WorkArea
+                            activeIssue={activeIssue}
+                            activeProjectId={activeProjectId}
+                            activeProject={projects.find((p) => p.id === activeProjectId) ?? null}
+                            hasRepoPath={hasRepoPath}
+                        />
+                    )}
                     {subTab === 'diff' && <DiffTab/>}
                     {subTab === 'docs' && <DocsTab issue={activeIssue} labelsMap={labelsMap}/>}
                 </div>
+            </div>
+
+            <div className='IV__rightSidebar'>
+                {/* Future: git control */}
             </div>
 
             {modalIssue !== undefined && (
                 <CreateIssueModal
                     issue={modalIssue}
                     labels={labelsList}
-                    cycles={cycles}
                     onSave={handleSaveIssue}
                     onDelete={modalIssue ? handleDeleteIssue : undefined}
                     onClose={() => setModalIssue(undefined)}

@@ -112,6 +112,16 @@ export const OPEN_CHANGELOG_LINK = 'open-changelog-link';
 
 export const PING_DOMAIN = 'ping-domain';
 
+export const AO_PICK_REPO_PATH = 'ao-pick-repo-path';
+export const AO_SPAWN_SESSION = 'ao-spawn-session';
+export const AO_SEND_MESSAGE = 'ao-send-message';
+export const AO_SEND_RAW_INPUT = 'ao-send-raw-input';
+export const AO_RESIZE_TERMINAL = 'ao-resize-terminal';
+export const AO_KILL_SESSION = 'ao-kill-session';
+export const AO_GET_SESSION_STATUS = 'ao-get-session-status';
+export const AO_OUTPUT_UPDATE = 'ao-output-update';
+export const AO_OPEN_TERMINAL = 'ao-open-terminal';
+
 export const GET_LANGUAGE_INFORMATION = 'get-language-information';
 export const GET_AVAILABLE_LANGUAGES = 'get-available-languages';
 

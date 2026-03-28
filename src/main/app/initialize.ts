@@ -39,7 +39,16 @@ import {
     SERVER_URL_CHANGED,
     GET_AUTH_TOKEN,
     ISSUES_API_REQUEST,
+    AO_PICK_REPO_PATH,
+    AO_SPAWN_SESSION,
+    AO_SEND_MESSAGE,
+    AO_SEND_RAW_INPUT,
+    AO_RESIZE_TERMINAL,
+    AO_KILL_SESSION,
+    AO_GET_SESSION_STATUS,
+    AO_OPEN_TERMINAL,
 } from 'common/communication';
+import aoManager from 'main/aoManager';
 import Config from 'common/config';
 import {MATTERMOST_PROTOCOL} from 'common/constants';
 import {Logger} from 'common/log';
@@ -333,6 +342,39 @@ function initializeInterCommunicationEventListeners() {
             return null;
         }
         return response.json();
+    });
+
+    ipcMain.handle(AO_PICK_REPO_PATH, (_event, serverId: string, projectId: string) => {
+        const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined;
+        return aoManager.pickRepoPath(serverId, projectId, win);
+    });
+
+    ipcMain.handle(AO_SPAWN_SESSION, (event, projectId: string, projectName: string, sessionPrefix: string, issue: {id: string; identifier: string; title: string; description: string}, userPrompt: string) => {
+        return aoManager.spawnSession(projectId, projectName, sessionPrefix, issue, userPrompt, event.sender);
+    });
+
+    ipcMain.handle(AO_SEND_MESSAGE, (_event, projectId: string, message: string) => {
+        return aoManager.sendMessage(projectId, message);
+    });
+
+    ipcMain.handle(AO_SEND_RAW_INPUT, (_event, projectId: string, input: string) => {
+        return aoManager.sendRawInput(projectId, input);
+    });
+
+    ipcMain.handle(AO_RESIZE_TERMINAL, (_event, projectId: string, cols: number, rows: number) => {
+        return aoManager.resizeTerminal(projectId, cols, rows);
+    });
+
+    ipcMain.handle(AO_KILL_SESSION, (_event, projectId: string) => {
+        return aoManager.killSession(projectId);
+    });
+
+    ipcMain.handle(AO_GET_SESSION_STATUS, (event, projectId: string) => {
+        return aoManager.getSessionStatus(projectId, event.sender);
+    });
+
+    ipcMain.handle(AO_OPEN_TERMINAL, (_event, projectId: string) => {
+        return aoManager.openTerminal(projectId);
     });
 }
 
