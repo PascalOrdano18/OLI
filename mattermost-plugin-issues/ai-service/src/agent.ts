@@ -8,9 +8,9 @@ import { createTools } from './tools';
 import { PluginClient } from './plugin-client';
 import type { AnalyzeRequest, AnalyzeResponse } from './types';
 
-const SYSTEM_PROMPT = `You are an AI assistant that analyzes team conversations to keep the issue tracker up-to-date.
+const SYSTEM_PROMPT = `You are an AI assistant that analyzes team conversations and audio call transcriptions to keep the issue tracker up-to-date.
 
-When a conversation ends, you review the transcript and determine if any actionable information was discussed — features, bugs, requirements, specifications, action items, decisions, or tasks.
+When a conversation ends — whether it was a text chat or an audio/video call — you review the transcript and determine if any actionable information was discussed — features, bugs, requirements, specifications, action items, decisions, or tasks.
 
 Your workflow:
 1. Read the conversation carefully.
@@ -34,7 +34,7 @@ Guidelines:
 - If no projects exist, report that you cannot create issues and suggest creating a project first.`;
 
 export async function analyzeConversation(request: AnalyzeRequest): Promise<AnalyzeResponse> {
-    const { conversation, callback_url, internal_secret, openai_api_key } = request;
+    const { conversation, call_transcription, callback_url, internal_secret, openai_api_key } = request;
 
     const client = new PluginClient(callback_url, internal_secret);
     const tools = createTools(client);
@@ -49,13 +49,6 @@ export async function analyzeConversation(request: AnalyzeRequest): Promise<Anal
     const participantList = conversation.participants
         .map((p) => `@${p.username}`)
         .join(', ');
-
-    const transcript = conversation.messages
-        .map((m) => {
-            const ts = new Date(m.timestamp).toLocaleTimeString('en-US', { hour12: false });
-            return `[${ts}] @${m.username}: ${m.message}`;
-        })
-        .join('\n');
 
     // Pre-fetch all existing issues so the model can see them before deciding.
     let existingIssuesSection = '';
@@ -81,7 +74,33 @@ export async function analyzeConversation(request: AnalyzeRequest): Promise<Anal
         existingIssuesSection = '\n\n---\n**EXISTING ISSUES:** Could not fetch — use list_projects and search_all_issues to check manually.';
     }
 
-    const prompt = `A ${channelTypeLabel} conversation just ended.
+    let prompt: string;
+
+    if (call_transcription) {
+        // Call transcription mode — audio call was transcribed via Whisper.
+        prompt = `An audio call just ended and was automatically transcribed.
+
+**Channel:** ${conversation.channel_name} (${channelTypeLabel})
+**Channel ID:** ${conversation.channel_id}
+**Participants:** ${participantList}
+
+**Call Transcription:**
+${call_transcription}
+${existingIssuesSection}
+
+Analyze this call transcription and take appropriate action. This is from an audio/video call, so the transcription may contain conversational speech patterns, filler words, and less formal language compared to text chat. Focus on extracting actionable items: feature requests, bug reports, decisions, task assignments, and requirements.
+
+If the transcription references earlier context or is unclear without prior messages, use get_channel_history with the channel ID above.`;
+    } else {
+        // Text conversation mode — the existing behavior.
+        const transcript = conversation.messages
+            .map((m) => {
+                const ts = new Date(m.timestamp).toLocaleTimeString('en-US', { hour12: false });
+                return `[${ts}] @${m.username}: ${m.message}`;
+            })
+            .join('\n');
+
+        prompt = `A ${channelTypeLabel} conversation just ended.
 
 **Channel ID:** ${conversation.channel_id}
 **Participants:** ${participantList}
@@ -93,6 +112,7 @@ ${transcript}
 ${existingIssuesSection}
 
 Analyze this conversation and take appropriate action. If the conversation seems to reference earlier context or is unclear without prior messages, use get_channel_history with the channel ID above.`;
+    }
 
     const result = await generateText({
         model: openai('gpt-4o-mini'),
