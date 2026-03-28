@@ -8,9 +8,9 @@ import { createTools } from './tools';
 import { PluginClient } from './plugin-client';
 import type { AnalyzeRequest, AnalyzeResponse } from './types';
 
-const SYSTEM_PROMPT = `You are an AI assistant that analyzes team conversations to keep the issue tracker up-to-date.
+const SYSTEM_PROMPT = `You are an AI assistant that analyzes team conversations and audio call transcriptions to keep the issue tracker up-to-date.
 
-When a conversation ends, you review the transcript and determine if any actionable information was discussed — features, bugs, requirements, specifications, action items, decisions, or tasks.
+When a conversation ends — whether it was a text chat or an audio/video call — you review the transcript and determine if any actionable information was discussed — features, bugs, requirements, specifications, action items, decisions, or tasks.
 
 Your workflow:
 1. Read the conversation carefully.
@@ -34,7 +34,14 @@ Guidelines:
 - If no projects exist, report that you cannot create issues and suggest creating a project first.`;
 
 export async function analyzeConversation(request: AnalyzeRequest): Promise<AnalyzeResponse> {
-    const { conversation, callback_url, internal_secret, openai_api_key } = request;
+    const { conversation, call_transcription, callback_url, internal_secret, openai_api_key } = request;
+
+    console.log(`[AI Agent] === ANALYZE START ===`);
+    console.log(`[AI Agent] callback_url=${callback_url}`);
+    console.log(`[AI Agent] internal_secret=${internal_secret ? '***' + internal_secret.slice(-4) : 'MISSING'}`);
+    console.log(`[AI Agent] openai_api_key=${openai_api_key ? '***' + openai_api_key.slice(-4) : 'MISSING'}`);
+    console.log(`[AI Agent] channel_id=${conversation.channel_id}, channel_type=${conversation.channel_type}`);
+    console.log(`[AI Agent] has call_transcription=${!!call_transcription}, messages=${conversation.messages.length}`);
 
     const client = new PluginClient(callback_url, internal_secret);
     const tools = createTools(client);
@@ -50,20 +57,16 @@ export async function analyzeConversation(request: AnalyzeRequest): Promise<Anal
         .map((p) => `@${p.username}`)
         .join(', ');
 
-    const transcript = conversation.messages
-        .map((m) => {
-            const ts = new Date(m.timestamp).toLocaleTimeString('en-US', { hour12: false });
-            return `[${ts}] @${m.username}: ${m.message}`;
-        })
-        .join('\n');
-
     // Pre-fetch all existing issues so the model can see them before deciding.
+    console.log(`[AI Agent] Pre-fetching projects and issues...`);
     let existingIssuesSection = '';
     try {
         const projects = await client.listProjects();
+        console.log(`[AI Agent] Found ${projects.length} projects:`, JSON.stringify(projects.map(p => ({ id: p.id, name: p.name, prefix: p.prefix }))));
         const issueLines: string[] = [];
         for (const project of projects) {
             const result = await client.listIssues(project.id);
+            console.log(`[AI Agent] Project "${project.name}" has ${result.issues.length} issues`);
             for (const issue of result.issues) {
                 const desc = issue.description.length > 150
                     ? issue.description.substring(0, 150) + '...'
@@ -77,11 +80,38 @@ export async function analyzeConversation(request: AnalyzeRequest): Promise<Anal
             existingIssuesSection = '\n\n---\n**EXISTING ISSUES:** None yet.';
         }
     } catch (err) {
-        console.error('[AI Agent] Failed to pre-fetch issues:', err);
+        console.error('[AI Agent] FAILED to pre-fetch issues:', err);
         existingIssuesSection = '\n\n---\n**EXISTING ISSUES:** Could not fetch — use list_projects and search_all_issues to check manually.';
     }
+    console.log(`[AI Agent] Existing issues section length: ${existingIssuesSection.length} chars`);
 
-    const prompt = `A ${channelTypeLabel} conversation just ended.
+    let prompt: string;
+
+    if (call_transcription) {
+        // Call transcription mode — audio call was transcribed via Whisper.
+        prompt = `An audio call just ended and was automatically transcribed.
+
+**Channel:** ${conversation.channel_name} (${channelTypeLabel})
+**Channel ID:** ${conversation.channel_id}
+**Participants:** ${participantList}
+
+**Call Transcription:**
+${call_transcription}
+${existingIssuesSection}
+
+Analyze this call transcription and take appropriate action. This is from an audio/video call, so the transcription may contain conversational speech patterns, filler words, and less formal language compared to text chat. Focus on extracting actionable items: feature requests, bug reports, decisions, task assignments, and requirements.
+
+If the transcription references earlier context or is unclear without prior messages, use get_channel_history with the channel ID above.`;
+    } else {
+        // Text conversation mode — the existing behavior.
+        const transcript = conversation.messages
+            .map((m) => {
+                const ts = new Date(m.timestamp).toLocaleTimeString('en-US', { hour12: false });
+                return `[${ts}] @${m.username}: ${m.message}`;
+            })
+            .join('\n');
+
+        prompt = `A ${channelTypeLabel} conversation just ended.
 
 **Channel ID:** ${conversation.channel_id}
 **Participants:** ${participantList}
@@ -93,8 +123,10 @@ ${transcript}
 ${existingIssuesSection}
 
 Analyze this conversation and take appropriate action. If the conversation seems to reference earlier context or is unclear without prior messages, use get_channel_history with the channel ID above.`;
+    }
 
-    console.log(`[AI Agent] Prompt:\n${prompt}`);
+    console.log(`[AI Agent] Sending prompt to GPT-4o-mini (${prompt.length} chars)...`);
+    console.log(`[AI Agent] === FULL PROMPT ===\n${prompt}\n=== END PROMPT ===`);
 
     const result = await generateText({
         model: openai('gpt-4o-mini'),
@@ -104,6 +136,7 @@ Analyze this conversation and take appropriate action. If the conversation seems
         prompt,
         toolChoice: 'auto',
         onStepFinish: (step) => {
+            console.log(`[AI Agent] Step finished: toolCalls=${step.toolCalls?.length || 0}, text=${step.text?.substring(0, 200) || '(none)'}`);
             if (step.toolCalls?.length) {
                 for (const tc of step.toolCalls) {
                     console.log(`[AI Agent] Tool call: ${tc.toolName}(${JSON.stringify(tc.args).substring(0, 500)})`);
@@ -121,13 +154,16 @@ Analyze this conversation and take appropriate action. If the conversation seems
     });
 
     console.log(`[AI Agent] Final response: ${result.text?.substring(0, 500)}`);
+    console.log(`[AI Agent] Total steps: ${result.steps.length}`);
 
-    const actionsTaken = result.steps
-        .flatMap((s) => s.toolCalls || [])
+    const allToolCalls = result.steps.flatMap((s) => s.toolCalls || []);
+    console.log(`[AI Agent] All tool calls: ${allToolCalls.map(tc => tc.toolName).join(', ') || 'NONE'}`);
+
+    const actionsTaken = allToolCalls
         .filter((tc) => tc.toolName === 'create_issue' || tc.toolName === 'update_issue')
         .length;
 
-    console.log(`[AI Agent] Actions taken: ${actionsTaken}`);
+    console.log(`[AI Agent] === ANALYZE DONE: ${actionsTaken} actions taken ===`);
 
     return {
         summary: result.text,
