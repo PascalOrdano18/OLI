@@ -74,6 +74,12 @@ export class PluginClient {
         return this.request<Cycle[]>(`/internal/projects/${projectID}/cycles`);
     }
 
+    async deleteIssue(issueID: string): Promise<{ status: string }> {
+        return this.request<{ status: string }>(`/internal/issues/${issueID}`, {
+            method: 'DELETE',
+        });
+    }
+
     async getChannelHistory(channelID: string, limit?: number, before?: number): Promise<ChannelHistoryResponse> {
         const params = new URLSearchParams();
         if (limit) params.set('limit', String(limit));

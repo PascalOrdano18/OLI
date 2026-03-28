@@ -188,5 +188,18 @@ export function createTools(client: PluginClient) {
                 };
             }),
         }),
+
+        delete_issue: tool({
+            description: 'Permanently delete an issue that is no longer needed. Use this when the conversation makes clear that a tracked feature or task has been explicitly abandoned, deemed unnecessary, or was created by mistake. Prefer setting status to "cancelled" via update_issue for work that is simply deprioritized — only delete when the issue should not exist at all.',
+            parameters: z.object({
+                issue_id: z.string().describe('The issue UUID to delete'),
+                reason: z.string().describe('Brief explanation of why this issue is being deleted, based on the conversation'),
+            }),
+            execute: safe(async ({ issue_id, reason }) => {
+                console.log(`[AI Agent] Deleting issue ${issue_id}: ${reason}`);
+                await client.deleteIssue(issue_id);
+                return { status: 'deleted', issue_id };
+            }),
+        }),
     };
 }
