@@ -157,10 +157,13 @@
     "webpack-merge": "5.8.0"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.64",
+    "@ai-sdk/openai": "^3.0.48",
     "@emotion/react": "11.11.4",
     "@floating-ui/react": "0.26.28",
     "@mattermost/compass-icons": "0.1.45",
     "@sentry/electron": "7.4.0",
+    "ai": "^6.0.141",
     "auto-launch": "5.0.6",
     "cf-prefs": "2.0.1",
     "classnames": "2.5.1",
@@ -180,6 +183,7 @@
     "uuid": "9.0.1",
     "valid-url": "1.0.9",
     "windows-focus-assist": "1.4.0",
-    "yargs": "17.7.2"
+    "yargs": "17.7.2",
+    "zod": "^4.3.6"
   }
 }
