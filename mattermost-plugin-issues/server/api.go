@@ -48,6 +48,9 @@ func (p *Plugin) initRouter() *mux.Router {
 	api.HandleFunc("/projects/{id}/context", p.handleGetProjectContext).Methods(http.MethodGet)
 	api.HandleFunc("/issues/{id}/context", p.handleGetIssueContext).Methods(http.MethodGet)
 
+	// Call audio upload (from Desktop App)
+	api.HandleFunc("/call-audio", p.handleCallAudioUpload).Methods(http.MethodPost)
+
 	// Internal API for AI service callbacks (shared-secret auth).
 	internal := router.PathPrefix("/internal").Subrouter()
 	internal.Use(p.internalAuthMiddleware)

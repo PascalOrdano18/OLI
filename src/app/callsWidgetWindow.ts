@@ -4,6 +4,7 @@
 import type {IpcMainEvent, Rectangle, Event, IpcMainInvokeEvent} from 'electron';
 import {BrowserWindow, desktopCapturer, dialog, ipcMain, systemPreferences} from 'electron';
 
+import {startCallAudioCapture, stopCallAudioCapture, uploadCallAudio} from 'app/callsAudioCapture';
 import MainWindow from 'app/mainWindow/mainWindow';
 import NavigationManager from 'app/navigationManager';
 import TabManager from 'app/tabs/tabManager';
@@ -557,6 +558,19 @@ export class CallsWidgetWindow {
                 }
 
                 ipcMain.off(CALLS_JOINED_CALL, connected);
+
+                // Start audio capture for transcription after a short delay
+                // to allow WebRTC tracks to be established.
+                if (this.win) {
+                    setTimeout(() => {
+                        if (this.win && !this.win.isDestroyed()) {
+                            startCallAudioCapture(this.win).catch((err) => {
+                                log.error('Failed to start call audio capture', {err});
+                            });
+                        }
+                    }, 3000);
+                }
+
                 resolve({callID: msg.callID, sessionID: incomingSessionId});
             };
             ipcMain.on(CALLS_JOINED_CALL, connected);
@@ -572,10 +586,127 @@ export class CallsWidgetWindow {
         return promise;
     };
 
-    private handleCallsLeave = () => {
+    private handleCallsLeave = async () => {
         log.debug('handleCallsLeave');
 
+        // Stop audio capture and upload for transcription before closing.
+        if (this.win && !this.win.isDestroyed()) {
+            try {
+                const audioBuffer = await stopCallAudioCapture(this.win);
+                if (audioBuffer && audioBuffer.length > 0) {
+                    const serverURL = this.getViewURL();
+                    const channelURL = this.options?.channelURL;
+
+                    if (serverURL && channelURL) {
+                        // Extract channel ID from the channel URL.
+                        // channelURL format: /{teamName}/channels/{channelNameOrId}
+                        // We need to resolve this, but we can pass it as-is and
+                        // let the plugin handle it. For now, extract what we can.
+                        log.info('Uploading call audio for transcription', {
+                            audioSize: audioBuffer.length,
+                            serverURL: serverURL.toString(),
+                        });
+
+                        // Upload happens asynchronously — don't block the close.
+                        this.uploadCallAudioAsync(serverURL.toString(), channelURL, audioBuffer);
+                    } else {
+                        log.warn('Cannot upload call audio: missing serverURL or channelURL');
+                    }
+                }
+            } catch (err) {
+                log.error('Error during call audio capture stop', {err});
+            }
+        }
+
         this.close();
+    };
+
+    private uploadCallAudioAsync = (serverURL: string, channelURL: string, audioBuffer: Buffer) => {
+        // The channelURL from the Calls widget contains the channel identifier.
+        // We need to resolve the channel ID. The plugin API expects a channel_id.
+        // We'll extract it from the URL path or pass the URL and let the main
+        // view help us resolve it.
+        //
+        // channelURL format examples:
+        //   /team-name/channels/channel-name
+        //   /team-name/messages/@username
+        //
+        // We need the actual channel ID. We can get it by querying the server.
+        // For simplicity, we'll use the Mattermost API to resolve it.
+        this.resolveChannelIDAndUpload(serverURL, channelURL, audioBuffer).catch((err) => {
+            log.error('Failed to upload call audio', {err});
+        });
+    };
+
+    private resolveChannelIDAndUpload = async (serverURL: string, channelURL: string, audioBuffer: Buffer) => {
+        // Try to get channel info from the main view's webContents if available.
+        // The channelURL path contains the channel name/ID after /channels/ or /messages/.
+        // We'll make a direct API call to resolve it.
+
+        const baseURL = serverURL.replace(/\/$/, '');
+
+        // Parse the channel identifier from the URL.
+        // Format: /teamname/channels/channelname OR /teamname/messages/@username
+        const parts = channelURL.split('/').filter(Boolean);
+        if (parts.length < 3) {
+            log.error('Cannot parse channelURL', {channelURL});
+            return;
+        }
+
+        const teamName = parts[0];
+        const channelType = parts[1]; // 'channels' or 'messages'
+        const channelName = parts[2];
+
+        let channelID: string | undefined;
+
+        if (channelType === 'channels') {
+            // Resolve via team/channel name API.
+            try {
+                const {net: electronNet, session: electronSession} = await import('electron');
+                channelID = await new Promise<string>((resolve, reject) => {
+                    const req = electronNet.request({
+                        url: `${baseURL}/api/v4/teams/name/${teamName}/channels/name/${channelName}`,
+                        session: electronSession.defaultSession,
+                        useSessionCookies: true,
+                    });
+                    let body = '';
+                    req.on('response', (resp) => {
+                        resp.on('data', (chunk: Buffer) => {
+                            body += chunk.toString();
+                        });
+                        resp.on('end', () => {
+                            try {
+                                const data = JSON.parse(body);
+                                if (data.id) {
+                                    resolve(data.id);
+                                } else {
+                                    reject(new Error('No channel ID in response'));
+                                }
+                            } catch (e) {
+                                reject(e);
+                            }
+                        });
+                    });
+                    req.on('error', reject);
+                    req.end();
+                });
+            } catch (err) {
+                log.error('Failed to resolve channel ID', {err, teamName, channelName});
+                return;
+            }
+        } else if (channelType === 'messages') {
+            // For DMs/GMs the channelName might be a user handle like @username.
+            // We'd need additional resolution. For now, log and skip.
+            log.warn('DM/GM channel resolution not yet implemented for audio upload', {channelURL});
+            return;
+        }
+
+        if (!channelID) {
+            log.error('Could not resolve channel ID', {channelURL});
+            return;
+        }
+
+        await uploadCallAudio(serverURL, channelID, audioBuffer);
     };
 
     private focusChannelView() {
