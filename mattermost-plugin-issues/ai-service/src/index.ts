@@ -79,11 +79,12 @@ app.post('/transcribe-and-analyze', upload.single('audio'), async (req, res) => 
         );
         console.log(`[AI Service] Transcription complete: ${transcription.length} chars`);
 
-        if (transcription.length < 20) {
-            console.log('[AI Service] Transcription too short, skipping analysis');
-            res.json({ summary: 'Call transcription was too short to analyze.', actions_taken: 0 });
+        if (transcription.length === 0) {
+            console.log('[AI Service] Empty transcription, skipping analysis');
+            res.json({ summary: 'No speech detected in call audio.', actions_taken: 0 });
             return;
         }
+        console.log(`[AI Service] Transcription text: "${transcription}"`);
 
         // Step 2: Analyze the transcription using the existing agent.
         const analyzeRequest: AnalyzeRequest = {
