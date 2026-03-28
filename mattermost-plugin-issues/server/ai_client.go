@@ -48,8 +48,9 @@ type AnalyzeRequest struct {
 
 // AnalyzeResponse is the response from the AI service.
 type AnalyzeResponse struct {
-	Summary      string `json:"summary"`
-	ActionsTaken int    `json:"actions_taken"`
+	Summary      string     `json:"summary"`
+	ActionsTaken int        `json:"actions_taken"`
+	IssueRefs    []IssueRef `json:"issue_refs"`
 }
 
 // AIClient calls the external AI service.

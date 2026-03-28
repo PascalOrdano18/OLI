@@ -367,7 +367,7 @@ func (p *Plugin) handleOliMention(post *model.Post) {
 	}()
 }
 
-// ensureNotificationChannel finds or creates the "oli-notificacions" channel.
+// ensureNotificationChannel finds or creates the "all-the-actions" channel.
 func (p *Plugin) ensureNotificationChannel() (*model.Channel, error) {
 	teams, appErr := p.API.GetTeams()
 	if appErr != nil {
@@ -378,17 +378,17 @@ func (p *Plugin) ensureNotificationChannel() (*model.Channel, error) {
 	}
 	teamID := teams[0].Id
 
-	ch, appErr := p.API.GetChannelByName(teamID, "oli-notificacions", false)
+	ch, appErr := p.API.GetChannelByName(teamID, "all-the-actions", false)
 	if appErr == nil {
 		return ch, nil
 	}
 
 	ch, appErr = p.API.CreateChannel(&model.Channel{
 		TeamId:      teamID,
-		Name:        "oli-notificacions",
-		DisplayName: "Oli Notificacions",
+		Name:        "all-the-actions",
+		DisplayName: "All The Actions",
 		Type:        model.ChannelTypeOpen,
-		Purpose:     "Conversation end notifications from the Issues Tracker plugin.",
+		Purpose:     "Activity feed: issues created, updated, and deleted by the AI agent.",
 	})
 	if appErr != nil {
 		return nil, fmt.Errorf("could not create channel: %s", appErr.Error())
