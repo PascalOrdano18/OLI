@@ -12,9 +12,10 @@ import (
 
 func (p *Plugin) initRouter() *mux.Router {
 	router := mux.NewRouter()
-	router.Use(p.authMiddleware)
 
+	// User-facing API (Mattermost session auth).
 	api := router.PathPrefix("/api/v1").Subrouter()
+	api.Use(p.authMiddleware)
 
 	// Projects
 	api.HandleFunc("/projects", p.handleListProjects).Methods(http.MethodGet)
@@ -41,6 +42,18 @@ func (p *Plugin) initRouter() *mux.Router {
 	api.HandleFunc("/projects/{id}/cycles", p.handleCreateCycle).Methods(http.MethodPost)
 	api.HandleFunc("/cycles/{id}", p.handleUpdateCycle).Methods(http.MethodPut)
 	api.HandleFunc("/cycles/{id}", p.handleDeleteCycle).Methods(http.MethodDelete)
+
+	// Internal API for AI service callbacks (shared-secret auth).
+	internal := router.PathPrefix("/internal").Subrouter()
+	internal.Use(p.internalAuthMiddleware)
+
+	internal.HandleFunc("/projects", p.handleInternalListProjects).Methods(http.MethodGet)
+	internal.HandleFunc("/projects/{id}/issues", p.handleInternalListIssues).Methods(http.MethodGet)
+	internal.HandleFunc("/projects/{id}/issues", p.handleInternalCreateIssue).Methods(http.MethodPost)
+	internal.HandleFunc("/issues/{id}", p.handleInternalGetIssue).Methods(http.MethodGet)
+	internal.HandleFunc("/issues/{id}", p.handleInternalUpdateIssue).Methods(http.MethodPut)
+	internal.HandleFunc("/projects/{id}/labels", p.handleInternalListLabels).Methods(http.MethodGet)
+	internal.HandleFunc("/projects/{id}/cycles", p.handleInternalListCycles).Methods(http.MethodGet)
 
 	return router
 }
