@@ -312,7 +312,19 @@ func containsFionaMention(message string) bool {
 }
 
 func containsOliMention(message string) bool {
-	return strings.Contains(strings.ToLower(message), "@oli")
+	lower := strings.ToLower(message)
+	idx := strings.Index(lower, "@oli")
+	if idx < 0 {
+		return false
+	}
+	end := idx + 4
+	if end < len(lower) {
+		next := lower[end]
+		if (next >= 'a' && next <= 'z') || (next >= '0' && next <= '9') || next == '_' || next == '-' {
+			return false
+		}
+	}
+	return true
 }
 
 // handleOliMention sends the user's question to the AI service and posts

@@ -235,15 +235,3 @@ func (cm *ConversationMonitor) getChannelMemberIDs(channel *model.Channel) []str
 	return ids
 }
 
-func channelTypeLabel(ct model.ChannelType) string {
-	switch ct {
-	case model.ChannelTypeDirect:
-		return "DM"
-	case model.ChannelTypeGroup:
-		return "Group"
-	case model.ChannelTypePrivate:
-		return "Private Channel"
-	default:
-		return "Channel"
-	}
-}
