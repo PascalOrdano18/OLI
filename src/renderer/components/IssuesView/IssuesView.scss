@@ -305,16 +305,18 @@
     align-items: center;
     gap: 10px;
     padding: 6px 14px;
-    background: rgba(var(--center-channel-color-rgb), 0.04);
+    background: var(--center-channel-bg);
     border-bottom: 1px solid rgba(var(--center-channel-color-rgb), 0.1);
     flex-shrink: 0;
     font-size: 12px;
+    color: var(--center-channel-color);
 }
 
 .IV__terminalSessionId {
     font-family: 'Menlo', 'Monaco', monospace;
     font-size: 11px;
-    opacity: 0.6;
+    font-weight: 600;
+    color: var(--button-bg, #166de0);
 }
 
 .IV__terminalPulse {
@@ -336,12 +338,25 @@
     margin-left: auto;
 }
 
+.IV__terminalBody {
+    flex: 1;
+    min-height: 0;
+    padding: 12px;
+    background: var(--center-channel-bg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
 .IV__terminal {
     flex: 1;
     min-height: 0;
-    background: #0d0d14;
+    background: #13151c;
+    border-radius: 6px;
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
     overflow: hidden;
     position: relative;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
 
     .xterm {
         position: absolute;

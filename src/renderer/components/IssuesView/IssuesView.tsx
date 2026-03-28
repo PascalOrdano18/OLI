@@ -436,23 +436,27 @@ const EmbeddedTerminal: React.FC<{projectId: string}> = ({projectId}) => {
         if (!containerRef.current) { return; }
         const term = new Terminal({
             theme: {
-                background: '#1e1e2e',
-                foreground: '#cdd6f4',
-                cursor: '#f5e0dc',
-                selectionBackground: '#45475a',
-                black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
-                blue: '#89b4fa', magenta: '#f5c2e7', cyan: '#94e2d5', white: '#bac2de',
-                brightBlack: '#585b70', brightRed: '#f38ba8', brightGreen: '#a6e3a1',
-                brightYellow: '#f9e2af', brightBlue: '#89b4fa', brightMagenta: '#f5c2e7',
-                brightCyan: '#94e2d5', brightWhite: '#a6adc8',
+                background: '#13151c',
+                foreground: '#d8dce8',
+                cursor: '#166de0',
+                cursorAccent: '#13151c',
+                selectionBackground: 'rgba(22, 109, 224, 0.28)',
+                selectionInactiveBackground: 'rgba(180, 180, 200, 0.15)',
+                black: '#1e2130', red: '#e05c5c', green: '#3dc779', yellow: '#f0a840',
+                blue: '#4d85e8', magenta: '#b06de0', cyan: '#35c7d6', white: '#c8cdd8',
+                brightBlack: '#4a4f66', brightRed: '#ef7070', brightGreen: '#55d98a',
+                brightYellow: '#f7bf60', brightBlue: '#6d9ef0', brightMagenta: '#c48ae8',
+                brightCyan: '#55d5e3', brightWhite: '#eef0f5',
             },
             fontFamily: '"Menlo", "Monaco", "Courier New", monospace',
             fontSize: 13,
             lineHeight: 1.3,
             cursorBlink: true,
-            scrollback: 5000,
+            scrollback: 10000,
+            allowProposedApi: true,
             disableStdin: false,
             allowTransparency: false,
+            fastScrollModifier: 'alt',
         });
         const fit = new FitAddon();
         term.loadAddon(fit);
@@ -460,6 +464,63 @@ const EmbeddedTerminal: React.FC<{projectId: string}> = ({projectId}) => {
         fit.fit();
         termRef.current = term;
         fitRef.current = fit;
+
+        // XDA handler so tmux enables clipboard (OSC 52) support
+        term.parser.registerCsiHandler({prefix: '>', final: 'q'}, () => {
+            term.write('\x1bP>|XTerm(370)\x1b\\');
+            return true;
+        });
+
+        // OSC 52 handler — write tmux-copied text to clipboard
+        term.parser.registerOscHandler(52, (data) => {
+            const parts = data.split(';');
+            if (parts.length < 2) { return false; }
+            try {
+                const binary = atob(parts[parts.length - 1]);
+                const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+                navigator.clipboard?.writeText(new TextDecoder().decode(bytes)).catch(() => { /* ignore */ });
+            } catch { /* ignore */ }
+            return true;
+        });
+
+        // Cmd+C / Ctrl+Shift+C to copy selection
+        term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+            if (e.type !== 'keydown') { return true; }
+            const isCopy =
+                (e.metaKey && !e.ctrlKey && !e.altKey && e.code === 'KeyC') ||
+                (e.ctrlKey && e.shiftKey && e.code === 'KeyC');
+            if (isCopy && term.hasSelection()) {
+                navigator.clipboard?.writeText(term.getSelection()).catch(() => { /* ignore */ });
+                term.clearSelection();
+                return false;
+            }
+            return true;
+        });
+
+        // Buffer writes while selection is active so highlights aren't wiped
+        const writeBuffer: string[] = [];
+        let selectionActive = false;
+        let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const flushBuffer = () => {
+            if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+            if (writeBuffer.length > 0) {
+                term.write(writeBuffer.join(''));
+                writeBuffer.length = 0;
+            }
+        };
+
+        const selDisposable = term.onSelectionChange(() => {
+            if (term.hasSelection()) {
+                selectionActive = true;
+                if (!safetyTimer) {
+                    safetyTimer = setTimeout(() => { selectionActive = false; flushBuffer(); }, 5000);
+                }
+            } else {
+                selectionActive = false;
+                flushBuffer();
+            }
+        });
 
         // Sync terminal size to tmux on resize
         const syncSize = () => {
@@ -476,21 +537,26 @@ const EmbeddedTerminal: React.FC<{projectId: string}> = ({projectId}) => {
             window.desktop.ao.sendRawInput(projectId, input).catch(() => { /* ignore */ });
         });
 
-        // Receive screen snapshot from main process
-        const handleOutput = (data: {screen: string}) => {
-            term.write('\x1b[H\x1b[J'); // cursor home + clear to end of screen (no scrollback wipe)
-            term.write(data.screen);
+        // Receive streaming data from main process
+        const handleOutput = (data: {data: string; isInitial?: boolean}) => {
+            const chunk = data.data;
+            if (selectionActive) {
+                writeBuffer.push(chunk);
+            } else {
+                term.write(chunk);
+            }
         };
         window.desktop.ao.onOutputUpdate(handleOutput);
 
         const ro = new ResizeObserver(syncSize);
         if (containerRef.current) { ro.observe(containerRef.current); }
 
-        // Initial size sync
         syncSize();
 
         return () => {
             inputDisposable.dispose();
+            selDisposable.dispose();
+            if (safetyTimer) { clearTimeout(safetyTimer); }
             window.desktop.ao.offOutputUpdate(handleOutput);
             ro.disconnect();
             term.dispose();
@@ -745,7 +811,9 @@ const WorkArea: React.FC<{
                     <span className='IV__terminalTimer'>{fmtTime(elapsedSecs)}</span>
                     <button className='IV__btn IV__btn--danger IV__btn--sm' onClick={handleKill}>{'■ Kill'}</button>
                 </div>
-                <EmbeddedTerminal projectId={activeProjectId}/>
+                <div className='IV__terminalBody'>
+                    <EmbeddedTerminal projectId={activeProjectId}/>
+                </div>
             </div>
         );
     }

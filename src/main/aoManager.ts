@@ -3,8 +3,9 @@
 
 import {createHash} from 'crypto';
 import {execFile, spawn} from 'child_process';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
+import {createReadStream, existsSync, mkdirSync, ReadStream, readFileSync, unlinkSync, writeFileSync} from 'fs';
 import {join, resolve} from 'path';
+import {tmpdir} from 'os';
 import {promisify} from 'util';
 
 import {app, BrowserWindow, dialog, WebContents} from 'electron';
@@ -31,6 +32,8 @@ interface SessionEntry {
     tmuxName: string;
     projectId: string;
     pollInterval: ReturnType<typeof setInterval> | null;
+    pipeStream: ReadStream | null;
+    pipePath: string | null;
     lastOutput: string;
     webContentsId: number;
 }
@@ -269,6 +272,74 @@ export class AoManager {
         }
     }
 
+    private getPipePath(projectId: string): string {
+        const safe = projectId.replace(/[^a-z0-9]/gi, '-');
+        return join(tmpdir(), `ao-term-${safe}.pipe`);
+    }
+
+    private async startStreaming(entry: SessionEntry, webContents: WebContents): Promise<void> {
+        const pipePath = this.getPipePath(entry.projectId);
+        entry.pipePath = pipePath;
+
+        // Clean up any leftover pipe from a previous session
+        if (existsSync(pipePath)) {
+            try { unlinkSync(pipePath); } catch { /* ignore */ }
+        }
+
+        // Send current screen as initial state so the terminal isn't blank
+        const initial = await this.captureTmux(entry.tmuxName);
+        if (!webContents.isDestroyed() && initial) {
+            webContents.send(AO_OUTPUT_UPDATE, {data: '\x1b[H\x1b[2J' + initial, isInitial: true});
+        }
+
+        // Create FIFO for streaming
+        try {
+            await execFileAsync('mkfifo', [pipePath]);
+        } catch (err) {
+            log.warn('mkfifo failed, falling back to polling', {err});
+            this.startPolling(entry, webContents);
+            return;
+        }
+
+        // Start streaming pipe in background — createReadStream will unblock once
+        // tmux pipe-pane opens the write end via its spawned cat process.
+        const stream = createReadStream(pipePath, {encoding: 'utf8'});
+        entry.pipeStream = stream;
+
+        stream.on('data', (chunk: string | Buffer) => {
+            if (webContents.isDestroyed()) {
+                this.stopStreaming(entry);
+                return;
+            }
+            webContents.send(AO_OUTPUT_UPDATE, {data: chunk.toString()});
+        });
+
+        stream.on('error', (err) => {
+            log.warn('Terminal stream error', {err});
+        });
+
+        // Tell tmux to pipe pane output into the FIFO (-o = output only)
+        execFileAsync('tmux', ['pipe-pane', '-t', entry.tmuxName, '-o', `cat > '${pipePath}'`]).
+            catch((err) => log.warn('pipe-pane failed', {err}));
+    }
+
+    private stopStreaming(entry: SessionEntry): void {
+        if (entry.pipeStream) {
+            entry.pipeStream.destroy();
+            entry.pipeStream = null;
+        }
+        if (entry.tmuxName) {
+            // Stop pipe-pane by calling pipe-pane with no command
+            execFileAsync('tmux', ['pipe-pane', '-t', entry.tmuxName]).catch(() => { /* ignore */ });
+        }
+        if (entry.pipePath) {
+            if (existsSync(entry.pipePath)) {
+                try { unlinkSync(entry.pipePath); } catch { /* ignore */ }
+            }
+            entry.pipePath = null;
+        }
+    }
+
     private startPolling(entry: SessionEntry, webContents: WebContents): void {
         entry.pollInterval = setInterval(async () => {
             if (webContents.isDestroyed()) {
@@ -279,7 +350,7 @@ export class AoManager {
             const output = await this.captureTmux(entry.tmuxName);
             if (output && output !== entry.lastOutput) {
                 entry.lastOutput = output;
-                webContents.send(AO_OUTPUT_UPDATE, {screen: output});
+                webContents.send(AO_OUTPUT_UPDATE, {data: output, isInitial: true});
             }
         }, 1000);
     }
@@ -366,13 +437,15 @@ export class AoManager {
             tmuxName,
             projectId,
             pollInterval: null,
+            pipeStream: null,
+            pipePath: null,
             lastOutput: baseline,
             webContentsId: webContents.id,
         };
 
         this.sessions.set(projectId, entry);
         this.persistSession(projectId, sessionId, tmuxName);
-        this.startPolling(entry, webContents);
+        this.startStreaming(entry, webContents);
 
         return sessionId;
     }
@@ -431,6 +504,7 @@ export class AoManager {
         }
 
         this.stopPolling(entry);
+        this.stopStreaming(entry);
         this.sessions.delete(projectId);
         this.removePersistedSession(projectId);
 
@@ -455,11 +529,13 @@ export class AoManager {
                 tmuxName: persisted.tmuxName,
                 projectId,
                 pollInterval: null,
+                pipeStream: null,
+                pipePath: null,
                 lastOutput: '',
                 webContentsId: webContents.id,
             };
             this.sessions.set(projectId, restoredEntry);
-            this.startPolling(restoredEntry, webContents);
+            this.startStreaming(restoredEntry, webContents);
         }
 
         return {
