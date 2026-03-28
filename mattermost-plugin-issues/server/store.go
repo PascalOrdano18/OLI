@@ -7,6 +7,10 @@ package main
 // The KV store implementation is the default; a SQL implementation can be
 // swapped in later for deployments that need more sophisticated querying.
 type Store interface {
+	// Company Info
+	GetCompanyInfo() (*CompanyInfo, error)
+	SetCompanyInfo(info *CompanyInfo) error
+
 	// Projects
 	CreateProject(project *Project) error
 	GetProject(id string) (*Project, error)
