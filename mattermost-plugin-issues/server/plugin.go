@@ -91,7 +91,7 @@ func (p *Plugin) OnActivate() error {
 		})
 	}
 
-	p.conversationMonitor = NewConversationMonitor(p.API, p.botUserID, notifChannel.Id, p.onConversationEnd)
+	p.conversationMonitor = NewConversationMonitor(p.API, p.botUserID, p.oliAgentUserID, notifChannel.Id, p.onConversationEnd)
 
 	if err := p.API.RegisterCommand(getCommand()); err != nil {
 		return err
