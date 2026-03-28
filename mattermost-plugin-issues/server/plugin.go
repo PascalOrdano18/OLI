@@ -216,15 +216,55 @@ func (p *Plugin) onConversationEnd(conv *conversationState, usernameCache map[st
 			return
 		}
 
-		// Post AI analysis summary to the notification channel.
-		summary := fmt.Sprintf("#### :robot_face: AI Analysis\n%s\n\n*Actions taken: %d*", result.Summary, result.ActionsTaken)
+		// Build a concise summary message.
+		label := "conversation"
+		switch conv.channelType {
+		case "D":
+			label = "DM"
+		case "G":
+			label = "group chat"
+		case "P":
+			label = "private channel"
+		case "O":
+			if conv.channelName != "" {
+				label = fmt.Sprintf("~%s", conv.channelName)
+			} else {
+				label = "channel"
+			}
+		}
+
+		memberNames := make([]string, 0, len(conv.memberIDs))
+		for _, id := range conv.memberIDs {
+			if name := usernameCache[id]; name != "" {
+				memberNames = append(memberNames, name)
+			}
+		}
+
+		summary := fmt.Sprintf("Analyzed %s between %s — %s",
+			label,
+			strings.Join(memberNames, ", "),
+			result.Summary,
+		)
+
+		// Build props with issue refs for rich rendering.
+		props := map[string]interface{}{}
+		oliData := map[string]interface{}{}
+		if len(result.IssueRefs) > 0 {
+			oliData["issue_refs"] = result.IssueRefs
+		}
+		if len(oliData) > 0 {
+			props["oli_data"] = oliData
+		}
+
 		post := &model.Post{
-			UserId:    p.botUserID,
+			UserId:    p.oliAgentUserID,
 			ChannelId: notifChannelID,
 			Message:   summary,
+			Type:      "custom_oli_response",
+			Props:     props,
 		}
 		if _, appErr := p.API.CreatePost(post); appErr != nil {
-			p.API.LogError("[ConversationMonitor] failed to post AI summary", "error", appErr.Error())
+			p.API.LogError("[ConversationMonitor] failed to post action summary", "error", appErr.Error())
 		}
 	}()
 }
