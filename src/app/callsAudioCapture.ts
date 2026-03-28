@@ -53,12 +53,13 @@ const AUDIO_CAPTURE_INJECTION = `
         if (cap.remoteTrackIds.includes(track.id)) return;
         cap.remoteTrackIds.push(track.id);
         try {
-            // Clone the track so we don't interfere with WebRTC's usage of it.
-            const cloned = track.clone();
-            const stream = new MediaStream([cloned]);
+            // Wrap the original track in a new MediaStream — do NOT clone.
+            // Cloning produces silence in Chromium when WebRTC owns the source.
+            // A MediaStream wrapper lets AudioContext read alongside WebRTC.
+            const stream = new MediaStream([track]);
             const source = cap.ctx.createMediaStreamSource(stream);
             source.connect(cap.dest);
-            console.log('[CallsAudioCapture] Added REMOTE audio track (cloned), total:', cap.remoteTrackIds.length);
+            console.log('[CallsAudioCapture] Added REMOTE audio track (direct), total:', cap.remoteTrackIds.length);
         } catch (e) {
             console.error('[CallsAudioCapture] Failed to add remote track:', e);
         }
@@ -135,45 +136,93 @@ const AUDIO_CAPTURE_INJECTION = `
         }
     }
 
-    function scanExistingPeerConnections() {
-        // Look for existing peer connections stored by the wrapper or on window
-        for (const pc of cap.peerConnections) {
-            try {
-                // Receivers = remote audio (other participants)
-                const receivers = pc.getReceivers();
-                console.log('[CallsAudioCapture] Existing PC has', receivers.length, 'receivers');
-                for (const receiver of receivers) {
-                    if (receiver.track && receiver.track.kind === 'audio') {
-                        console.log('[CallsAudioCapture] Found REMOTE audio receiver track:', receiver.track.id, 'state:', receiver.track.readyState);
-                        addRemoteTrackToMixer(receiver.track);
-                    }
-                }
+    // Discover existing RTCPeerConnections that were created before our injection.
+    // We intercept getStats() on the prototype — the Calls plugin calls it regularly
+    // for call quality metrics, so we'll catch it quickly.
+    function discoverExistingPeerConnections() {
+        const OrigGetStats = RTCPeerConnection.prototype.getStats;
+        RTCPeerConnection.prototype.getStats = function(...args) {
+            if (!cap.peerConnections.includes(this)) {
+                cap.peerConnections.push(this);
+                console.log('[CallsAudioCapture] Discovered existing PeerConnection via getStats, total PCs:', cap.peerConnections.length);
+                // Scan this PC immediately for tracks.
+                scanSinglePC(this);
+            }
+            return OrigGetStats.apply(this, args);
+        };
 
-                // Senders = local audio (YOUR mic as sent to other participants)
-                const senders = pc.getSenders();
-                console.log('[CallsAudioCapture] Existing PC has', senders.length, 'senders');
-                for (const sender of senders) {
-                    if (sender.track && sender.track.kind === 'audio') {
-                        console.log('[CallsAudioCapture] Found LOCAL audio sender track:', sender.track.id, 'state:', sender.track.readyState, 'enabled:', sender.track.enabled);
-                        // Add the sender track (local mic) to the mixer.
-                        // This is the exact track the Calls plugin is using — no need for a separate getUserMedia.
-                        if (!cap.localTrackAdded) {
-                            try {
-                                const cloned = sender.track.clone();
-                                const stream = new MediaStream([cloned]);
-                                const source = cap.ctx.createMediaStreamSource(stream);
-                                source.connect(cap.dest);
+        // Also intercept getSenders/getReceivers as another discovery vector.
+        const OrigGetSenders = RTCPeerConnection.prototype.getSenders;
+        RTCPeerConnection.prototype.getSenders = function(...args) {
+            if (!cap.peerConnections.includes(this)) {
+                cap.peerConnections.push(this);
+                console.log('[CallsAudioCapture] Discovered existing PeerConnection via getSenders');
+                scanSinglePC(this);
+            }
+            return OrigGetSenders.apply(this, args);
+        };
+    }
+
+    function scanSinglePC(pc) {
+        try {
+            const receivers = pc.getReceivers();
+            const senders = pc.getSenders();
+            console.log('[CallsAudioCapture] PC scan: receivers=' + receivers.length + ' senders=' + senders.length);
+
+            for (const receiver of receivers) {
+                if (receiver.track && receiver.track.kind === 'audio') {
+                    console.log('[CallsAudioCapture] Found REMOTE audio track:', receiver.track.id, 'state:', receiver.track.readyState);
+                    addRemoteTrackToMixer(receiver.track);
+                }
+            }
+
+            for (const sender of senders) {
+                if (sender.track && sender.track.kind === 'audio') {
+                    console.log('[CallsAudioCapture] Found LOCAL audio sender track:', sender.track.id, 'state:', sender.track.readyState, 'enabled:', sender.track.enabled);
+                    if (!cap.localTrackAdded) {
+                        try {
+                            // Use the original track directly (not clone) wrapped in a new MediaStream.
+                            // Cloning produces silence in Chromium when WebRTC owns the source.
+                            // A MediaStream wrapper around the original track lets AudioContext
+                            // read from the same source WITHOUT interfering with WebRTC.
+                            const stream = new MediaStream([sender.track]);
+                            const source = cap.ctx.createMediaStreamSource(stream);
+                            source.connect(cap.dest);
+                            cap.localTrackAdded = true;
+                            console.log('[CallsAudioCapture] LOCAL mic track (direct, no clone) added to mixer!');
+                        } catch (e) {
+                            console.error('[CallsAudioCapture] Failed to add local sender track:', e);
+                            // Fallback: try getUserMedia
+                            console.log('[CallsAudioCapture] Trying getUserMedia fallback for local mic...');
+                            navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then((micStream) => {
+                                const micSource = cap.ctx.createMediaStreamSource(micStream);
+                                micSource.connect(cap.dest);
+                                cap.localStream = micStream;
                                 cap.localTrackAdded = true;
-                                console.log('[CallsAudioCapture] LOCAL mic track (from sender) added to mixer');
-                            } catch (e) {
-                                console.error('[CallsAudioCapture] Failed to add local sender track:', e);
-                            }
+                                console.log('[CallsAudioCapture] getUserMedia fallback local mic added to mixer');
+                            }).catch((err) => {
+                                console.error('[CallsAudioCapture] getUserMedia fallback also failed:', err);
+                            });
                         }
                     }
                 }
-            } catch (e) {
-                console.log('[CallsAudioCapture] Error scanning PC:', e.message);
             }
+
+            if (receivers.length > 0 || senders.length > 0) {
+                maybeStartRecording();
+            }
+        } catch (e) {
+            console.error('[CallsAudioCapture] Error scanning PC:', e);
+        }
+    }
+
+    // Start discovering existing PCs immediately.
+    discoverExistingPeerConnections();
+
+    function scanExistingPeerConnections() {
+        console.log('[CallsAudioCapture] Scanning', cap.peerConnections.length, 'known PeerConnections');
+        for (const pc of cap.peerConnections) {
+            scanSinglePC(pc);
         }
     }
 
