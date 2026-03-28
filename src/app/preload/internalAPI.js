@@ -131,6 +131,15 @@ import {
     SET_VIEW_MODE,
     GET_AUTH_TOKEN,
     ISSUES_API_REQUEST,
+    AO_PICK_REPO_PATH,
+    AO_SPAWN_SESSION,
+    AO_SEND_MESSAGE,
+    AO_SEND_RAW_INPUT,
+    AO_RESIZE_TERMINAL,
+    AO_KILL_SESSION,
+    AO_GET_SESSION_STATUS,
+    AO_OUTPUT_UPDATE,
+    AO_OPEN_TERMINAL,
 } from 'common/communication';
 
 console.log('Preload initialized');
@@ -312,6 +321,19 @@ contextBridge.exposeInMainWorld('desktop', {
     loadingScreen: {
         loadingScreenAnimationFinished: () => ipcRenderer.send(LOADING_SCREEN_ANIMATION_FINISHED),
         onToggleLoadingScreenVisibility: (listener) => ipcRenderer.on(TOGGLE_LOADING_SCREEN_VISIBILITY, (_, toggle) => listener(toggle)),
+    },
+
+    ao: {
+        pickRepoPath: (serverId, projectId) => ipcRenderer.invoke(AO_PICK_REPO_PATH, serverId, projectId),
+        spawnSession: (projectId, projectName, sessionPrefix, issue, userPrompt) => ipcRenderer.invoke(AO_SPAWN_SESSION, projectId, projectName, sessionPrefix, issue, userPrompt),
+        sendMessage: (projectId, message) => ipcRenderer.invoke(AO_SEND_MESSAGE, projectId, message),
+        sendRawInput: (projectId, input) => ipcRenderer.invoke(AO_SEND_RAW_INPUT, projectId, input),
+        resizeTerminal: (projectId, cols, rows) => ipcRenderer.invoke(AO_RESIZE_TERMINAL, projectId, cols, rows),
+        killSession: (projectId) => ipcRenderer.invoke(AO_KILL_SESSION, projectId),
+        getSessionStatus: (projectId) => ipcRenderer.invoke(AO_GET_SESSION_STATUS, projectId),
+        onOutputUpdate: (cb) => ipcRenderer.on(AO_OUTPUT_UPDATE, (_e, data) => cb(data)),
+        offOutputUpdate: (cb) => ipcRenderer.off(AO_OUTPUT_UPDATE, cb),
+        openTerminal: (projectId) => ipcRenderer.invoke(AO_OPEN_TERMINAL, projectId),
     },
 
     modals: {
