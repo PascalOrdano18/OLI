@@ -40,6 +40,7 @@ const AUDIO_CAPTURE_INJECTION = `
         ctx: null,
         dest: null,
         localStream: null,
+        localTrackAdded: false,
         peerConnections: [],
     };
     const cap = window.__callsAudioCapture;
@@ -138,12 +139,36 @@ const AUDIO_CAPTURE_INJECTION = `
         // Look for existing peer connections stored by the wrapper or on window
         for (const pc of cap.peerConnections) {
             try {
+                // Receivers = remote audio (other participants)
                 const receivers = pc.getReceivers();
                 console.log('[CallsAudioCapture] Existing PC has', receivers.length, 'receivers');
                 for (const receiver of receivers) {
                     if (receiver.track && receiver.track.kind === 'audio') {
-                        console.log('[CallsAudioCapture] Found existing audio receiver track:', receiver.track.id);
+                        console.log('[CallsAudioCapture] Found REMOTE audio receiver track:', receiver.track.id, 'state:', receiver.track.readyState);
                         addRemoteTrackToMixer(receiver.track);
+                    }
+                }
+
+                // Senders = local audio (YOUR mic as sent to other participants)
+                const senders = pc.getSenders();
+                console.log('[CallsAudioCapture] Existing PC has', senders.length, 'senders');
+                for (const sender of senders) {
+                    if (sender.track && sender.track.kind === 'audio') {
+                        console.log('[CallsAudioCapture] Found LOCAL audio sender track:', sender.track.id, 'state:', sender.track.readyState, 'enabled:', sender.track.enabled);
+                        // Add the sender track (local mic) to the mixer.
+                        // This is the exact track the Calls plugin is using — no need for a separate getUserMedia.
+                        if (!cap.localTrackAdded) {
+                            try {
+                                const cloned = sender.track.clone();
+                                const stream = new MediaStream([cloned]);
+                                const source = cap.ctx.createMediaStreamSource(stream);
+                                source.connect(cap.dest);
+                                cap.localTrackAdded = true;
+                                console.log('[CallsAudioCapture] LOCAL mic track (from sender) added to mixer');
+                            } catch (e) {
+                                console.error('[CallsAudioCapture] Failed to add local sender track:', e);
+                            }
+                        }
                     }
                 }
             } catch (e) {
@@ -152,11 +177,14 @@ const AUDIO_CAPTURE_INJECTION = `
         }
     }
 
-    // Capture local mic — use the SAME constraints as the Calls plugin
-    // to share the mic rather than fight for exclusive access.
-    async function captureLocalMic() {
+    // Fallback: capture local mic via getUserMedia if we couldn't get it from senders.
+    async function captureLocalMicFallback() {
+        if (cap.localTrackAdded) {
+            console.log('[CallsAudioCapture] Local track already added from PC sender, skipping getUserMedia');
+            return;
+        }
         try {
-            console.log('[CallsAudioCapture] Requesting local mic...');
+            console.log('[CallsAudioCapture] Fallback: requesting local mic via getUserMedia...');
             cap.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -166,28 +194,30 @@ const AUDIO_CAPTURE_INJECTION = `
                 video: false,
             });
             const tracks = cap.localStream.getAudioTracks();
-            console.log('[CallsAudioCapture] Got local mic, tracks:', tracks.length, 'track state:', tracks[0]?.readyState, 'enabled:', tracks[0]?.enabled);
+            console.log('[CallsAudioCapture] Fallback mic, tracks:', tracks.length, 'state:', tracks[0]?.readyState, 'enabled:', tracks[0]?.enabled);
             const localSource = cap.ctx.createMediaStreamSource(cap.localStream);
             localSource.connect(cap.dest);
-            console.log('[CallsAudioCapture] Local mic connected to mixer');
+            cap.localTrackAdded = true;
+            console.log('[CallsAudioCapture] Fallback local mic connected to mixer');
         } catch (e) {
-            console.error('[CallsAudioCapture] Failed to get local mic:', e.message);
+            console.error('[CallsAudioCapture] Fallback getUserMedia failed:', e.message);
         }
     }
 
     // Run all capture strategies with delays.
     setTimeout(async () => {
-        await captureLocalMic();
         scanExistingMediaElements();
-        scanExistingPeerConnections();
+        scanExistingPeerConnections(); // Gets both remote (receivers) AND local (senders)
+        await captureLocalMicFallback(); // Only if sender track wasn't found
         maybeStartRecording();
     }, 3000);
 
     // Scan again later in case elements/connections appear after initial scan.
-    setTimeout(() => {
+    setTimeout(async () => {
         console.log('[CallsAudioCapture] Re-scanning for media sources...');
         scanExistingMediaElements();
         scanExistingPeerConnections();
+        await captureLocalMicFallback();
     }, 8000);
 
     console.log('[CallsAudioCapture] Injection complete, waiting for tracks...');
