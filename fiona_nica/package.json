@@ -1,0 +1,21 @@
+{
+  "name": "fiona",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@mattermost/client": "^11.5.0",
+    "dotenv": "^17.3.1",
+    "node-fetch": "^3.3.2",
+    "ws": "^8.20.0"
+  }
+}
