@@ -9,6 +9,7 @@ import {fetchProjects} from './actions';
 
 import CreateIssueModal from './components/create_issue_modal/create_issue_modal';
 import SidebarHeader from './components/sidebar_header/sidebar_header';
+import OliResponsePost from './components/oli/oli_response_post';
 
 import './styles/main.scss';
 
@@ -18,6 +19,7 @@ type PluginRegistry = {
     registerRightHandSidebarComponent: (component: any, title: string) => any;
     registerChannelHeaderButtonAction: (icon: any, action: () => void, dropdownText: string, tooltipText: string) => void;
     registerLeftSidebarHeaderComponent: (component: any) => void;
+    registerPostTypeComponent: (typeName: string, component: any) => void;
     registerRootComponent: (component: any) => void;
     registerWebSocketEventHandler: (event: string, handler: (msg: any) => void) => void;
 };
@@ -36,6 +38,9 @@ class Plugin {
 
         // Register left sidebar header component.
         registry.registerLeftSidebarHeaderComponent(SidebarHeader);
+
+        // Register custom post type for Oli responses.
+        registry.registerPostTypeComponent('custom_oli_response', OliResponsePost);
 
         // Register WebSocket handlers for real-time updates.
         registry.registerWebSocketEventHandler(
