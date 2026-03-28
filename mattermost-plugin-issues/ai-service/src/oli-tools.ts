@@ -40,7 +40,7 @@ const MAX_FILE_SIZE = 100 * 1024; // 100KB
 
 function safePath(requested: string): string | null {
     const resolved = path.resolve(REPO_PATH, requested);
-    if (!resolved.startsWith(REPO_PATH)) {
+    if (!resolved.startsWith(REPO_PATH + path.sep) && resolved !== REPO_PATH) {
         return null;
     }
     return resolved;

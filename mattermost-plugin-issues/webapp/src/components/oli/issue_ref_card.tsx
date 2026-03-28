@@ -4,7 +4,7 @@
 import React from 'react';
 
 import type {IssueStatus, IssuePriority} from '../../types/model';
-import {STATUS_COLORS, STATUS_LABELS, PRIORITY_COLORS, PRIORITY_LABELS} from '../../types/model';
+import {STATUS_COLORS, STATUS_LABELS, PRIORITY_COLORS} from '../../types/model';
 
 interface IssueRefData {
     id: string;
