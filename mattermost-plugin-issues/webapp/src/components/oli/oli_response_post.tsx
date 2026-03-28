@@ -36,13 +36,16 @@ const OliResponsePost: React.FC<Props> = ({post}) => {
     const codeSnippets = oliData?.code_snippets || [];
     const issueRefs = oliData?.issue_refs || [];
 
+    const hasCards = codeSnippets.length > 0 || issueRefs.length > 0;
+    if (!hasCards) {
+        // No rich cards — let Mattermost render the post normally.
+        return null;
+    }
+
+    // Render only the rich embeds below the message.
+    // Mattermost renders the message text itself; we append cards.
     return (
-        <div className='issues-oli-response'>
-            {post.message && (
-                <div style={{whiteSpace: 'pre-wrap', marginBottom: codeSnippets.length > 0 || issueRefs.length > 0 ? '8px' : 0}}>
-                    {post.message}
-                </div>
-            )}
+        <div className='issues-oli-response' style={{marginTop: '8px'}}>
             {codeSnippets.length > 0 && (
                 <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
                     {codeSnippets.map((snippet, i) => (
