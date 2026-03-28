@@ -25,6 +25,7 @@ type Plugin struct {
 	store               Store
 	conversationMonitor *ConversationMonitor
 	botUserID           string
+	oliAgentUserID      string
 	aiClient            *AIClient
 }
 
@@ -38,6 +39,12 @@ func (p *Plugin) OnActivate() error {
 		return err
 	}
 	p.botUserID = botUserID
+
+	oliAgentUserID, oliErr := p.ensureOliAgent()
+	if oliErr != nil {
+		return fmt.Errorf("failed to create oli-agent bot: %w", oliErr)
+	}
+	p.oliAgentUserID = oliAgentUserID
 
 	notifChannel, chErr := p.ensureNotificationChannel()
 	if chErr != nil {
@@ -225,16 +232,139 @@ func (p *Plugin) onConversationEnd(conv *conversationState, usernameCache map[st
 // MessageHasBeenPosted is invoked after a message is posted. It feeds the
 // post into the conversation monitor to track DM conversation lifecycles.
 // If the message mentions @fiona, the conversation is flushed immediately.
+// If the message mentions @oli or is a DM to the oli-agent bot, it triggers
+// Oli's chat handler.
 func (p *Plugin) MessageHasBeenPosted(_ *plugin.Context, post *model.Post) {
+	// Skip messages from our own bots to avoid loops.
+	if post.UserId == p.botUserID || post.UserId == p.oliAgentUserID {
+		return
+	}
+
 	p.conversationMonitor.HandlePost(post)
 
 	if containsFionaMention(post.Message) {
 		p.conversationMonitor.FlushConversation(post.ChannelId)
 	}
+
+	// Handle @oli mentions.
+	if containsOliMention(post.Message) {
+		p.handleOliMention(post)
+		return
+	}
+
+	// Handle DMs to the oli-agent bot.
+	channel, appErr := p.API.GetChannel(post.ChannelId)
+	if appErr == nil && channel.Type == model.ChannelTypeDirect {
+		members, membErr := p.API.GetChannelMembers(post.ChannelId, 0, 10)
+		if membErr == nil {
+			for _, m := range members {
+				if m.UserId == p.oliAgentUserID {
+					p.handleOliMention(post)
+					return
+				}
+			}
+		}
+	}
 }
 
 func containsFionaMention(message string) bool {
 	return strings.Contains(strings.ToLower(message), "@fiona")
+}
+
+func containsOliMention(message string) bool {
+	return strings.Contains(strings.ToLower(message), "@oli")
+}
+
+// handleOliMention sends the user's question to the AI service and posts
+// Oli's response back in the same channel/thread.
+func (p *Plugin) handleOliMention(post *model.Post) {
+	p.configLock.RLock()
+	config := p.config
+	client := p.aiClient
+	p.configLock.RUnlock()
+
+	if client == nil || config == nil || !config.isAIEnabled() {
+		return
+	}
+
+	// Strip @oli mention from the message to get the question.
+	message := post.Message
+	lower := strings.ToLower(message)
+	if idx := strings.Index(lower, "@oli"); idx >= 0 {
+		message = message[:idx] + message[idx+4:]
+	}
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return
+	}
+
+	// Resolve username.
+	username := post.UserId
+	if user, appErr := p.API.GetUser(post.UserId); appErr == nil {
+		username = user.Username
+	}
+
+	// Build callback URL.
+	siteURL := "http://localhost:8065"
+	if cfg := p.API.GetConfig(); cfg != nil && cfg.ServiceSettings.SiteURL != nil && *cfg.ServiceSettings.SiteURL != "" {
+		siteURL = *cfg.ServiceSettings.SiteURL
+	}
+	callbackURL := siteURL + "/plugins/com.mattermost.issues"
+
+	req := &ChatRequest{
+		Message:        message,
+		ChannelID:      post.ChannelId,
+		Username:       username,
+		CallbackURL:    callbackURL,
+		InternalSecret: config.AIServiceSecret,
+		OpenAIAPIKey:   config.OpenAIAPIKey,
+	}
+
+	oliUserID := p.oliAgentUserID
+	channelID := post.ChannelId
+	rootID := post.RootId
+	if rootID == "" && post.Id != "" {
+		// If the mention is a top-level post, reply in a thread under it.
+		rootID = post.Id
+	}
+
+	go func() {
+		p.API.LogInfo("[Oli] handling question",
+			"channel_id", channelID,
+			"user", username,
+			"message", message,
+		)
+
+		result, err := client.Chat(req)
+		if err != nil {
+			p.API.LogError("[Oli] chat failed", "error", err.Error())
+			return
+		}
+
+		props := map[string]interface{}{}
+		oliData := map[string]interface{}{}
+		if len(result.CodeSnippets) > 0 {
+			oliData["code_snippets"] = result.CodeSnippets
+		}
+		if len(result.IssueRefs) > 0 {
+			oliData["issue_refs"] = result.IssueRefs
+		}
+		if len(oliData) > 0 {
+			props["oli_data"] = oliData
+		}
+
+		replyPost := &model.Post{
+			UserId:    oliUserID,
+			ChannelId: channelID,
+			RootId:    rootID,
+			Message:   result.Text,
+			Type:      "custom_oli_response",
+			Props:     props,
+		}
+		if _, appErr := p.API.CreatePost(replyPost); appErr != nil {
+			p.API.LogError("[Oli] failed to post response", "error", appErr.Error())
+		}
+	}()
 }
 
 // ensureNotificationChannel finds or creates the "oli-notificacions" channel.
@@ -272,6 +402,19 @@ func (p *Plugin) ensureBot() (string, error) {
 		Username:    "oli-bot",
 		DisplayName: "Oli Bot",
 		Description: "Posts conversation end notifications.",
+	})
+	if err != nil {
+		return "", err
+	}
+	return botUserID, nil
+}
+
+// ensureOliAgent finds or creates the "oli-agent" bot user.
+func (p *Plugin) ensureOliAgent() (string, error) {
+	botUserID, err := p.API.EnsureBotUser(&model.Bot{
+		Username:    "oli-agent",
+		DisplayName: "Oli",
+		Description: "AI team member — ask me about the codebase, issues, or company.",
 	})
 	if err != nil {
 		return "", err
