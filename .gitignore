@@ -1,3 +1,5 @@
+localhost+*.pem
+fiona_nica/.env
 Thumbs.db
 .DS_Store
 *.log
