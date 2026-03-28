@@ -51,6 +51,7 @@ class Client {
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: 'GET',
             headers: this.getHeaders(),
+            credentials: 'include',
         });
         if (!response.ok) {
             throw new Error(`GET ${path} failed: ${response.status}`);
@@ -62,6 +63,7 @@ class Client {
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: 'POST',
             headers: this.getHeaders(),
+            credentials: 'include',
             body: JSON.stringify(body),
         });
         if (!response.ok) {
@@ -74,6 +76,7 @@ class Client {
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: 'PUT',
             headers: this.getHeaders(),
+            credentials: 'include',
             body: JSON.stringify(body),
         });
         if (!response.ok) {
@@ -86,6 +89,7 @@ class Client {
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: 'DELETE',
             headers: this.getHeaders(),
+            credentials: 'include',
         });
         if (!response.ok) {
             throw new Error(`DELETE ${path} failed: ${response.status}`);
@@ -95,13 +99,49 @@ class Client {
     private getHeaders(): Record<string, string> {
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
         };
-        // Mattermost sets the CSRF token in a meta tag.
+
+        // Try to get the auth token from Mattermost's client.
+        // The token is stored in localStorage or in the cookie.
+        const token = this.getAuthToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Mattermost CSRF token from meta tag.
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         if (csrfToken) {
             headers['X-CSRF-Token'] = csrfToken;
         }
+
         return headers;
+    }
+
+    private getAuthToken(): string {
+        // Mattermost stores the token in localStorage under different keys
+        // depending on version. Try common locations.
+        try {
+            // Standard Mattermost token storage
+            const token = localStorage.getItem('MMTOKEN') ||
+                          localStorage.getItem('token') ||
+                          '';
+            if (token) {
+                return token;
+            }
+
+            // Try to get from cookie
+            const cookies = document.cookie.split(';');
+            for (const cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'MMAUTHTOKEN' && value) {
+                    return value;
+                }
+            }
+        } catch {
+            // Ignore errors
+        }
+        return '';
     }
 }
 
