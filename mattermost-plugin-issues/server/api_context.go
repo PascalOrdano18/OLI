@@ -17,8 +17,9 @@ type ProjectContext struct {
 	Cycles  []*Cycle      `json:"cycles"`
 }
 
-// GeneralContext is the full state: all projects with their data.
+// GeneralContext is the full state: company info plus all projects with their data.
 type GeneralContext struct {
+	Company  *CompanyInfo     `json:"company"`
 	Projects []ProjectContext `json:"projects"`
 }
 
@@ -32,6 +33,12 @@ type IssueContext struct {
 
 // GET /api/v1/context/general
 func (p *Plugin) handleGetGeneralContext(w http.ResponseWriter, _ *http.Request) {
+	companyInfo, err := p.store.GetCompanyInfo()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	projects, err := p.store.ListProjects()
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
@@ -39,8 +46,12 @@ func (p *Plugin) handleGetGeneralContext(w http.ResponseWriter, _ *http.Request)
 	}
 
 	result := GeneralContext{
+		Company:  companyInfo,
 		Projects: make([]ProjectContext, 0, len(projects)),
 	}
+
+	totalIssues := 0
+	openIssues := 0
 
 	for _, project := range projects {
 		issues, err := p.store.ListIssues(project.ID, IssueFilterParams{})
@@ -59,12 +70,26 @@ func (p *Plugin) handleGetGeneralContext(w http.ResponseWriter, _ *http.Request)
 			return
 		}
 
+		for _, issue := range issues {
+			totalIssues++
+			if !issue.Status.IsCompleted() {
+				openIssues++
+			}
+		}
+
 		result.Projects = append(result.Projects, ProjectContext{
 			Project: project,
 			Issues:  issues,
 			Labels:  labels,
 			Cycles:  cycles,
 		})
+	}
+
+	// Fill in live stats if company info exists.
+	if result.Company != nil {
+		result.Company.State.ActiveProjects = len(projects)
+		result.Company.State.TotalIssues = totalIssues
+		result.Company.State.OpenIssues = openIssues
 	}
 
 	respondJSON(w, http.StatusOK, result)
