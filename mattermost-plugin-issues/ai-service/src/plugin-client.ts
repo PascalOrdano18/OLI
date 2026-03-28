@@ -14,6 +14,8 @@ export class PluginClient {
 
     private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
         const url = `${this.baseURL}${path}`;
+        const method = options.method || 'GET';
+        console.log(`[PluginClient] ${method} ${url}${options.body ? ` body=${String(options.body).substring(0, 300)}` : ''}`);
         const response = await fetch(url, {
             ...options,
             headers: {
@@ -22,11 +24,12 @@ export class PluginClient {
                 ...(options.headers || {}),
             },
         });
+        const text = await response.text();
+        console.log(`[PluginClient] ${method} ${path} → ${response.status} (${text.length} chars): ${text.substring(0, 500)}`);
         if (!response.ok) {
-            const text = await response.text();
             throw new Error(`Plugin API error ${response.status}: ${text}`);
         }
-        return response.json() as Promise<T>;
+        return JSON.parse(text) as T;
     }
 
     async listProjects(): Promise<Project[]> {

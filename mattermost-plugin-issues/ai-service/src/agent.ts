@@ -36,6 +36,13 @@ Guidelines:
 export async function analyzeConversation(request: AnalyzeRequest): Promise<AnalyzeResponse> {
     const { conversation, call_transcription, callback_url, internal_secret, openai_api_key } = request;
 
+    console.log(`[AI Agent] === ANALYZE START ===`);
+    console.log(`[AI Agent] callback_url=${callback_url}`);
+    console.log(`[AI Agent] internal_secret=${internal_secret ? '***' + internal_secret.slice(-4) : 'MISSING'}`);
+    console.log(`[AI Agent] openai_api_key=${openai_api_key ? '***' + openai_api_key.slice(-4) : 'MISSING'}`);
+    console.log(`[AI Agent] channel_id=${conversation.channel_id}, channel_type=${conversation.channel_type}`);
+    console.log(`[AI Agent] has call_transcription=${!!call_transcription}, messages=${conversation.messages.length}`);
+
     const client = new PluginClient(callback_url, internal_secret);
     const tools = createTools(client);
 
@@ -51,12 +58,15 @@ export async function analyzeConversation(request: AnalyzeRequest): Promise<Anal
         .join(', ');
 
     // Pre-fetch all existing issues so the model can see them before deciding.
+    console.log(`[AI Agent] Pre-fetching projects and issues...`);
     let existingIssuesSection = '';
     try {
         const projects = await client.listProjects();
+        console.log(`[AI Agent] Found ${projects.length} projects:`, JSON.stringify(projects.map(p => ({ id: p.id, name: p.name, prefix: p.prefix }))));
         const issueLines: string[] = [];
         for (const project of projects) {
             const result = await client.listIssues(project.id);
+            console.log(`[AI Agent] Project "${project.name}" has ${result.issues.length} issues`);
             for (const issue of result.issues) {
                 const desc = issue.description.length > 150
                     ? issue.description.substring(0, 150) + '...'
@@ -70,9 +80,10 @@ export async function analyzeConversation(request: AnalyzeRequest): Promise<Anal
             existingIssuesSection = '\n\n---\n**EXISTING ISSUES:** None yet.';
         }
     } catch (err) {
-        console.error('[AI Agent] Failed to pre-fetch issues:', err);
+        console.error('[AI Agent] FAILED to pre-fetch issues:', err);
         existingIssuesSection = '\n\n---\n**EXISTING ISSUES:** Could not fetch — use list_projects and search_all_issues to check manually.';
     }
+    console.log(`[AI Agent] Existing issues section length: ${existingIssuesSection.length} chars`);
 
     let prompt: string;
 
@@ -114,6 +125,9 @@ ${existingIssuesSection}
 Analyze this conversation and take appropriate action. If the conversation seems to reference earlier context or is unclear without prior messages, use get_channel_history with the channel ID above.`;
     }
 
+    console.log(`[AI Agent] Sending prompt to GPT-4o-mini (${prompt.length} chars)...`);
+    console.log(`[AI Agent] === FULL PROMPT ===\n${prompt}\n=== END PROMPT ===`);
+
     const result = await generateText({
         model: openai('gpt-4o-mini'),
         tools,
@@ -122,18 +136,35 @@ Analyze this conversation and take appropriate action. If the conversation seems
         prompt,
         toolChoice: 'auto',
         onStepFinish: (step) => {
+            console.log(`[AI Agent] Step finished: toolCalls=${step.toolCalls?.length || 0}, text=${step.text?.substring(0, 200) || '(none)'}`);
             if (step.toolCalls?.length) {
                 for (const tc of step.toolCalls) {
-                    console.log(`[AI Agent] Tool call: ${tc.toolName}(${JSON.stringify(tc.args).substring(0, 200)})`);
+                    console.log(`[AI Agent] Tool call: ${tc.toolName}(${JSON.stringify(tc.args).substring(0, 500)})`);
+                }
+            }
+            if (step.toolResults?.length) {
+                for (const tr of step.toolResults) {
+                    console.log(`[AI Agent] Tool result for ${tr.toolName}: ${JSON.stringify(tr.result).substring(0, 500)}`);
                 }
             }
         },
     });
 
-    const actionsTaken = result.steps
-        .flatMap((s) => s.toolCalls || [])
+    console.log(`[AI Agent] GPT response text: ${result.text?.substring(0, 500)}`);
+    console.log(`[AI Agent] Total steps: ${result.steps.length}`);
+    for (let i = 0; i < result.steps.length; i++) {
+        const s = result.steps[i];
+        console.log(`[AI Agent] Step ${i}: toolCalls=${s.toolCalls?.length || 0}, text=${s.text?.substring(0, 100) || '(none)'}`);
+    }
+
+    const allToolCalls = result.steps.flatMap((s) => s.toolCalls || []);
+    console.log(`[AI Agent] All tool calls: ${allToolCalls.map(tc => tc.toolName).join(', ') || 'NONE'}`);
+
+    const actionsTaken = allToolCalls
         .filter((tc) => tc.toolName === 'create_issue' || tc.toolName === 'update_issue')
         .length;
+
+    console.log(`[AI Agent] === ANALYZE DONE: ${actionsTaken} actions taken ===`);
 
     return {
         summary: result.text,
