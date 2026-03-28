@@ -335,3 +335,72 @@ func (p *Plugin) handleInternalGetChannelHistory(w http.ResponseWriter, r *http.
 		"count":      len(messages),
 	})
 }
+
+func (p *Plugin) handleInternalGetCompanyInfo(w http.ResponseWriter, _ *http.Request) {
+	info, err := p.store.GetCompanyInfo()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if info == nil {
+		respondJSON(w, http.StatusOK, &CompanyInfo{})
+		return
+	}
+	respondJSON(w, http.StatusOK, info)
+}
+
+func (p *Plugin) handleInternalUpdateCompanyInfo(w http.ResponseWriter, r *http.Request) {
+	existing, err := p.store.GetCompanyInfo()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if existing == nil {
+		existing = &CompanyInfo{}
+	}
+
+	var updates CompanyInfo
+	if err := decodeJSON(r, &updates); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Merge: only overwrite non-zero fields.
+	if updates.Company.Name != "" {
+		existing.Company.Name = updates.Company.Name
+	}
+	if updates.Company.Mission != "" {
+		existing.Company.Mission = updates.Company.Mission
+	}
+	if updates.Company.Description != "" {
+		existing.Company.Description = updates.Company.Description
+	}
+	if len(updates.Company.TeamMembers) > 0 {
+		existing.Company.TeamMembers = updates.Company.TeamMembers
+	}
+	if updates.Repository.URL != "" {
+		existing.Repository.URL = updates.Repository.URL
+	}
+	if updates.Repository.Description != "" {
+		existing.Repository.Description = updates.Repository.Description
+	}
+	if len(updates.Repository.TechStack) > 0 {
+		existing.Repository.TechStack = updates.Repository.TechStack
+	}
+	if updates.Repository.MainBranch != "" {
+		existing.Repository.MainBranch = updates.Repository.MainBranch
+	}
+	if updates.State.Summary != "" {
+		existing.State.Summary = updates.State.Summary
+	}
+	if updates.State.Phase != "" {
+		existing.State.Phase = updates.State.Phase
+	}
+
+	if err := p.store.SetCompanyInfo(existing); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, existing)
+}
