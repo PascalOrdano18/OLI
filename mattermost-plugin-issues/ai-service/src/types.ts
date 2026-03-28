@@ -34,6 +34,7 @@ export interface AnalyzeRequest {
 export interface AnalyzeResponse {
     summary: string;
     actions_taken: number;
+    issue_refs: IssueRef[];
 }
 
 export interface Project {
