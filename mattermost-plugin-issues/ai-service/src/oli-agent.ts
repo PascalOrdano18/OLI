@@ -66,8 +66,9 @@ Channel ID (for fetching history if needed): ${channel_id}`;
                         });
                     }
 
-                    // Capture issue refs from get_issue results.
-                    if (tr.toolName === 'get_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                    // Capture issue refs from single-issue tool results.
+                    if (['get_issue', 'create_issue', 'update_issue'].includes(tr.toolName) &&
+                        tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
                         const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
                         if (!issueRefs.some((ref) => ref.id === r.id)) {
                             issueRefs.push({
@@ -80,29 +81,20 @@ Channel ID (for fetching history if needed): ${channel_id}`;
                         }
                     }
 
-                    // Capture issue refs from create_issue results.
-                    if (tr.toolName === 'create_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
-                        const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
-                        issueRefs.push({
-                            id: r.id,
-                            identifier: r.identifier,
-                            title: r.title,
-                            status: r.status,
-                            priority: r.priority,
-                        });
-                    }
-
-                    // Capture issue refs from update_issue results.
-                    if (tr.toolName === 'update_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
-                        const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
-                        if (!issueRefs.some((ref) => ref.id === r.id)) {
-                            issueRefs.push({
-                                id: r.id,
-                                identifier: r.identifier,
-                                title: r.title,
-                                status: r.status,
-                                priority: r.priority,
-                            });
+                    // Capture issue refs from list_issues and search_all_issues results.
+                    if (['list_issues', 'search_all_issues'].includes(tr.toolName) &&
+                        tr.result && typeof tr.result === 'object' && 'issues' in tr.result) {
+                        const r = tr.result as { issues: Array<{ id: string; identifier: string; title: string; status: string; priority: string }> };
+                        for (const issue of r.issues) {
+                            if (!issueRefs.some((ref) => ref.id === issue.id)) {
+                                issueRefs.push({
+                                    id: issue.id,
+                                    identifier: issue.identifier,
+                                    title: issue.title,
+                                    status: issue.status,
+                                    priority: issue.priority,
+                                });
+                            }
                         }
                     }
                 }
