@@ -159,8 +159,8 @@ declare global {
                 resizeTerminal: (projectId: string, cols: number, rows: number) => Promise<void>;
                 killSession: (projectId: string) => Promise<void>;
                 getSessionStatus: (projectId: string) => Promise<{sessionId: string | null; hasRepoPath: boolean; repoPath: string | null}>;
-                onOutputUpdate: (cb: (data: {screen: string}) => void) => void;
-                offOutputUpdate: (cb: (data: {screen: string}) => void) => void;
+                onOutputUpdate: (cb: (data: {data: string; isInitial?: boolean}) => void) => void;
+                offOutputUpdate: (cb: (data: {data: string; isInitial?: boolean}) => void) => void;
                 openTerminal: (projectId: string) => Promise<void>;
             };
 

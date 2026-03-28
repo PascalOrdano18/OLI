@@ -1,7 +1,6 @@
 "use client";
 
 import { DirectTerminal } from "@/components/DirectTerminal";
-import { Terminal } from "@/components/Terminal";
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 
@@ -366,7 +365,7 @@ function TerminalTestPageContent() {
                   ✅ Battle-tested (ttyd)
                   <br />❌ No control over capabilities
                 </div>
-                <Terminal sessionId={oldSessionId} />
+                <DirectTerminal sessionId={oldSessionId} />
               </div>
 
               {/* New Implementation */}
