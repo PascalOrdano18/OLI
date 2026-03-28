@@ -4,8 +4,9 @@
 import {tool} from 'ai';
 import {z} from 'zod';
 
-export async function executeDeleteIssue(_issueId: string): Promise<{deleted: boolean}> {
-    throw new Error('Not implemented');
+export async function executeDeleteIssue(issueId: string): Promise<{deleted: boolean}> {
+    console.log('[TOOL] deleteIssue →', issueId);
+    return {deleted: true};
 }
 
 export const deleteIssueTool = tool({

@@ -6,8 +6,10 @@ import {z} from 'zod';
 
 import type {Issue} from '../types';
 
-export async function executeUpdateIssue(_issue: Issue): Promise<Issue> {
-    throw new Error('Not implemented');
+export async function executeUpdateIssue(issue: Issue): Promise<Issue> {
+    const updated = {...issue, updatedAt: new Date().toISOString()};
+    console.log('[TOOL] updateIssue →', JSON.stringify(updated, null, 2));
+    return updated;
 }
 
 export const updateIssueTool = tool({

@@ -4,9 +4,12 @@
 import 'dotenv/config';
 import express from 'express';
 
-import {runAgent as runMessagesAgent} from '../fiona/messages/agent.ts';
-import {runAgent as runCallsAgent} from '../fiona/calls/agent.ts';
-import {getPostsBefore, postMessage} from '../fiona/common/mattermost.ts';
+import type {MattermostPost} from './common/mattermost';
+import {getPostsBefore, postMessage} from './common/mattermost';
+import type {Context} from './common/types';
+
+import {runAgent as runMessagesAgent} from './messages/agent';
+import {runAgent as runCallsAgent} from './calls/agent';
 
 const app = express();
 app.use(express.json());
@@ -14,10 +17,11 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 app.post('/fiona/messages', async (req, res) => {
-    const {triggerPost, channelId} = req.body;
+    const {triggerPost, channelId} = req.body as {triggerPost: MattermostPost; channelId: string};
 
     if (!triggerPost || !channelId) {
-        return res.status(400).json({error: 'Missing triggerPost or channelId'});
+        res.status(400).json({error: 'Missing triggerPost or channelId'});
+        return;
     }
 
     try {
@@ -25,26 +29,29 @@ app.post('/fiona/messages', async (req, res) => {
         const {reply} = await runMessagesAgent(triggerPost, contextPosts);
 
         await postMessage(channelId, reply);
-        return res.json({reply});
+        res.json({reply});
     } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error('[POST /fiona/messages] Error:', err);
-        return res.status(500).json({error: err.message});
+        res.status(500).json({error: message});
     }
 });
 
 app.post('/fiona/calls', async (req, res) => {
-    const {context, transcript} = req.body;
+    const {context, transcript} = req.body as {context: Context; transcript: string};
 
     if (!context || !transcript) {
-        return res.status(400).json({error: 'Missing context or transcript'});
+        res.status(400).json({error: 'Missing context or transcript'});
+        return;
     }
 
     try {
         const {reply} = await runCallsAgent(context, transcript);
-        return res.json({reply});
+        res.json({reply});
     } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error('[POST /fiona/calls] Error:', err);
-        return res.status(500).json({error: err.message});
+        res.status(500).json({error: message});
     }
 });
 

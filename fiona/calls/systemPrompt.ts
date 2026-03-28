@@ -1,7 +1,7 @@
 // Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import type {Context} from '../../common/types';
+import type {Context} from '../common/types';
 
 const basePrompt = `You are an intelligent project management agent embedded in a unified communication and development platform. Your role is to analyze video call transcripts and maintain the project's issue tracker by creating, updating, or deleting issues based on what was discussed.
 

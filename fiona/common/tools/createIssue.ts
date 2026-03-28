@@ -6,8 +6,14 @@ import {z} from 'zod';
 
 import type {Issue, NewIssue} from '../types';
 
-export async function executeCreateIssue(_issue: NewIssue): Promise<Issue> {
-    throw new Error('Not implemented');
+let nextId = 4;
+
+export async function executeCreateIssue(issue: NewIssue): Promise<Issue> {
+    const id = `ALPHA-${nextId++}`;
+    const now = new Date().toISOString();
+    const created: Issue = {id, ...issue, labels: issue.labels ?? [], createdAt: now, updatedAt: now};
+    console.log('[TOOL] createIssue →', JSON.stringify(created, null, 2));
+    return created;
 }
 
 export const createIssueTool = tool({

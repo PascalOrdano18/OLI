@@ -1,25 +1,24 @@
 {
   "name": "fiona",
   "version": "1.0.0",
-  "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "start": "tsx index.ts",
+    "dev": "tsx watch index.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.64",
-    "@anthropic-ai/sdk": "^0.80.0",
     "@mattermost/client": "^11.5.0",
     "ai": "^6.0.141",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "node-fetch": "^3.3.2",
     "ws": "^8.20.0",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.2"
   }
 }
