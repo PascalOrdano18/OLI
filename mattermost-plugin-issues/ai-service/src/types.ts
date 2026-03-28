@@ -97,3 +97,55 @@ export interface ChannelHistoryResponse {
     messages: ChannelHistoryMessage[];
     count: number;
 }
+
+export interface ChatRequest {
+    message: string;
+    channel_id: string;
+    username: string;
+    callback_url: string;
+    internal_secret: string;
+    openai_api_key: string;
+}
+
+export interface CodeSnippet {
+    file: string;
+    lines: string;
+    language: string;
+    content: string;
+}
+
+export interface IssueRef {
+    id: string;
+    identifier: string;
+    title: string;
+    status: string;
+    priority: string;
+}
+
+export interface ChatResponse {
+    text: string;
+    code_snippets: CodeSnippet[];
+    issue_refs: IssueRef[];
+}
+
+export interface CompanyInfo {
+    company: {
+        name: string;
+        mission: string;
+        description: string;
+        team_members: string[];
+    };
+    repository: {
+        url: string;
+        description: string;
+        tech_stack: string[];
+        main_branch: string;
+    };
+    current_state: {
+        summary: string;
+        phase: string;
+        active_projects: number;
+        total_issues: number;
+        open_issues: number;
+    };
+}
