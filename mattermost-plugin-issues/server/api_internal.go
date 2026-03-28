@@ -214,6 +214,24 @@ func (p *Plugin) handleInternalListCycles(w http.ResponseWriter, r *http.Request
 	respondJSON(w, http.StatusOK, cycles)
 }
 
+func (p *Plugin) handleInternalDeleteIssue(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+
+	issue, err := p.store.GetIssue(id)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if err := p.store.DeleteIssue(id); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	p.broadcastIssue(wsEventIssueDeleted, issue)
+	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
 // channelHistoryMessage is a single message returned by the channel history endpoint.
 type channelHistoryMessage struct {
 	UserID   string `json:"user_id"`
