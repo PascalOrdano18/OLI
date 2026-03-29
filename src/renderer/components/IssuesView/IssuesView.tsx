@@ -28,14 +28,14 @@ const STATUS_LABELS: Record<IssueStatus, string> = {
     in_review: 'In Review', done: 'Done', cancelled: 'Cancelled',
 };
 const STATUS_COLORS: Record<IssueStatus, string> = {
-    backlog: '#8b95a1', todo: '#3d9ef5', in_progress: '#f5a623',
+    backlog: '#8b95a1', todo: '#96afc5', in_progress: '#f5a623',
     in_review: '#9b59b6', done: '#3dc779', cancelled: '#e05c5c',
 };
 const PRIORITY_LABELS: Record<IssuePriority, string> = {
     urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low', none: 'No Priority',
 };
 const PRIORITY_COLORS: Record<IssuePriority, string> = {
-    urgent: '#e05c5c', high: '#f5a623', medium: '#f5d63d', low: '#3d9ef5', none: '#8b95a1',
+    urgent: '#e05c5c', high: '#f5a623', medium: '#f5d63d', low: '#96afc5', none: '#8b95a1',
 };
 const PRIORITY_ICONS: Record<IssuePriority, string> = {
     urgent: '!', high: '↑', medium: '—', low: '↓', none: '·',

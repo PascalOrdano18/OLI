@@ -5,7 +5,9 @@ import {type BrowserWindow, WebContentsView, app, ipcMain} from 'electron';
 import type {WebContentsViewConstructorOptions, Event} from 'electron/main';
 import type {Options} from 'electron-context-menu';
 import {EventEmitter} from 'events';
+import path from 'path';
 import semver from 'semver';
+import {pathToFileURL} from 'url';
 
 import NavigationManager from 'app/navigationManager';
 import AppState from 'common/appState';
@@ -46,6 +48,346 @@ enum Status {
     WAITING_MM,
     ERROR = -1,
 }
+
+const buildDesktopSidebarThemeOverrideScript = () => {
+    const openSansRegular = pathToFileURL(path.join(app.getAppPath(), 'dist', 'assets', 'fonts', 'open-sans-v13-latin-ext_latin_cyrillic-ext_greek-ext_greek_cyrillic_vietnamese-regular.woff2')).href;
+    const openSansSemiBold = pathToFileURL(path.join(app.getAppPath(), 'dist', 'assets', 'fonts', 'open-sans-v13-latin-ext_latin_cyrillic-ext_greek-ext_greek_cyrillic_vietnamese-600.woff2')).href;
+
+    return `
+(() => {
+    const themeVars = {
+        '--sidebar-bg': '#ffffff',
+        '--sidebar-header-bg': '#ffffff',
+        '--sidebar-team-bar-bg': '#f6f8fa',
+        '--sidebar-text-hover-bg': '#f6f8fa',
+        '--sidebar-text-active-border': '#d1d9e0',
+        '--sidebar-text-active-color': '#000000',
+        '--sidebar-text': '#000000',
+        '--sidebar-unread-text': '#000000',
+        '--sidebar-header-text-color': '#000000',
+    };
+
+    const sidebarSurfaceColors = new Map([
+        ['rgb(30, 50, 92)', '#ffffff'],
+        ['rgb(25, 42, 77)', '#ffffff'],
+        ['rgb(22, 37, 69)', '#f6f8fa'],
+        ['rgb(40, 66, 123)', '#f6f8fa'],
+    ]);
+
+    const sidebarStyle = \`
+        @font-face {
+            font-family: 'Open Sans';
+            font-style: normal;
+            font-weight: 400;
+            src: url('${openSansRegular}') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Open Sans';
+            font-style: normal;
+            font-weight: 600;
+            src: url('${openSansSemiBold}') format('woff2');
+        }
+
+        html,
+        body,
+        input,
+        textarea,
+        select,
+        button {
+            font-family: 'Open Sans', sans-serif !important;
+        }
+
+        #SidebarContainer,
+        .SidebarContainer,
+        .sidebar-left,
+        [class*="sidebar-left"] {
+            background: #ffffff !important;
+            color: #000000 !important;
+            font-family: 'Open Sans', sans-serif !important;
+            border-right: 1px solid rgba(31, 35, 40, 0.12) !important;
+            box-sizing: border-box !important;
+        }
+
+        #SidebarContainer *,
+        .SidebarContainer *,
+        .sidebar-left *,
+        [class*="sidebar-left"] * {
+            color: #000000 !important;
+            font-family: 'Open Sans', sans-serif !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        #SidebarContainer svg,
+        #SidebarContainer svg path,
+        .SidebarContainer svg,
+        .SidebarContainer svg path,
+        .sidebar-left svg,
+        .sidebar-left svg path,
+        [class*="sidebar-left"] svg,
+        [class*="sidebar-left"] svg path {
+            fill: currentColor !important;
+        }
+
+        #SidebarContainer input,
+        .SidebarContainer input,
+        .sidebar-left input,
+        [class*="sidebar-left"] input {
+            color: #000000 !important;
+            caret-color: #000000 !important;
+        }
+
+        #SidebarContainer input::placeholder,
+        .SidebarContainer input::placeholder,
+        .sidebar-left input::placeholder,
+        [class*="sidebar-left"] input::placeholder {
+            color: rgba(0, 0, 0, 0.6) !important;
+        }
+
+        #SidebarContainer button,
+        .SidebarContainer button,
+        .sidebar-left button,
+        [class*="sidebar-left"] button {
+            color: #000000 !important;
+        }
+
+        #SidebarContainer [class*="SidebarChannelGroupHeader"],
+        #SidebarContainer [class*="SidebarSectionTitle"],
+        #SidebarContainer [class*="SidebarCategory"],
+        #SidebarContainer [class*="SidebarGroupLabel"],
+        .SidebarContainer [class*="SidebarChannelGroupHeader"],
+        .SidebarContainer [class*="SidebarSectionTitle"],
+        .SidebarContainer [class*="SidebarCategory"],
+        .SidebarContainer [class*="SidebarGroupLabel"],
+        .sidebar-left [class*="SidebarChannelGroupHeader"],
+        .sidebar-left [class*="SidebarSectionTitle"],
+        .sidebar-left [class*="SidebarCategory"],
+        .sidebar-left [class*="SidebarGroupLabel"],
+        [class*="sidebar-left"] [class*="SidebarChannelGroupHeader"],
+        [class*="sidebar-left"] [class*="SidebarSectionTitle"],
+        [class*="sidebar-left"] [class*="SidebarCategory"],
+        [class*="sidebar-left"] [class*="SidebarGroupLabel"] {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.6px !important;
+            color: rgba(31, 35, 40, 0.56) !important;
+            opacity: 1 !important;
+        }
+
+        #SidebarContainer [class*="SidebarLinkLabel"],
+        #SidebarContainer [class*="SidebarItem"] a,
+        #SidebarContainer [class*="SidebarItem"] span,
+        #SidebarContainer [class*="SidebarChannel"] a,
+        #SidebarContainer [class*="SidebarChannel"] span,
+        .SidebarContainer [class*="SidebarLinkLabel"],
+        .SidebarContainer [class*="SidebarItem"] a,
+        .SidebarContainer [class*="SidebarItem"] span,
+        .SidebarContainer [class*="SidebarChannel"] a,
+        .SidebarContainer [class*="SidebarChannel"] span,
+        .sidebar-left a,
+        .sidebar-left button,
+        [class*="sidebar-left"] a,
+        [class*="sidebar-left"] button {
+            font-size: 13px !important;
+            font-weight: 400 !important;
+            letter-spacing: -0.1px !important;
+        }
+
+        #SidebarContainer [class*="SidebarHeader"] a,
+        #SidebarContainer [class*="SidebarHeader"] span,
+        #SidebarContainer [class*="SidebarHeader"] button,
+        .SidebarContainer [class*="SidebarHeader"] a,
+        .SidebarContainer [class*="SidebarHeader"] span,
+        .SidebarContainer [class*="SidebarHeader"] button,
+        .sidebar-left [class*="SidebarHeader"] a,
+        .sidebar-left [class*="SidebarHeader"] span,
+        .sidebar-left [class*="SidebarHeader"] button,
+        [class*="sidebar-left"] [class*="SidebarHeader"] a,
+        [class*="sidebar-left"] [class*="SidebarHeader"] span,
+        [class*="sidebar-left"] [class*="SidebarHeader"] button {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            letter-spacing: -0.1px !important;
+        }
+
+        #SidebarContainer [aria-current="page"],
+        .SidebarContainer [aria-current="page"],
+        .sidebar-left [aria-current="page"],
+        [class*="sidebar-left"] [aria-current="page"] {
+            background: #f6f8fa !important;
+            border-radius: 4px !important;
+        }
+
+        #SidebarContainer [aria-current="page"] *,
+        .SidebarContainer [aria-current="page"] *,
+        .sidebar-left [aria-current="page"] *,
+        [class*="sidebar-left"] [aria-current="page"] * {
+            font-weight: 600 !important;
+        }
+    \`;
+
+    const headerStyle = \`
+        header,
+        .global-header,
+        [class*="global-header"],
+        .channel-header,
+        [class*="channel-header"],
+        .top-bar,
+        [class*="top-bar"] {
+            background: #ffffff !important;
+            color: #000000 !important;
+            font-family: 'Open Sans', sans-serif !important;
+            border-bottom: 1px solid rgba(31, 35, 40, 0.12) !important;
+            box-shadow: none !important;
+            box-sizing: border-box !important;
+        }
+
+        header *,
+        .global-header *,
+        [class*="global-header"] *,
+        .channel-header *,
+        [class*="channel-header"] *,
+        .top-bar *,
+        [class*="top-bar"] * {
+            color: #000000 !important;
+            font-family: 'Open Sans', sans-serif !important;
+            border-bottom: none !important;
+            box-shadow: none !important;
+            text-shadow: none !important;
+        }
+
+        header::after,
+        .global-header::after,
+        [class*="global-header"]::after,
+        .channel-header::after,
+        [class*="channel-header"]::after,
+        .top-bar::after,
+        [class*="top-bar"]::after {
+            display: none !important;
+        }
+
+        header svg,
+        header svg path,
+        .global-header svg,
+        .global-header svg path,
+        [class*="global-header"] svg,
+        [class*="global-header"] svg path,
+        .channel-header svg,
+        .channel-header svg path,
+        [class*="channel-header"] svg,
+        [class*="channel-header"] svg path,
+        .top-bar svg,
+        .top-bar svg path,
+        [class*="top-bar"] svg,
+        [class*="top-bar"] svg path {
+            fill: currentColor !important;
+        }
+
+        .channel-header h1,
+        .channel-header h2,
+        .channel-header h3,
+        [class*="channel-header"] h1,
+        [class*="channel-header"] h2,
+        [class*="channel-header"] h3,
+        [class*="channel-header__title"],
+        [class*="channelHeaderTitle"],
+        [class*="TitleWrapper"] {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            letter-spacing: -0.1px !important;
+        }
+
+        .channel-header strong,
+        .channel-header b,
+        [class*="channel-header"] strong,
+        [class*="channel-header"] b,
+        #SidebarContainer strong,
+        #SidebarContainer b,
+        .SidebarContainer strong,
+        .SidebarContainer b {
+            font-weight: 600 !important;
+        }
+    \`;
+
+    const hideMattermostBranding = () => {
+        const headerRoots = Array.from(document.querySelectorAll('header, .global-header, [class*="global-header"], .top-bar, [class*="top-bar"]'));
+        const brandedLabels = new Set(['mattermost', 'team edition']);
+
+        for (const root of headerRoots) {
+            for (const element of root.querySelectorAll('a, button, div, span')) {
+                const label = element.textContent?.trim().toLowerCase();
+                if (!label || !brandedLabels.has(label)) {
+                    continue;
+                }
+
+                const hideTarget = element.closest('a, button') || element.parentElement || element;
+                if (hideTarget instanceof HTMLElement) {
+                    hideTarget.style.setProperty('display', 'none', 'important');
+                }
+            }
+        }
+
+        for (const element of document.querySelectorAll('[aria-label*="Mattermost"], [title*="Mattermost"]')) {
+            if (element instanceof HTMLElement) {
+                element.style.setProperty('display', 'none', 'important');
+            }
+        }
+    };
+
+    const applyTheme = () => {
+        const targets = [document.documentElement, document.body].filter(Boolean);
+        for (const target of targets) {
+            for (const [name, value] of Object.entries(themeVars)) {
+                target.style.setProperty(name, value, 'important');
+            }
+        }
+
+        let styleEl = document.getElementById('desktop-sidebar-theme-override');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'desktop-sidebar-theme-override';
+            document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = sidebarStyle + headerStyle;
+
+        const wrapper = document.querySelector('.main-wrapper');
+        if (wrapper) {
+            wrapper.style.setProperty('background-color', '#ffffff', 'important');
+            wrapper.style.setProperty('background-image', 'none', 'important');
+
+            for (const el of wrapper.querySelectorAll('*')) {
+                const bg = getComputedStyle(el).backgroundColor;
+                const replacement = sidebarSurfaceColors.get(bg);
+                if (replacement) {
+                    el.style.setProperty('background-color', replacement, 'important');
+                    el.style.setProperty('background-image', 'none', 'important');
+                }
+            }
+        }
+
+        hideMattermostBranding();
+    };
+
+    applyTheme();
+    window.addEventListener('load', applyTheme, {once: true});
+    setTimeout(applyTheme, 50);
+    setTimeout(applyTheme, 250);
+    setTimeout(applyTheme, 1000);
+
+    if (!window.__desktopSidebarThemeObserver) {
+        const observer = new MutationObserver(() => applyTheme());
+        observer.observe(document.documentElement, {attributes: true, attributeFilter: ['style', 'class']});
+        if (document.body) {
+            observer.observe(document.body, {attributes: true, attributeFilter: ['style', 'class']});
+        }
+        window.__desktopSidebarThemeObserver = observer;
+    }
+})();
+`;
+};
+
 export class MattermostWebContentsView extends EventEmitter {
     private view: MattermostView;
     private parentWindow: BrowserWindow;
@@ -423,6 +765,10 @@ export class MattermostWebContentsView extends EventEmitter {
                 this.status = Status.ERROR;
             }
         };
+    };
+
+    applyDesktopThemeOverride = () => {
+        void this.webContentsView.webContents.executeJavaScript(buildDesktopSidebarThemeOverrideScript());
     };
 
     /**
