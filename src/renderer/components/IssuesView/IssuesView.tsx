@@ -658,7 +658,29 @@ const DiffTab: React.FC = () => (
 
 // ── DocsTab ────────────────────────────────────────────────────────────────
 
-const DocsTab: React.FC<{issue: Issue | null; labelsMap: Record<string, IssueLabel>}> = ({issue, labelsMap}) => {
+const DocsTab: React.FC<{
+    issue: Issue | null;
+    labelsMap: Record<string, IssueLabel>;
+    labelsList: IssueLabel[];
+    onSave: (data: Partial<Issue>) => Promise<void>;
+}> = ({issue, labelsMap, labelsList, onSave}) => {
+    const [title, setTitle] = useState(issue?.title ?? '');
+    const [description, setDescription] = useState(issue?.description ?? '');
+    const [status, setStatus] = useState<IssueStatus>(issue?.status ?? 'backlog');
+    const [priority, setPriority] = useState<IssuePriority>(issue?.priority ?? 'none');
+    const [labelIds, setLabelIds] = useState<string[]>(issue?.label_ids ?? []);
+    const [dirty, setDirty] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        setTitle(issue?.title ?? '');
+        setDescription(issue?.description ?? '');
+        setStatus(issue?.status ?? 'backlog');
+        setPriority(issue?.priority ?? 'none');
+        setLabelIds(issue?.label_ids ?? []);
+        setDirty(false);
+    }, [issue?.id]);
+
     if (!issue) {
         return (
             <div className='IV__docsEmpty'>
@@ -667,39 +689,80 @@ const DocsTab: React.FC<{issue: Issue | null; labelsMap: Record<string, IssueLab
             </div>
         );
     }
-    const issueLabels = (issue.label_ids || []).map((id) => labelsMap[id]).filter(Boolean);
+
+    const handleSave = async () => {
+        if (!title.trim() || saving) { return; }
+        setSaving(true);
+        try {
+            await onSave({title: title.trim(), description, status, priority, label_ids: labelIds});
+            setDirty(false);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className='IV__docs'>
             <div className='IV__docsContent'>
                 <div className='IV__docsMeta'>
-                    <span className='IV__docsMetaItem' style={{background: STATUS_COLORS[issue.status] + '22', color: STATUS_COLORS[issue.status], border: `1px solid ${STATUS_COLORS[issue.status]}44`}}>
-                        {STATUS_LABELS[issue.status]}
-                    </span>
-                    <span className='IV__docsMetaItem' style={{color: PRIORITY_COLORS[issue.priority]}}>
-                        {PRIORITY_ICONS[issue.priority]} {PRIORITY_LABELS[issue.priority]}
-                    </span>
                     <span className='IV__docsMetaItem IV__docsMetaItem--id'>{issue.identifier}</span>
-                    {issueLabels.map((label) => (
-                        <span key={label.id} className='IV__docsMetaItem' style={{background: label.color + '22', color: label.color, border: `1px solid ${label.color}44`}}>{label.name}</span>
-                    ))}
-                </div>
-                <h1 className='IV__docsTitle'>{issue.title}</h1>
-                <div className='IV__docsSection'>
-                    <h2 className='IV__docsH2'>{'Overview'}</h2>
-                    {issue.description ? (
-                        <p className='IV__docsText'>{issue.description}</p>
-                    ) : (
-                        <p className='IV__docsText IV__docsText--placeholder'>{'No description provided.'}</p>
+                    <select
+                        value={status}
+                        onChange={(e) => { setStatus(e.target.value as IssueStatus); setDirty(true); }}
+                        className='IV__docsMetaSelect'
+                        style={{background: STATUS_COLORS[status] + '22', color: STATUS_COLORS[status], border: `1px solid ${STATUS_COLORS[status]}44`}}
+                    >
+                        {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                    <select
+                        value={priority}
+                        onChange={(e) => { setPriority(e.target.value as IssuePriority); setDirty(true); }}
+                        className='IV__docsMetaSelect'
+                        style={{color: PRIORITY_COLORS[priority]}}
+                    >
+                        {Object.entries(PRIORITY_LABELS).map(([v, l]) => <option key={v} value={v}>{PRIORITY_ICONS[v as IssuePriority]} {l}</option>)}
+                    </select>
+                    {dirty && (
+                        <button
+                            className='IV__btn IV__btn--primary IV__docsSaveBtn'
+                            onClick={handleSave}
+                            disabled={!title.trim() || saving}
+                        >{saving ? 'Saving…' : 'Save'}</button>
                     )}
                 </div>
-                <div className='IV__docsSection'>
-                    <h2 className='IV__docsH2'>{'Acceptance criteria'}</h2>
-                    <ul className='IV__docsList'>
-                        <li className='IV__docsListItem'>{'[ ] Define the expected behavior'}</li>
-                        <li className='IV__docsListItem'>{'[ ] Cover edge cases'}</li>
-                        <li className='IV__docsListItem'>{'[ ] Write tests'}</li>
-                    </ul>
+                <input
+                    className='IV__docsTitleInput'
+                    value={title}
+                    onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
+                    placeholder='Issue title'
+                />
+                <div className='IV__docsSection IV__docsSection--grow'>
+                    <h2 className='IV__docsH2'>{'Description'}</h2>
+                    <textarea
+                        className='IV__docsDescInput'
+                        value={description}
+                        onChange={(e) => { setDescription(e.target.value); setDirty(true); }}
+                        placeholder='Add a description...'
+                    />
                 </div>
+                {labelsList.length > 0 && (
+                    <div className='IV__docsSection'>
+                        <h2 className='IV__docsH2'>{'Labels'}</h2>
+                        <div className='IV__labelPicker'>
+                            {labelsList.map((label) => {
+                                const sel = labelIds.includes(label.id);
+                                return (
+                                    <button
+                                        key={label.id}
+                                        onClick={() => { setLabelIds((p) => p.includes(label.id) ? p.filter((x) => x !== label.id) : [...p, label.id]); setDirty(true); }}
+                                        className='IV__labelToggle'
+                                        style={{border: `1px solid ${label.color}`, background: sel ? label.color + '30' : 'transparent', color: label.color}}
+                                    >{label.name}</button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -910,6 +973,13 @@ const IssuesView: React.FC = () => {
         setModalIssue(undefined);
     };
 
+    const handleUpdateActiveIssue = async (data: Partial<Issue>) => {
+        if (!activeIssue) { return; }
+        const updated = await api<Issue>('PUT', `/issues/${activeIssue.id}`, data);
+        setIssues((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+        setActiveIssue(updated);
+    };
+
     const handleDeleteIssue = async () => {
         if (!modalIssue) { return; }
         if (window.confirm(`Delete "${modalIssue.identifier} ${modalIssue.title}"?`)) {
@@ -955,7 +1025,7 @@ const IssuesView: React.FC = () => {
                         />
                     )}
                     {subTab === 'diff' && <DiffTab/>}
-                    {subTab === 'docs' && <DocsTab issue={activeIssue} labelsMap={labelsMap}/>}
+                    {subTab === 'docs' && <DocsTab issue={activeIssue} labelsMap={labelsMap} labelsList={labelsList} onSave={handleUpdateActiveIssue}/>}
                 </div>
             </div>
 
