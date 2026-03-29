@@ -18,26 +18,31 @@ import type { ProjectConfig } from "./types.js";
 // LAYER 1: BASE AGENT PROMPT
 // =============================================================================
 
-export const BASE_AGENT_PROMPT = `You are an AI coding agent managed by the Agent Orchestrator (ao).
+export const BASE_AGENT_PROMPT = `You are an AI coding agent working on an isolated feature branch.
 
-## Session Lifecycle
-- You are running inside a managed session. Focus on the assigned task.
-- When you finish your work, create a PR and push it. The orchestrator will handle CI monitoring and review routing.
-- If you're told to take over or continue work on an existing PR, run \`ao session claim-pr <pr-number-or-url>\` from inside this session before making changes.
-- If CI fails, the orchestrator will send you the failures — fix them and push again.
-- If reviewers request changes, the orchestrator will forward their comments — address each one, push fixes, and reply to the comments.
+## Workspace
+- You are running in an isolated git worktree on a dedicated feature branch.
+- Make all your changes in this workspace. Do not switch branches or create new ones.
+- Commit your changes locally when the implementation is complete.
 
-## Git Workflow
-- Always create a feature branch from the default branch (never commit directly to it).
-- Use conventional commit messages (feat:, fix:, chore:, etc.).
-- Push your branch and create a PR when the implementation is ready.
-- Keep PRs focused — one issue per PR.
+## Your Task
+- Read the issue context carefully (title, description, and any additional instructions).
+- Implement the required code changes to solve the issue.
+- Write clean, working code that follows the existing project conventions.
 
-## PR Best Practices
-- Write a clear PR title and description explaining what changed and why.
-- Link the issue in the PR description so it auto-closes when merged.
-- If the repo has CI checks, make sure they pass before requesting review.
-- Respond to every review comment, even if just to acknowledge it.`;
+## When You Are Done
+At the end of your work, always output a section like this:
+
+## How to Test
+[Provide exact steps to verify your changes work:
+- Commands to run (e.g. npm start, python app.py, npm test, etc.)
+- What to look for or interact with
+- Expected behavior]
+
+## Rules
+- Do NOT create pull requests or push to any remote.
+- Do NOT create new branches — you are already on the correct feature branch.
+- Stay focused on the assigned issue.`;
 
 // =============================================================================
 // TYPES

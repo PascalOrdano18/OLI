@@ -151,6 +151,34 @@ declare global {
                 onToggleLoadingScreenVisibility: (listener: (toggle: boolean) => void) => void;
             };
 
+            ao: {
+                pickRepoPath: (serverId: string, projectId: string) => Promise<string | null>;
+                spawnSession: (projectId: string, projectName: string, sessionPrefix: string, issue: {id: string; identifier: string; title: string; description: string}, userPrompt: string) => Promise<string>;
+                sendMessage: (projectId: string, message: string) => Promise<void>;
+                sendRawInput: (projectId: string, input: string) => Promise<void>;
+                resizeTerminal: (projectId: string, cols: number, rows: number) => Promise<void>;
+                killSession: (projectId: string) => Promise<void>;
+                getSessionStatus: (projectId: string) => Promise<{sessionId: string | null; hasRepoPath: boolean; repoPath: string | null}>;
+                onOutputUpdate: (cb: (data: {data: string; isInitial?: boolean}) => void) => void;
+                offOutputUpdate: (cb: (data: {data: string; isInitial?: boolean}) => void) => void;
+                openTerminal: (projectId: string) => Promise<void>;
+                getDiff: (projectId: string) => Promise<string>;
+                getGitFiles: (projectId: string) => Promise<{name: string; type: 'file' | 'dir'}[]>;
+                getGitChanges: (projectId: string) => Promise<{path: string; status: string; additions: number; deletions: number}[]>;
+                gitAction: (projectId: string, action: string, extraArgs?: string) => Promise<string>;
+                getGitStatus: (projectId: string) => Promise<{
+                    hasWorktree: boolean;
+                    branch: string;
+                    defaultBranch: string;
+                    hasUncommittedChanges: boolean;
+                    hasUnpushedCommits: boolean;
+                    hasPR: boolean;
+                    prUrl: string;
+                    uncommittedFileCount: number;
+                    unpushedCommitCount: number;
+                }>;
+            };
+
             downloadsDropdown: {
                 requestInfo: () => void;
                 sendSize: (width: number, height: number) => void;
