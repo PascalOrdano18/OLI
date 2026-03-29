@@ -180,6 +180,8 @@
     "uuid": "9.0.1",
     "valid-url": "1.0.9",
     "windows-focus-assist": "1.4.0",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0",
     "yargs": "17.7.2"
   }
 }
