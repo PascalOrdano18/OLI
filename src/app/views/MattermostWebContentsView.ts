@@ -35,6 +35,7 @@ import {localizeMessage} from 'main/i18nManager';
 import performanceMonitor from 'main/performanceMonitor';
 import {getServerAPI} from 'main/server/serverAPI';
 
+import CUSTOM_MM_CSS from './customCSS';
 import WebContentsEventManager from './webContentEvents';
 
 import ContextMenu from '../../main/contextMenu';
@@ -97,6 +98,9 @@ export class MattermostWebContentsView extends EventEmitter {
         if (!DeveloperMode.get('disableContextMenu')) {
             this.contextMenu = new ContextMenu(this.generateContextMenu(), this.webContentsView.webContents);
         }
+        // Inject custom CSS on every page load to unify visual style with Issues view
+        this.webContentsView.webContents.on('did-finish-load', this.injectCustomCSS);
+
         this.maxRetries = MAX_SERVER_RETRIES;
 
         this.altPressStatus = false;
@@ -478,6 +482,52 @@ export class MattermostWebContentsView extends EventEmitter {
         } else {
             ViewManager.updateViewTitle(this.id, channelName, secondPart);
         }
+    };
+
+    private injectCustomCSS = () => {
+        if (this.isDestroyed()) {
+            return;
+        }
+
+        // 1. Inject CSS stylesheet
+        this.webContentsView.webContents.insertCSS(CUSTOM_MM_CSS).catch((err) => {
+            this.log.error('Failed to inject custom CSS', err);
+        });
+
+        // 2. Strip inline theme styles that Mattermost applies via JS on #app/body,
+        //    and keep watching for re-application via a MutationObserver.
+        const themeOverrideScript = `
+        (function() {
+            function stripInlineTheme() {
+                var targets = document.querySelectorAll('#app, #root, body, .app__body');
+                targets.forEach(function(el) {
+                    if (el.style.cssText) {
+                        el.style.cssText = '';
+                    }
+                });
+            }
+            stripInlineTheme();
+
+            // Watch for Mattermost re-applying inline theme styles
+            var observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(m) {
+                    if (m.type === 'attributes' && m.attributeName === 'style') {
+                        stripInlineTheme();
+                    }
+                });
+            });
+            var root = document.getElementById('app') || document.getElementById('root') || document.body;
+            if (root) {
+                observer.observe(root, { attributes: true, attributeFilter: ['style'] });
+            }
+            if (document.body && document.body !== root) {
+                observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
+            }
+        })();
+        `;
+        this.webContentsView.webContents.executeJavaScript(themeOverrideScript).catch((err) => {
+            this.log.error('Failed to inject theme override script', err);
+        });
     };
 
     private handleAltBlur = () => {
