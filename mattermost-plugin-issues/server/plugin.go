@@ -69,27 +69,9 @@ func (p *Plugin) OnActivate() error {
 		p.API.LogInfo("[ConversationMonitor] AI analysis disabled (missing configuration)")
 	}
 
-	// Seed company info if not set.
-	if info, _ := p.store.GetCompanyInfo(); info == nil {
-		_ = p.store.SetCompanyInfo(&CompanyInfo{
-			Company: CompanyDetails{
-				Name:        "OLI",
-				Mission:     "Build an AI-powered project management layer inside Mattermost that automatically tracks issues from team conversations.",
-				Description: "OLI is a hackathon project by a team of 4 ITBA engineers. It adds an intelligent issue tracker plugin to Mattermost with an AI agent (Fiona) that listens to conversations and creates, updates, or deletes issues automatically.",
-				TeamMembers: []string{"admin", "friend1", "friend2", "friend3"},
-			},
-			Repository: RepositoryDetails{
-				URL:         "https://github.com/PascalOrdano18/amsterdam",
-				Description: "Mattermost plugin with AI-powered issue tracking. Includes a Go plugin server, React webapp, and a Node.js AI service.",
-				TechStack:   []string{"Go", "React", "TypeScript", "Node.js", "Express", "OpenAI GPT-4o-mini", "Mattermost Plugin API", "Docker"},
-				MainBranch:  "master",
-			},
-			State: CurrentState{
-				Summary: "MVP is functional. Fiona (AI agent) analyzes conversations across all channels and creates issues. The plugin UI displays issues in a right-hand sidebar with filtering, grouping, and real-time updates.",
-				Phase:   "mvp",
-			},
-		})
-	}
+	// Seed sample data (projects, issues, labels, cycles, company info).
+	// Idempotent — skips if projects already exist.
+	p.seedSampleData()
 
 	p.conversationMonitor = NewConversationMonitor(p.API, p.botUserID, p.oliAgentUserID, notifChannel.Id, p.onConversationEnd)
 
