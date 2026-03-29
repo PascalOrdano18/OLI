@@ -309,15 +309,20 @@ type IssueRef struct {
 	Title      string `json:"title"`
 	Status     string `json:"status"`
 	Priority   string `json:"priority"`
+	Action     string `json:"action,omitempty"`
 }
 
 // ToMap converts an IssueRef to a map for gob-safe post Props.
 func (r IssueRef) ToMap() map[string]interface{} {
-	return map[string]interface{}{
+	m := map[string]interface{}{
 		"id":         r.ID,
 		"identifier": r.Identifier,
 		"title":      r.Title,
 		"status":     r.Status,
 		"priority":   r.Priority,
 	}
+	if r.Action != "" {
+		m["action"] = r.Action
+	}
+	return m
 }

@@ -17,6 +17,7 @@ const conversationTimeout = 2 * time.Minute
 
 // conversationMessage is a single message captured during a conversation.
 type conversationMessage struct {
+	PostID    string
 	UserID    string
 	Message   string
 	Timestamp int64
@@ -87,6 +88,7 @@ func (cm *ConversationMonitor) HandlePost(post *model.Post) {
 	defer cm.mu.Unlock()
 
 	msg := conversationMessage{
+		PostID:    post.Id,
 		UserID:    post.UserId,
 		Message:   post.Message,
 		Timestamp: post.CreateAt,

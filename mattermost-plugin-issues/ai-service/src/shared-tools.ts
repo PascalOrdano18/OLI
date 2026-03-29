@@ -176,8 +176,10 @@ export function createIssueTools(client: PluginClient) {
             }),
             execute: safe(async ({ issue_id, reason }) => {
                 console.log(`[AI Agent] Deleting issue ${issue_id}: ${reason}`);
+                // Fetch issue details before deletion so we can report what was deleted.
+                const issue = await client.getIssue(issue_id);
                 await client.deleteIssue(issue_id);
-                return { status: 'deleted', issue_id };
+                return { status: 'deleted', issue_id, identifier: issue.identifier, title: issue.title };
             }),
         }),
     };

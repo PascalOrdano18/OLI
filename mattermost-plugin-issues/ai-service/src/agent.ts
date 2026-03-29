@@ -148,28 +148,34 @@ Analyze this conversation and take appropriate action. If the conversation seems
                 for (const tr of step.toolResults) {
                     console.log(`[AI Agent] Tool result [${tr.toolName}]: ${JSON.stringify(tr.result).substring(0, 500)}`);
 
-                    // Capture issue refs from create/update/get results.
-                    if (['create_issue', 'update_issue', 'get_issue'].includes(tr.toolName) &&
-                        tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                    // Capture issue refs from create/update/get results with action type.
+                    if (tr.toolName === 'create_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
                         const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
                         if (!issueRefs.some((ref) => ref.id === r.id)) {
-                            issueRefs.push({
-                                id: r.id,
-                                identifier: r.identifier,
-                                title: r.title,
-                                status: r.status,
-                                priority: r.priority,
-                            });
+                            issueRefs.push({ ...r, action: 'created' });
                         }
                     }
-                    if (tr.toolName === 'delete_issue' && tr.result && typeof tr.result === 'object' && 'issue_id' in tr.result) {
-                        const r = tr.result as { issue_id: string; status: string };
+                    if (tr.toolName === 'update_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                        const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
+                        if (!issueRefs.some((ref) => ref.id === r.id)) {
+                            issueRefs.push({ ...r, action: 'edited' });
+                        }
+                    }
+                    if (tr.toolName === 'get_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                        const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
+                        if (!issueRefs.some((ref) => ref.id === r.id)) {
+                            issueRefs.push(r);
+                        }
+                    }
+                    if (tr.toolName === 'delete_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                        const r = tr.result as { issue_id: string; identifier: string; title: string };
                         issueRefs.push({
                             id: r.issue_id,
-                            identifier: '(deleted)',
-                            title: 'Deleted issue',
+                            identifier: r.identifier,
+                            title: r.title,
                             status: 'deleted',
                             priority: 'none',
+                            action: 'deleted',
                         });
                     }
                 }
