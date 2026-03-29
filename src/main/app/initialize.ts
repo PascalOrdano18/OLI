@@ -316,8 +316,11 @@ function initializeInterCommunicationEventListeners() {
 
     ipcMain.handle(ISSUES_API_REQUEST, async (_event, method: string, path: string, body?: unknown) => {
         const currentServerId = ServerManager.getCurrentServerId();
+        console.log('[issues-api-request] incoming', {method, path, hasBody: body !== undefined, currentServerId});
+
         const currentServer = currentServerId ? ServerManager.getServer(currentServerId) : null;
         if (!currentServer?.url) {
+            console.log('[issues-api-request] no active server', {hasServer: Boolean(currentServer)});
             throw new Error('No active server');
         }
         const serverUrl = currentServer.url.toString().replace(/\/$/, '');
@@ -325,7 +328,9 @@ function initializeInterCommunicationEventListeners() {
         const authCookie = cookies.find((c) => c.name === 'MMAUTHTOKEN');
         const token = authCookie?.value ?? '';
 
-        const url = `${serverUrl}/plugins/com.mattermost.issues/api/v1${path}`;
+        const fullUrl = `${serverUrl}/plugins/com.mattermost.issues/api/v1${path}`;
+        console.log('[issues-api-request] request', {serverUrl, fullUrl, hasToken: Boolean(token)});
+
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
@@ -334,13 +339,29 @@ function initializeInterCommunicationEventListeners() {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await net.fetch(url, {
+        const response = await net.fetch(fullUrl, {
             method,
             headers,
             ...(body !== undefined ? {body: JSON.stringify(body)} : {}),
         });
 
+        console.log('[issues-api-request] response', {method, path, status: response.status, ok: response.ok});
+
         if (!response.ok) {
+            let errText = '';
+            try {
+                errText = await response.text();
+            } catch {
+                errText = '(could not read body)';
+            }
+            console.log('[issues-api-request] failed', {
+                serverUrl,
+                fullUrl,
+                method,
+                path,
+                status: response.status,
+                bodyPreview: errText.slice(0, 500),
+            });
             throw new Error(`${method} ${path} → ${response.status}`);
         }
         if (method === 'DELETE') {
