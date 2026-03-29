@@ -12,7 +12,6 @@ import './IssuesView.scss';
 
 type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'cancelled';
 type IssuePriority = 'urgent' | 'high' | 'medium' | 'low' | 'none';
-type GroupBy = 'status' | 'priority' | 'none';
 type SubTab = 'agents' | 'diff' | 'docs';
 
 interface Project { id: string; name: string; prefix: string; next_issue_number: number }
@@ -22,8 +21,6 @@ interface Issue {
     cycle_id: string; estimate_hours: number; sort_order: number;
 }
 interface IssueLabel { id: string; name: string; color: string }
-interface IssueFilters { status?: IssueStatus; priority?: IssuePriority; searchQuery?: string; groupBy: GroupBy }
-
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<IssueStatus, string> = {
@@ -43,8 +40,6 @@ const PRIORITY_COLORS: Record<IssuePriority, string> = {
 const PRIORITY_ICONS: Record<IssuePriority, string> = {
     urgent: '!', high: '↑', medium: '—', low: '↓', none: '·',
 };
-const STATUS_ORDER: IssueStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'cancelled'];
-const PRIORITY_ORDER: IssuePriority[] = ['urgent', 'high', 'medium', 'low', 'none'];
 
 // ── API helper ─────────────────────────────────────────────────────────────
 
@@ -52,295 +47,121 @@ function api<T>(method: string, path: string, body?: unknown): Promise<T> {
     return window.desktop.issuesApiRequest(method, path, body) as Promise<T>;
 }
 
-// ── Sidebar sub-components ─────────────────────────────────────────────────
-
-const PriorityIcon: React.FC<{priority: IssuePriority}> = ({priority}) => (
-    <span className='IV__priorityIcon' title={PRIORITY_LABELS[priority]} style={{color: PRIORITY_COLORS[priority]}}>
-        {PRIORITY_ICONS[priority]}
-    </span>
-);
-
-const StatusDot: React.FC<{status: IssueStatus}> = ({status}) => (
-    <span
-        className='IV__statusDot'
-        style={{background: STATUS_COLORS[status], boxShadow: `0 0 0 1px ${STATUS_COLORS[status]}60`}}
-        title={STATUS_LABELS[status]}
-    />
-);
-
-const LabelPill: React.FC<{label: IssueLabel}> = ({label}) => (
-    <span
-        className='IV__labelPill'
-        style={{background: label.color + '28', color: label.color, border: `1px solid ${label.color}55`}}
-    >
-        {label.name}
-    </span>
-);
-
-// ── ProjectSelector ────────────────────────────────────────────────────────
-
-const ProjectSelector: React.FC<{
-    projects: Project[];
-    activeProjectId: string;
-    serverId: string;
-    onSelect: (id: string) => void;
-    onCreate: (data: {name: string; prefix: string}) => void;
-    onRepoPicked: (path: string) => void;
-}> = ({projects, activeProjectId, serverId, onSelect, onCreate, onRepoPicked}) => {
-    const [isCreating, setIsCreating] = useState(false);
-    const [newName, setNewName] = useState('');
-    const [newPrefix, setNewPrefix] = useState('');
-    const [repoPath, setRepoPath] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!activeProjectId) { return; }
-        window.desktop.ao.getSessionStatus(activeProjectId).then((s) => {
-            setRepoPath(s.repoPath);
-        }).catch(() => { /* ignore */ });
-    }, [activeProjectId]);
-
-    const handlePickRepo = async () => {
-        if (!activeProjectId) {
-            alert('Create a project first before linking a git repo.');
-            return;
-        }
-        try {
-            const picked = await window.desktop.ao.pickRepoPath(serverId, activeProjectId);
-            if (picked) {
-                setRepoPath(picked);
-                onRepoPicked(picked);
-            }
-        } catch (err) {
-            alert(`Failed to link repo: ${err instanceof Error ? err.message : String(err)}`);
-        }
-    };
-
-    const handleCreate = () => {
-        if (newName.trim() && newPrefix.trim()) {
-            onCreate({name: newName.trim(), prefix: newPrefix.trim()});
-            setNewName(''); setNewPrefix(''); setIsCreating(false);
-        }
-    };
-
-    if (isCreating) {
-        return (
-            <div className='IV__createProject'>
-                <input autoFocus={true} type='text' placeholder='Name' value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { handleCreate(); } else if (e.key === 'Escape') { setIsCreating(false); } }}
-                    className='IV__input IV__input--sm'/>
-                <input type='text' placeholder='PRE' value={newPrefix}
-                    onChange={(e) => setNewPrefix(e.target.value.toUpperCase())}
-                    className='IV__input IV__input--sm IV__input--prefix'/>
-                <button onClick={handleCreate} className='IV__btn IV__btn--xs'>{'OK'}</button>
-                <button onClick={() => setIsCreating(false)} className='IV__btn IV__btn--xs IV__btn--ghost'>{'✕'}</button>
-            </div>
-        );
-    }
-
-    return (
-        <div className='IV__projectSelector'>
-            <select value={activeProjectId} onChange={(e) => onSelect(e.target.value)} className='IV__projectSelect'>
-                {projects.length === 0 && <option value=''>{'No projects'}</option>}
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <button onClick={() => setIsCreating(true)} title='New project' className='IV__iconBtn'>{'+'}</button>
-            <button
-                onClick={handlePickRepo}
-                title={repoPath ? `Repo: ${repoPath}` : 'Link a local git repo'}
-                className={`IV__iconBtn${repoPath ? ' IV__iconBtn--active' : ''}`}
-            >{'📁'}</button>
-        </div>
-    );
-};
-
-// ── IssueRow ───────────────────────────────────────────────────────────────
-
-const IssueRow: React.FC<{
-    issue: Issue;
-    labels: Record<string, IssueLabel>;
-    isActive: boolean;
-    onClick: () => void;
-}> = ({issue, labels, isActive, onClick}) => {
-    const issueLabels = (issue.label_ids || []).map((id) => labels[id]).filter(Boolean);
-    return (
-        <div onClick={onClick} className={`IV__issueRow${isActive ? ' IV__issueRow--active' : ''}`}>
-            <PriorityIcon priority={issue.priority}/>
-            <StatusDot status={issue.status}/>
-            <span className='IV__issueId'>{issue.identifier}</span>
-            <span className='IV__issueTitle'>{issue.title}</span>
-            {issueLabels.length > 0 && (
-                <div className='IV__issueLabelRow'>
-                    {issueLabels.map((label) => <LabelPill key={label.id} label={label}/>)}
-                </div>
-            )}
-        </div>
-    );
-};
-
-// ── IssueList ──────────────────────────────────────────────────────────────
-
-const IssueList: React.FC<{
-    groupedIssues: Record<string, Issue[]>;
-    labels: Record<string, IssueLabel>;
-    filters: IssueFilters;
-    activeIssueId: string | null;
-    onClickIssue: (issue: Issue) => void;
-}> = ({groupedIssues, labels, filters, activeIssueId, onClickIssue}) => {
-    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-    const entries = Object.entries(groupedIssues);
-    const groupBy = filters.groupBy || 'status';
-
-    if (entries.length === 0) {
-        return <div className='IV__empty'>{'No issues found'}</div>;
-    }
-
-    const getLabel = (key: string) => {
-        if (groupBy === 'status') { return STATUS_LABELS[key as IssueStatus] || key; }
-        if (groupBy === 'priority') { return PRIORITY_LABELS[key as IssuePriority] || key; }
-        return key;
-    };
-    const getColor = (key: string) => {
-        if (groupBy === 'status') { return STATUS_COLORS[key as IssueStatus] || '#8b95a1'; }
-        if (groupBy === 'priority') { return PRIORITY_COLORS[key as IssuePriority] || '#8b95a1'; }
-        return '#8b95a1';
-    };
-
-    return (
-        <div className='IV__list'>
-            {entries.map(([key, issues]) => {
-                if (groupBy !== 'none' && issues.length === 0) { return null; }
-                const isCollapsed = collapsed[key];
-                const color = getColor(key);
-                return (
-                    <div key={key}>
-                        {groupBy !== 'none' && (
-                            <div className='IV__groupHeader' onClick={() => setCollapsed({...collapsed, [key]: !isCollapsed})}>
-                                <span className='IV__groupCaret'>{isCollapsed ? '▸' : '▾'}</span>
-                                <span className='IV__groupDot' style={{background: color}}/>
-                                <span className='IV__groupLabel' style={{color}}>{getLabel(key)}</span>
-                                <span className='IV__groupCount'>({issues.length})</span>
-                            </div>
-                        )}
-                        {!isCollapsed && issues.map((issue) => (
-                            <IssueRow
-                                key={issue.id}
-                                issue={issue}
-                                labels={labels}
-                                isActive={activeIssueId === issue.id}
-                                onClick={() => onClickIssue(issue)}
-                            />
-                        ))}
-                    </div>
-                );
-            })}
-        </div>
-    );
-};
-
 // ── IssueSidebar ───────────────────────────────────────────────────────────
 
 interface IssueSidebarProps {
     projects: Project[];
     activeProjectId: string;
-    serverId: string;
-    issues: Issue[];
-    labelsMap: Record<string, IssueLabel>;
-    filters: IssueFilters;
-    loading: boolean;
+    allIssues: Record<string, Issue[]>;
     activeIssueId: string | null;
+    loading: boolean;
     onSelectProject: (id: string) => void;
-    onCreateProject: (data: {name: string; prefix: string}) => void;
-    onNewIssue: () => void;
+    onCreateProject: () => void;
+    onNewIssue: (projectId: string) => void;
     onClickIssue: (issue: Issue) => void;
-    onFiltersChange: (f: IssueFilters) => void;
-    onRepoPicked: (path: string) => void;
 }
 
 const IssueSidebar: React.FC<IssueSidebarProps> = ({
-    projects, activeProjectId, serverId, issues, labelsMap, filters, loading, activeIssueId,
-    onSelectProject, onCreateProject, onNewIssue, onClickIssue, onFiltersChange, onRepoPicked,
-}) => {
-    const filtered = issues.filter((issue) => {
-        if (filters.status && issue.status !== filters.status) { return false; }
-        if (filters.priority && issue.priority !== filters.priority) { return false; }
-        if (filters.searchQuery) {
-            const q = filters.searchQuery.toLowerCase();
-            if (!issue.title.toLowerCase().includes(q) && !issue.identifier?.toLowerCase().includes(q)) { return false; }
-        }
-        return true;
-    });
+    projects, activeProjectId, allIssues, activeIssueId, loading,
+    onSelectProject, onCreateProject, onNewIssue, onClickIssue,
+}) => (
+    <div className='IV__sidebar'>
+        <div className='IV__workspacesHeader'>
+            <span className='IV__workspacesLabel'>{'Workspaces'}</span>
+            <button className='IV__iconBtn' onClick={onCreateProject} title='New project'>{'⊕'}</button>
+        </div>
+        <div className='IV__sidebarList'>
+            {loading && projects.length === 0 ? (
+                <div className='IV__loading'>{'Loading...'}</div>
+            ) : projects.map((project) => {
+                const issues = allIssues[project.id] || [];
+                return (
+                    <div key={project.id}>
+                        <div
+                            className={`IV__projectRow${activeProjectId === project.id ? ' IV__projectRow--active' : ''}`}
+                            onClick={() => onSelectProject(project.id)}
+                        >
+                            <span className='IV__projectAvatar'>{project.name[0]?.toUpperCase()}</span>
+                            <span className='IV__projectName'>{project.name}</span>
+                            <button
+                                className='IV__iconBtn IV__iconBtn--newIssue'
+                                onClick={(e) => { e.stopPropagation(); onNewIssue(project.id); }}
+                                title='New issue'
+                            >{'+'}</button>
+                        </div>
+                        {issues.map((issue) => {
+                            const num = issue.identifier?.split('-')[1] ?? '';
+                            return (
+                                <div
+                                    key={issue.id}
+                                    className={`IV__issueRow${activeIssueId === issue.id ? ' IV__issueRow--active' : ''}`}
+                                    onClick={() => onClickIssue(issue)}
+                                >
+                                    <span
+                                        className='IV__branchIcon'
+                                        style={{color: PRIORITY_COLORS[issue.priority]}}
+                                        title={PRIORITY_LABELS[issue.priority]}
+                                    >{PRIORITY_ICONS[issue.priority]}</span>
+                                    <span className='IV__issueTitle'>{issue.title}</span>
+                                    <span className='IV__issueNum'>{num}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+);
 
-    const groupedIssues = (() => {
-        const gb = filters.groupBy || 'status';
-        if (gb === 'none') { return {all: filtered}; }
-        const order = gb === 'status' ? STATUS_ORDER : PRIORITY_ORDER;
-        const map: Record<string, Issue[]> = {};
-        order.forEach((k) => { map[k] = []; });
-        filtered.forEach((issue) => {
-            const key = gb === 'status' ? issue.status : issue.priority;
-            if (!map[key]) { map[key] = []; }
-            map[key].push(issue);
-        });
-        return map;
-    })();
+// ── CreateProjectModal ─────────────────────────────────────────────────────
+
+const CreateProjectModal: React.FC<{
+    serverId: string;
+    onCreate: (data: {name: string; prefix: string}) => Promise<void>;
+    onClose: () => void;
+}> = ({onCreate, onClose}) => {
+    const [name, setName] = useState('');
+    const [creating, setCreating] = useState(false);
+
+    const derivePrefix = (n: string) => n.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5) || 'PRJ';
+
+    const handleCreate = async () => {
+        if (!name.trim() || creating) { return; }
+        setCreating(true);
+        try { await onCreate({name: name.trim(), prefix: derivePrefix(name)}); } finally { setCreating(false); }
+    };
 
     return (
-        <div className='IV__sidebar'>
-            <div className='IV__sidebarHeader'>
-                <ProjectSelector
-                    projects={projects}
-                    activeProjectId={activeProjectId}
-                    serverId={serverId}
-                    onSelect={onSelectProject}
-                    onCreate={onCreateProject}
-                    onRepoPicked={onRepoPicked}
-                />
-                <button
-                    onClick={onNewIssue}
-                    disabled={!activeProjectId}
-                    className={`IV__btn IV__btn--primary IV__btn--sm${!activeProjectId ? ' IV__btn--disabled' : ''}`}
-                >{'+ New'}</button>
-            </div>
-            <div className='IV__sidebarFilters'>
-                <input
-                    type='text'
-                    placeholder='Search issues...'
-                    value={filters.searchQuery || ''}
-                    onChange={(e) => onFiltersChange({...filters, searchQuery: e.target.value})}
-                    className='IV__input IV__input--search'
-                />
-                <div className='IV__filterRow'>
-                    <select value={filters.status || ''} onChange={(e) => onFiltersChange({...filters, status: (e.target.value || undefined) as IssueStatus | undefined})} className='IV__filterSelect'>
-                        <option value=''>{'All stati'}</option>
-                        {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </select>
-                    <select value={filters.priority || ''} onChange={(e) => onFiltersChange({...filters, priority: (e.target.value || undefined) as IssuePriority | undefined})} className='IV__filterSelect'>
-                        <option value=''>{'All prio'}</option>
-                        {Object.entries(PRIORITY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                    </select>
-                    <label className='IV__groupByLabel'>
-                        {'Group:'}
-                        <select value={filters.groupBy} onChange={(e) => onFiltersChange({...filters, groupBy: e.target.value as GroupBy})} className='IV__filterSelect'>
-                            <option value='status'>{'Status'}</option>
-                            <option value='priority'>{'Priority'}</option>
-                            <option value='none'>{'None'}</option>
-                        </select>
-                    </label>
+        <div className='IV__modalBackdrop' onClick={onClose}>
+            <div className='IV__modal' onClick={(e) => e.stopPropagation()}>
+                <div className='IV__modalHeader'>
+                    <h3 className='IV__modalTitle'>{'New Project'}</h3>
+                    <button onClick={onClose} className='IV__iconBtn'>{'✕'}</button>
                 </div>
-            </div>
-            <div className='IV__sidebarList'>
-                {loading ? (
-                    <div className='IV__loading'>{'Loading...'}</div>
-                ) : (
-                    <IssueList
-                        groupedIssues={groupedIssues}
-                        labels={labelsMap}
-                        filters={filters}
-                        activeIssueId={activeIssueId}
-                        onClickIssue={onClickIssue}
-                    />
-                )}
+                <div className='IV__modalBody'>
+                    <div className='IV__field'>
+                        <label className='IV__label'>{'Name *'}</label>
+                        <input
+                            autoFocus={true} type='text' value={name} placeholder='Project name'
+                            onChange={(e) => setName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { handleCreate(); } else if (e.key === 'Escape') { onClose(); } }}
+                            className='IV__input'
+                        />
+                    </div>
+                    <p className='IV__fieldHint'>{'After creating the project, you will be prompted to link a local git repository.'}</p>
+                </div>
+                <div className='IV__modalFooter'>
+                    <div/>
+                    <div className='IV__modalActions'>
+                        <button onClick={onClose} className='IV__btn IV__btn--ghost'>{'Cancel'}</button>
+                        <button
+                            onClick={handleCreate}
+                            disabled={!name.trim() || creating}
+                            className={`IV__btn IV__btn--primary${(!name.trim() || creating) ? ' IV__btn--disabled' : ''}`}
+                        >{creating ? 'Creating…' : 'Create & Link Repo'}</button>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -858,7 +679,7 @@ const WorkArea: React.FC<{
             <div className='IV__workArea'>
                 <div className='IV__workAreaEmpty'>
                     <div className='IV__workAreaEmptyIcon'>{'📁'}</div>
-                    <div>{'Link a local git repo using the 📁 button'}</div>
+                    <div>{'No git repo linked to this project. Create a new project or re-link via the ⊕ button.'}</div>
                 </div>
             </div>
         );
@@ -911,15 +732,16 @@ const IssuesView: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [activeProjectId, setActiveProjectId] = useState('');
     const [serverId, setServerId] = useState('');
-    const [issues, setIssues] = useState<Issue[]>([]);
+    const [allIssues, setAllIssues] = useState<Record<string, Issue[]>>({});
     const [labelsMap, setLabelsMap] = useState<Record<string, IssueLabel>>({});
     const [labelsList, setLabelsList] = useState<IssueLabel[]>([]);
-    const [filters, setFilters] = useState<IssueFilters>({groupBy: 'status'});
     const [loading, setLoading] = useState(true);
     const [modalIssue, setModalIssue] = useState<Issue | null | undefined>(undefined);
     const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
     const [hasRepoPath, setHasRepoPath] = useState(false);
     const [subTab, setSubTab] = useState<SubTab>('agents');
+    const [showCreateProject, setShowCreateProject] = useState(false);
+    const [newIssueProjectId, setNewIssueProjectId] = useState('');
     const initialized = useRef(false);
 
     const fetchProjects = useCallback(async () => {
@@ -949,12 +771,7 @@ const IssuesView: React.FC = () => {
         if (!activeProjectId) { return; }
         (async () => {
             try {
-                const [issueResp, lbls] = await Promise.all([
-                    api<{issues: Issue[]} | Issue[]>('GET', `/projects/${activeProjectId}/issues`),
-                    api<IssueLabel[]>('GET', `/projects/${activeProjectId}/labels`),
-                ]);
-                const issueList = Array.isArray(issueResp) ? issueResp : (issueResp as any).issues || [];
-                setIssues(issueList);
+                const lbls = await api<IssueLabel[]>('GET', `/projects/${activeProjectId}/labels`);
                 const lmap: Record<string, IssueLabel> = {};
                 (lbls || []).forEach((l) => { lmap[l.id] = l; });
                 setLabelsMap(lmap); setLabelsList(lbls || []);
@@ -962,21 +779,36 @@ const IssuesView: React.FC = () => {
         })();
     }, [activeProjectId]);
 
+    useEffect(() => {
+        projects.forEach(async (p) => {
+            setAllIssues((prev) => {
+                if (prev[p.id] !== undefined) { return prev; }
+                api<{issues: Issue[]} | Issue[]>('GET', `/projects/${p.id}/issues`).then((resp) => {
+                    const list = Array.isArray(resp) ? resp : (resp as any).issues || [];
+                    setAllIssues((cur) => ({...cur, [p.id]: list}));
+                }).catch(() => { /* ignore */ });
+                return {...prev, [p.id]: []};
+            });
+        });
+    }, [projects]);
+
     const handleSaveIssue = async (data: Partial<Issue>) => {
+        const projId = newIssueProjectId || activeProjectId;
         if (modalIssue) {
             const updated = await api<Issue>('PUT', `/issues/${modalIssue.id}`, data);
-            setIssues((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+            setAllIssues((prev) => ({...prev, [projId]: (prev[projId] || []).map((i) => (i.id === updated.id ? updated : i))}));
         } else {
-            const created = await api<Issue>('POST', `/projects/${activeProjectId}/issues`, data);
-            setIssues((prev) => [created, ...prev]);
+            const created = await api<Issue>('POST', `/projects/${projId}/issues`, data);
+            setAllIssues((prev) => ({...prev, [projId]: [created, ...(prev[projId] || [])]}));
         }
         setModalIssue(undefined);
+        setNewIssueProjectId('');
     };
 
     const handleUpdateActiveIssue = async (data: Partial<Issue>) => {
         if (!activeIssue) { return; }
         const updated = await api<Issue>('PUT', `/issues/${activeIssue.id}`, data);
-        setIssues((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+        setAllIssues((prev) => ({...prev, [activeProjectId]: (prev[activeProjectId] || []).map((i) => (i.id === updated.id ? updated : i))}));
         setActiveIssue(updated);
     };
 
@@ -984,7 +816,7 @@ const IssuesView: React.FC = () => {
         if (!modalIssue) { return; }
         if (window.confirm(`Delete "${modalIssue.identifier} ${modalIssue.title}"?`)) {
             await api('DELETE', `/issues/${modalIssue.id}`);
-            setIssues((prev) => prev.filter((i) => i.id !== modalIssue.id));
+            setAllIssues((prev) => ({...prev, [activeProjectId]: (prev[activeProjectId] || []).filter((i) => i.id !== modalIssue.id)}));
             if (activeIssue?.id === modalIssue.id) { setActiveIssue(null); }
             setModalIssue(undefined);
         }
@@ -995,22 +827,13 @@ const IssuesView: React.FC = () => {
             <IssueSidebar
                 projects={projects}
                 activeProjectId={activeProjectId}
-                serverId={serverId}
-                issues={issues}
-                labelsMap={labelsMap}
-                filters={filters}
-                loading={loading}
+                allIssues={allIssues}
                 activeIssueId={activeIssue?.id ?? null}
+                loading={loading}
                 onSelectProject={setActiveProjectId}
-                onCreateProject={async (data) => {
-                    const proj = await api<Project>('POST', '/projects', data);
-                    setProjects((prev) => [...prev, proj]);
-                    setActiveProjectId(proj.id);
-                }}
-                onNewIssue={() => setModalIssue(null)}
-                onClickIssue={(issue) => setActiveIssue((prev) => (prev?.id === issue.id ? null : issue))}
-                onFiltersChange={setFilters}
-                onRepoPicked={() => setHasRepoPath(true)}
+                onCreateProject={() => setShowCreateProject(true)}
+                onNewIssue={(projId) => { setNewIssueProjectId(projId); setActiveProjectId(projId); setModalIssue(null); }}
+                onClickIssue={(issue) => { setActiveProjectId(issue.project_id); setActiveIssue((prev) => (prev?.id === issue.id ? null : issue)); }}
             />
 
             <div className='IV__main'>
@@ -1033,13 +856,30 @@ const IssuesView: React.FC = () => {
                 {/* Future: git control */}
             </div>
 
+            {showCreateProject && (
+                <CreateProjectModal
+                    serverId={serverId}
+                    onClose={() => setShowCreateProject(false)}
+                    onCreate={async (data) => {
+                        const proj = await api<Project>('POST', '/projects', data);
+                        setProjects((prev) => [...prev, proj]);
+                        setActiveProjectId(proj.id);
+                        setAllIssues((prev) => ({...prev, [proj.id]: []}));
+                        setShowCreateProject(false);
+                        try {
+                            const picked = await window.desktop.ao.pickRepoPath(serverId, proj.id);
+                            if (picked) { setHasRepoPath(true); }
+                        } catch { /* user cancelled */ }
+                    }}
+                />
+            )}
             {modalIssue !== undefined && (
                 <CreateIssueModal
                     issue={modalIssue}
                     labels={labelsList}
                     onSave={handleSaveIssue}
                     onDelete={modalIssue ? handleDeleteIssue : undefined}
-                    onClose={() => setModalIssue(undefined)}
+                    onClose={() => { setModalIssue(undefined); setNewIssueProjectId(''); }}
                 />
             )}
         </div>
