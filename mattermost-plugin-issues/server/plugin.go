@@ -250,7 +250,11 @@ func (p *Plugin) onConversationEnd(conv *conversationState, usernameCache map[st
 		props := map[string]interface{}{}
 		oliData := map[string]interface{}{}
 		if len(result.IssueRefs) > 0 {
-			oliData["issue_refs"] = result.IssueRefs
+			refs := make([]interface{}, len(result.IssueRefs))
+			for i, r := range result.IssueRefs {
+				refs[i] = r.ToMap()
+			}
+			oliData["issue_refs"] = refs
 		}
 		if len(oliData) > 0 {
 			props["oli_data"] = oliData
@@ -401,10 +405,18 @@ func (p *Plugin) handleOliChat(post *model.Post, stripMention bool) {
 		props := map[string]interface{}{}
 		oliData := map[string]interface{}{}
 		if len(result.CodeSnippets) > 0 {
-			oliData["code_snippets"] = result.CodeSnippets
+			snippets := make([]interface{}, len(result.CodeSnippets))
+			for i, s := range result.CodeSnippets {
+				snippets[i] = s.ToMap()
+			}
+			oliData["code_snippets"] = snippets
 		}
 		if len(result.IssueRefs) > 0 {
-			oliData["issue_refs"] = result.IssueRefs
+			refs := make([]interface{}, len(result.IssueRefs))
+			for i, r := range result.IssueRefs {
+				refs[i] = r.ToMap()
+			}
+			oliData["issue_refs"] = refs
 		}
 		if len(oliData) > 0 {
 			props["oli_data"] = oliData
@@ -466,10 +478,10 @@ func (p *Plugin) ensureBot() (string, error) {
 	return botUserID, nil
 }
 
-// ensureOliAgent finds or creates the "oli-agent" bot user.
+// ensureOliAgent finds or creates the "oli" bot user.
 func (p *Plugin) ensureOliAgent() (string, error) {
 	botUserID, err := p.API.EnsureBotUser(&model.Bot{
-		Username:    "oli-agent",
+		Username:    "oli",
 		DisplayName: "Oli",
 		Description: "AI team member — ask me about the codebase, issues, or company.",
 	})

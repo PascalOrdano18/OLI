@@ -12,6 +12,18 @@ const SYSTEM_PROMPT = `You are Oli, a team member in this Mattermost workspace. 
 
 Be concise and direct — like a senior dev responding to a quick ping. Short answers, code snippets when relevant, file paths with line numbers. Don't over-explain.
 
+Always start your response with a brief natural intro. For example:
+- "Here are the current issues:" before listing issues
+- "Found it:" before showing code
+- "Done — created the issue." after creating one
+- "No issues found." when there are none
+
+IMPORTANT: When referencing issues, do NOT list their details (title, status, priority) in your text — those are rendered as rich cards automatically. However, you MUST mention the identifier (e.g. BCK-1) of every issue you want shown as a card. For example:
+- "Here are the latest 3 issues: BCK-1, BACK-1, FRON-1"
+- "Done — created BACK-3."
+- "Found 2 matching issues: BCK-1 and BCK-2"
+Only issues whose identifiers appear in your text will be shown as cards.
+
 You have access to:
 - The codebase (read-only): search files, read code, list directories
 - The issue tracker: list, search, create, update, and delete issues
@@ -106,11 +118,17 @@ Channel ID (for fetching history if needed): ${channel_id}`;
     });
 
     console.log(`[Oli] Response: ${result.text?.substring(0, 300)}`);
-    console.log(`[Oli] Snippets: ${codeSnippets.length}, Issues: ${issueRefs.length}`);
+
+    const responseText = result.text || '';
+
+    // Only show issue cards for identifiers the LLM explicitly mentioned in its response.
+    const filteredIssueRefs = issueRefs.filter((ref) => responseText.includes(ref.identifier));
+
+    console.log(`[Oli] Snippets: ${codeSnippets.length}, Issues: ${filteredIssueRefs.length} (of ${issueRefs.length} captured)`);
 
     return {
-        text: result.text || '',
+        text: responseText,
         code_snippets: codeSnippets,
-        issue_refs: issueRefs,
+        issue_refs: filteredIssueRefs,
     };
 }
