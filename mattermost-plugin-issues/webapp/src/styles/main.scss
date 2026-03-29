@@ -3,8 +3,15 @@
 
 // Scoped under .issues- prefix to avoid CSS conflicts with Mattermost webapp.
 
+$issues-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
 .issues-rhs {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: $issues-font-family;
+    -webkit-font-smoothing: antialiased;
+}
+
+.issues-oli-response {
+    font-family: $issues-font-family;
     -webkit-font-smoothing: antialiased;
 }
 

@@ -3,8 +3,6 @@
 
 import React from 'react';
 
-import Logo from 'renderer/components/Images/Logo';
-
 import './Header.scss';
 
 type HeaderProps = {
@@ -18,9 +16,6 @@ const Header = ({
         className='Header'
     >
         <div className='Header__main'>
-            <div className='Header__logo'>
-                <Logo/>
-            </div>
             {alternateLink}
         </div>
     </div>

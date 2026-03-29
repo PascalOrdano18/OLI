@@ -82,7 +82,6 @@ const RHSView: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 height: '100%',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             }}
         >
             <RHSHeader

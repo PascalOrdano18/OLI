@@ -54,7 +54,7 @@ const defaultPreferences: ConfigV4 = {
     enableMetrics: true,
     enableSentry: true,
     viewLimit: 15,
-    themeSyncing: true,
+    themeSyncing: false,
     useNativeTitleBar: false,
 };
 

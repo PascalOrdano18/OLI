@@ -7,6 +7,14 @@
     min-height: 100px;
     padding: 0 40px;
     box-sizing: border-box;
+    color: var(--neutral-1200);
+
+    a,
+    button,
+    span,
+    div {
+        color: inherit;
+    }
 
     .Header__main {
         display: flex;
@@ -14,10 +22,6 @@
         height: 100%;
         flex-flow: wrap;
         align-items: center;
-        justify-content: space-between;
-
-        .Header__logo {
-            width: 170px;
-        }
+        justify-content: flex-end;
     }
 }
