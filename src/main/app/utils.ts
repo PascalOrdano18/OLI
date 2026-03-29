@@ -169,6 +169,17 @@ export async function updateServerInfos(servers: MattermostServer[]) {
         }
 
         if (data.siteURL) {
+            // Don't replace a routable address with a loopback address — this indicates
+            // the server's SiteURL is misconfigured and would break network connectivity
+            const siteURLHost = new URL(data.siteURL).hostname;
+            const originalHost = srv.url.hostname;
+            const isLoopback = (host: string) => host === 'localhost' || host === '127.0.0.1' || host === '::1';
+            if (isLoopback(siteURLHost) && !isLoopback(originalHost)) {
+                log.warn('updateServerInfos: Ignoring loopback SiteURL from server, keeping user-entered URL', {siteURL: data.siteURL, originalURL: srv.url.toString()});
+                ServerManager.updateRemoteInfo(srv.id, data, false);
+                return;
+            }
+
             // We need to validate the site URL is reachable by pinging the server
             const tempServer = new MattermostServer({name: 'temp', url: data.siteURL}, false);
             const tempServerInfo = new ServerInfo(tempServer);

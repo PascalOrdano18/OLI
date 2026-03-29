@@ -229,5 +229,46 @@ describe('main/app/utils', () => {
             expect(mockServerInfoInstance.fetchRemoteInfo).toHaveBeenCalled();
             expect(ServerManager.updateRemoteInfo).not.toHaveBeenCalled();
         });
+
+        it('should not replace a routable URL with a loopback siteURL', async () => {
+            const mockServer = {
+                id: 'server-1',
+                name: 'Test Server',
+                url: new URL('http://10.2.64.150:8065/'),
+            };
+            const mockRemoteInfo = {
+                siteURL: 'http://localhost:8065/',
+                serverVersion: '9.0.0',
+            };
+            const mockServerInfoInstance = {
+                fetchRemoteInfo: jest.fn().mockResolvedValue(mockRemoteInfo),
+            };
+            ServerInfo.mockImplementation(() => mockServerInfoInstance);
+
+            await updateServerInfos([mockServer]);
+
+            expect(ServerManager.updateRemoteInfo).toHaveBeenCalledWith('server-1', mockRemoteInfo, false);
+        });
+
+        it('should still validate siteURL when both are routable addresses', async () => {
+            const mockServer = {
+                id: 'server-1',
+                name: 'Test Server',
+                url: new URL('http://10.2.64.150:8065/'),
+            };
+            const mockRemoteInfo = {
+                siteURL: 'http://mattermost.example.com:8065/',
+                serverVersion: '9.0.0',
+            };
+            const mockServerInfoInstance = {
+                fetchRemoteInfo: jest.fn().mockResolvedValue(mockRemoteInfo),
+                fetchConfigData: jest.fn().mockResolvedValue({siteURL: 'http://mattermost.example.com:8065/'}),
+            };
+            ServerInfo.mockImplementation(() => mockServerInfoInstance);
+
+            await updateServerInfos([mockServer]);
+
+            expect(ServerManager.updateRemoteInfo).toHaveBeenCalledWith('server-1', mockRemoteInfo, true);
+        });
     });
 });
