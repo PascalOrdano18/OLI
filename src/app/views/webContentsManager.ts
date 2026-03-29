@@ -220,6 +220,7 @@ export class WebContentsManager {
         const view = this.getViewByWebContentsId(e.sender.id);
         if (view) {
             view.setInitialized();
+            view.applyDesktopThemeOverride();
         }
     };
 

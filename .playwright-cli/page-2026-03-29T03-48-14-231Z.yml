@@ -1,0 +1,387 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: 󰗖
+      - generic [ref=e6]: We need your permission to show notifications in the browser.
+      - button "Manage notification preferences" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]: Manage notification preferences
+    - link "×" [ref=e9] [cursor=pointer]:
+      - /url: "#"
+  - generic [ref=e10]:
+    - generic [ref=e12]:
+      - generic [ref=e13]: 󰋽
+      - text: Please configure your
+      - link "site URL" [ref=e14] [cursor=pointer]:
+        - /url: http://localhost:8065
+      - text: on the
+      - link "System Console" [ref=e15] [cursor=pointer]:
+        - /url: /admin_console/environment/web_server
+      - text: .
+    - link "×" [ref=e16] [cursor=pointer]:
+      - /url: "#"
+  - banner [ref=e17]:
+    - navigation [ref=e21] [cursor=pointer]:
+      - button "Product switch menu" [ref=e22]:
+        - img [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e26]
+          - generic [ref=e29]: TEAM EDITION
+    - generic [ref=e30]:
+      - button "󰍉 Search" [ref=e32] [cursor=pointer]:
+        - generic [ref=e33]: 󰍉
+        - generic [ref=e34]: Search
+      - button "Help" [ref=e36] [cursor=pointer]:
+        - generic [ref=e37]: 󰘥
+    - generic [ref=e38]:
+      - button "Recent mentions" [ref=e39] [cursor=pointer]:
+        - generic [ref=e40]: 󰁥
+      - button "Saved messages" [ref=e41] [cursor=pointer]:
+        - generic [ref=e42]: 󰃃
+      - generic [ref=e43]:
+        - button "Settings" [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 󰢻
+        - button "User's account menu" [ref=e46] [cursor=pointer]:
+          - img [ref=e47]
+          - img [ref=e49]
+          - paragraph [ref=e51]: Status is "Online".
+  - generic [ref=e52]:
+    - generic [ref=e53]:
+      - generic [ref=e54]:
+        - button "OLI 󰅀" [ref=e55] [cursor=pointer]:
+          - generic [ref=e56]: OLI
+          - generic [ref=e57]: 󰅀
+        - button "Browse or create channels" [ref=e58] [cursor=pointer]:
+          - img [ref=e59]
+      - application "channel navigator region" [ref=e61]:
+        - generic [ref=e62]:
+          - link "unreads filter" [ref=e64] [cursor=pointer]:
+            - /url: "#"
+            - generic [ref=e65]: 󰈶
+          - button "Find Channels" [ref=e66] [cursor=pointer]:
+            - generic [ref=e67]: 󰍉
+            - generic [ref=e68]: Find channel
+      - generic "Open Issues Tracker" [ref=e70] [cursor=pointer]:
+        - generic [ref=e71]: 📋
+        - generic [ref=e72]: Issues
+      - list [ref=e73]:
+        - listitem [ref=e74]:
+          - link "Threads" [ref=e75] [cursor=pointer]:
+            - /url: /oli/threads
+            - img [ref=e77]
+            - generic [ref=e80]: Threads
+      - application "channel sidebar region" [ref=e81]:
+        - region "scrollable content" [ref=e86]:
+          - generic [ref=e88]:
+            - generic [ref=e89]:
+              - generic [ref=e90]:
+                - button "CHANNELS" [expanded] [ref=e92] [cursor=pointer]:
+                  - generic [ref=e93]: 󰅀
+                  - generic [ref=e94]: CHANNELS
+                - list [ref=e96]:
+                  - listitem [ref=e97]:
+                    - link "off-topic public channel" [ref=e98] [cursor=pointer]:
+                      - /url: /oli/channels/off-topic
+                      - generic [ref=e99]: 
+                      - generic [ref=e101]: Off-Topic
+                  - listitem [ref=e102]:
+                    - link "town square public channel" [ref=e103] [cursor=pointer]:
+                      - /url: /oli/channels/town-square
+                      - generic [ref=e104]: 
+                      - generic [ref=e106]: Town Square
+              - button "Add Channels" [ref=e107] [cursor=pointer]:
+                - generic [ref=e108]: 󰐖
+                - generic [ref=e109]: Add Channels
+            - generic [ref=e110]:
+              - generic [ref=e111]:
+                - generic [ref=e112]:
+                  - button "DIRECT MESSAGES" [expanded] [ref=e113] [cursor=pointer]:
+                    - generic [ref=e114]: 󰅀
+                    - generic [ref=e115]: DIRECT MESSAGES
+                  - button "Write a direct message" [ref=e116] [cursor=pointer]:
+                    - generic [ref=e117]: 󰐕
+                - list [ref=e119]:
+                  - listitem [ref=e120]:
+                    - link "fiona" [ref=e121] [cursor=pointer]:
+                      - /url: /oli/messages/@fiona
+                      - img "user profile image" [ref=e124]
+                      - generic [ref=e126]: fiona
+              - button "Invite Members" [ref=e127] [cursor=pointer]:
+                - generic "Invite Users" [ref=e128]:
+                  - generic [ref=e129]: 󰐖
+                  - generic [ref=e130]: Invite Members
+    - generic [ref=e136]:
+      - banner "channel header region" [ref=e137]:
+        - generic [ref=e138]:
+          - generic [ref=e141]:
+            - generic [ref=e142]:
+              - button "add to favorites" [ref=e143] [cursor=pointer]:
+                - generic [ref=e144]: 󰓒
+              - button "town square channel menu" [ref=e145] [cursor=pointer]:
+                - strong [ref=e146]: Town Square
+                - img [ref=e147]
+            - generic [ref=e149]:
+              - button "Members" [ref=e150] [cursor=pointer]:
+                - generic [ref=e151]: 󰀓
+                - generic [ref=e152]: "2"
+              - button "Channel files" [ref=e153] [cursor=pointer]:
+                - generic [ref=e154]: 󰧮
+            - generic [ref=e155]: 󰲶
+          - button "View Info" [ref=e156] [cursor=pointer]:
+            - generic [ref=e157]: 󰋽
+      - main [ref=e158]:
+        - generic [ref=e161]:
+          - generic "message list main region":
+            - generic [ref=e164]:
+              - generic [ref=e165]: At 5:30 AM Saturday, March 28, fiona wrote, (dry-run mode — AI call skipped)
+              - list [ref=e167]:
+                - listitem [ref=e168]:
+                  - generic [ref=e170]:
+                    - img [ref=e171]
+                    - heading "Town Square" [level=2] [ref=e188]
+                    - paragraph [ref=e189]: Welcome to Town Square. Post messages here that you want everyone to see. Everyone automatically becomes a member of this channel when they join the team.
+                    - button "Invite others to the workspace" [ref=e192] [cursor=pointer]:
+                      - generic [ref=e193]: 󰧬
+                      - generic [ref=e194]: Invite others to the workspace
+                - listitem [ref=e195]:
+                  - generic [ref=e196]:
+                    - generic:
+                      - separator
+                      - generic: Yesterday
+                - listitem [ref=e197]:
+                  - generic "At 4:19 AM Saturday, March 28, Someone wrote, fiona joined the team. nicathor joined the team." [ref=e199]:
+                    - generic [ref=e200]:
+                      - img "Mattermost Logo" [ref=e203]
+                      - generic [ref=e208]:
+                        - generic [ref=e209]:
+                          - generic [ref=e211] [cursor=pointer]: System
+                          - link "4:19 AM" [ref=e213] [cursor=pointer]:
+                            - /url: /oli/pl/user-activity-zz3ndxge3tg9jn59zcnesnatxy_u1bqtkpgy3r1tnpsq58gx68juc
+                            - time [ref=e214]: 4:19 AM
+                          - list [ref=e215]:
+                            - listitem
+                        - paragraph [ref=e223]:
+                          - text: You and
+                          - button "@fiona" [ref=e225] [cursor=pointer]
+                          - strong [ref=e226]: joined the team
+                          - text: .
+                - listitem [ref=e227]:
+                  - generic "At 5:27 AM Saturday, March 28, nicathor wrote, hola" [ref=e229]:
+                    - generic [ref=e230]:
+                      - button "nicathor profile image Online" [ref=e232] [cursor=pointer]:
+                        - img "nicathor profile image" [ref=e234]
+                        - img "Online" [ref=e236]
+                      - generic [ref=e238]:
+                        - generic [ref=e239]:
+                          - button "nicathor" [ref=e241] [cursor=pointer]
+                          - link "5:27 AM" [ref=e243] [cursor=pointer]:
+                            - /url: /oli/pl/qd9pz9curfb77pnr8w75ir4moh
+                            - time [ref=e244]: 5:27 AM
+                          - list [ref=e245]:
+                            - listitem
+                            - listitem
+                            - listitem
+                        - paragraph [ref=e252]: hola
+                - listitem [ref=e253]:
+                  - generic "At 5:27 AM Saturday, March 28, nicathor wrote, como" [ref=e255]:
+                    - generic [ref=e258]:
+                      - list [ref=e259]:
+                        - listitem
+                        - listitem
+                        - listitem
+                      - paragraph [ref=e266]: como
+                - listitem [ref=e267]:
+                  - generic "At 5:27 AM Saturday, March 28, nicathor wrote, te" [ref=e269]:
+                    - generic [ref=e272]:
+                      - list [ref=e273]:
+                        - listitem
+                        - listitem
+                        - listitem
+                      - paragraph [ref=e280]: te
+                - listitem [ref=e281]:
+                  - generic "At 5:27 AM Saturday, March 28, nicathor wrote, v" [ref=e283]:
+                    - generic [ref=e286]:
+                      - list [ref=e287]:
+                        - listitem
+                        - listitem
+                        - listitem
+                      - paragraph [ref=e294]: v
+                - listitem [ref=e295]:
+                  - generic "At 5:27 AM Saturday, March 28, nicathor wrote, a" [ref=e297]:
+                    - generic [ref=e300]:
+                      - list [ref=e301]:
+                        - listitem
+                        - listitem
+                        - listitem
+                      - paragraph [ref=e308]: a
+                - listitem [ref=e309]:
+                  - generic "At 5:27 AM Saturday, March 28, nicathor wrote, vamos a" [ref=e311]:
+                    - generic [ref=e314]:
+                      - list [ref=e315]:
+                        - listitem
+                        - listitem
+                        - listitem
+                      - paragraph [ref=e322]: vamos a
+                - listitem [ref=e323]:
+                  - generic "At 5:27 AM Saturday, March 28, nicathor wrote, romperla toda!!" [ref=e325]:
+                    - generic [ref=e328]:
+                      - list [ref=e329]:
+                        - listitem
+                        - listitem
+                        - listitem
+                      - paragraph [ref=e336]: romperla toda!!
+                - listitem [ref=e337]:
+                  - generic "At 5:27 AM Saturday, March 28, nicathor wrote, @fiona create issue" [ref=e339]:
+                    - generic [ref=e342]:
+                      - list [ref=e343]:
+                        - listitem
+                        - listitem
+                        - listitem
+                      - paragraph [ref=e350]:
+                        - button "@fiona" [ref=e352] [cursor=pointer]
+                        - text: create issue
+                - listitem [ref=e353]:
+                  - 'generic "At 5:27 AM Saturday, March 28, fiona wrote, Sorry, I ran into an error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CZVAMKbTJczyL5yfceM4B\"}" [ref=e355]':
+                    - generic [ref=e356]:
+                      - button "fiona profile image" [ref=e358] [cursor=pointer]:
+                        - img "fiona profile image" [ref=e360]
+                      - generic [ref=e361]:
+                        - generic [ref=e362]:
+                          - generic [ref=e363]:
+                            - button "fiona" [ref=e364] [cursor=pointer]
+                            - generic [ref=e366]: BOT
+                          - link "5:27 AM" [ref=e368] [cursor=pointer]:
+                            - /url: /oli/pl/hhdyg55m57yjfj33o4odmgcm1a
+                            - time [ref=e369]: 5:27 AM
+                          - list [ref=e370]:
+                            - listitem
+                            - listitem
+                            - listitem
+                        - paragraph [ref=e377]: "Sorry, I ran into an error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CZVAMKbTJczyL5yfceM4B\"}"
+                - listitem [ref=e378]:
+                  - generic "At 5:28 AM Saturday, March 28, nicathor wrote, @fiona create issue" [ref=e380]:
+                    - generic [ref=e381]:
+                      - button "nicathor profile image Online" [ref=e383] [cursor=pointer]:
+                        - img "nicathor profile image" [ref=e385]
+                        - img "Online" [ref=e387]
+                      - generic [ref=e389]:
+                        - generic [ref=e390]:
+                          - button "nicathor" [ref=e392] [cursor=pointer]
+                          - link "5:28 AM" [ref=e394] [cursor=pointer]:
+                            - /url: /oli/pl/aq79546gx7gdxcbgof7nkyyyth
+                            - time [ref=e395]: 5:28 AM
+                          - list [ref=e396]:
+                            - listitem
+                            - listitem
+                            - listitem
+                        - paragraph [ref=e403]:
+                          - button "@fiona" [ref=e405] [cursor=pointer]
+                          - text: create issue
+                - listitem [ref=e406]:
+                  - generic "At 5:28 AM Saturday, March 28, fiona wrote, (dry-run mode — AI call skipped)" [ref=e408]:
+                    - generic [ref=e409]:
+                      - button "fiona profile image" [ref=e411] [cursor=pointer]:
+                        - img "fiona profile image" [ref=e413]
+                      - generic [ref=e414]:
+                        - generic [ref=e415]:
+                          - generic [ref=e416]:
+                            - button "fiona" [ref=e417] [cursor=pointer]
+                            - generic [ref=e419]: BOT
+                          - link "5:28 AM" [ref=e421] [cursor=pointer]:
+                            - /url: /oli/pl/6s694tz55bdt7cepb7n3mgua1a
+                            - time [ref=e422]: 5:28 AM
+                          - list [ref=e423]:
+                            - listitem
+                            - listitem
+                            - listitem
+                        - paragraph [ref=e430]: (dry-run mode — AI call skipped)
+                - listitem [ref=e431]:
+                  - generic "At 5:30 AM Saturday, March 28, nicathor wrote, holaaaa" [ref=e433]:
+                    - generic [ref=e434]:
+                      - button "nicathor profile image Online" [ref=e436] [cursor=pointer]:
+                        - img "nicathor profile image" [ref=e438]
+                        - img "Online" [ref=e440]
+                      - generic [ref=e442]:
+                        - generic [ref=e443]:
+                          - button "nicathor" [ref=e445] [cursor=pointer]
+                          - link "5:30 AM" [ref=e447] [cursor=pointer]:
+                            - /url: /oli/pl/weympy1ngbg58yj916woisbfdy
+                            - time [ref=e448]: 5:30 AM
+                          - list [ref=e449]:
+                            - listitem
+                            - listitem
+                            - listitem
+                        - paragraph [ref=e456]: holaaaa
+                - listitem [ref=e457]:
+                  - generic "At 5:30 AM Saturday, March 28, nicathor wrote, @fiona create issue" [ref=e459]:
+                    - generic [ref=e462]:
+                      - list [ref=e463]:
+                        - listitem
+                        - listitem
+                        - listitem
+                      - paragraph [ref=e470]:
+                        - button "@fiona" [ref=e472] [cursor=pointer]
+                        - text: create issue
+                - listitem [ref=e473]:
+                  - generic "At 5:30 AM Saturday, March 28, fiona wrote, (dry-run mode — AI call skipped)" [ref=e475]:
+                    - generic [ref=e476]:
+                      - button "fiona profile image" [ref=e478] [cursor=pointer]:
+                        - img "fiona profile image" [ref=e480]
+                      - generic [ref=e481]:
+                        - generic [ref=e482]:
+                          - generic [ref=e483]:
+                            - button "fiona" [ref=e484] [cursor=pointer]
+                            - generic [ref=e486]: BOT
+                          - link "5:30 AM" [ref=e488] [cursor=pointer]:
+                            - /url: /oli/pl/zdqu7xqx77fs8yqdmghanpae8e
+                            - time [ref=e489]: 5:30 AM
+                          - list [ref=e490]:
+                            - listitem
+                            - listitem
+                            - listitem
+                        - paragraph [ref=e497]: (dry-run mode — AI call skipped)
+      - generic [ref=e499]:
+        - generic [ref=e500]:
+          - generic [ref=e501]: Login Successful
+          - application "Login Successful message input complementary region" [ref=e503]:
+            - textbox "Write to Town Square" [active] [ref=e508]
+            - generic [ref=e511]:
+              - button "bold" [ref=e512] [cursor=pointer]:
+                - img [ref=e513]
+              - button "italic" [ref=e515] [cursor=pointer]:
+                - img [ref=e516]
+              - button "strike through" [ref=e518] [cursor=pointer]:
+                - img [ref=e519]
+              - button "heading" [ref=e526] [cursor=pointer]:
+                - img [ref=e527]
+              - button "link" [ref=e530] [cursor=pointer]:
+                - img [ref=e531]
+              - button "code" [ref=e533] [cursor=pointer]:
+                - img [ref=e534]
+              - button "quote" [ref=e536] [cursor=pointer]:
+                - img [ref=e537]
+              - button "bulleted list" [ref=e539] [cursor=pointer]:
+                - img [ref=e540]
+              - button "numbered list" [ref=e542] [cursor=pointer]:
+                - img [ref=e543]
+              - button "Message priority" [ref=e547] [cursor=pointer]:
+                - img [ref=e548]
+            - generic [ref=e550]:
+              - button "formatting" [ref=e551] [cursor=pointer]:
+                - img "Format letter Case Icon" [ref=e552]
+                - img "Format letter Case Icon" [ref=e554]
+              - generic [ref=e558]:
+                - button "attachment" [ref=e559] [cursor=pointer]:
+                  - img "Attachment Icon" [ref=e560]
+                - button "Upload files"
+              - button "select an emoji" [ref=e562] [cursor=pointer]:
+                - img [ref=e563]
+              - button "Send Now" [disabled] [ref=e566]:
+                - img [ref=e567]
+        - form [ref=e569]:
+          - button "Messaging help" [ref=e571] [cursor=pointer]: Help
+  - generic [ref=e573]:
+    - button "📋" [ref=e576] [cursor=pointer]:
+      - generic [ref=e577]: 📋
+    - button "App Marketplace" [ref=e579] [cursor=pointer]:
+      - img [ref=e580]
+  - status [ref=e582]
