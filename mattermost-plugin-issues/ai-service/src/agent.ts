@@ -6,7 +6,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 
 import { createTools } from './tools';
 import { PluginClient } from './plugin-client';
-import type { AnalyzeRequest, AnalyzeResponse } from './types';
+import type { AnalyzeRequest, AnalyzeResponse, IssueRef } from './types';
 
 const SYSTEM_PROMPT = `You are an AI assistant that analyzes team conversations and audio call transcriptions to keep the issue tracker up-to-date.
 
@@ -128,6 +128,8 @@ Analyze this conversation and take appropriate action. If the conversation seems
     console.log(`[AI Agent] Sending prompt to GPT-4o-mini (${prompt.length} chars)...`);
     console.log(`[AI Agent] === FULL PROMPT ===\n${prompt}\n=== END PROMPT ===`);
 
+    const issueRefs: IssueRef[] = [];
+
     const result = await generateText({
         model: openai('gpt-4o-mini'),
         tools,
@@ -145,6 +147,31 @@ Analyze this conversation and take appropriate action. If the conversation seems
             if (step.toolResults?.length) {
                 for (const tr of step.toolResults) {
                     console.log(`[AI Agent] Tool result [${tr.toolName}]: ${JSON.stringify(tr.result).substring(0, 500)}`);
+
+                    // Capture issue refs from create/update/get results.
+                    if (['create_issue', 'update_issue', 'get_issue'].includes(tr.toolName) &&
+                        tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                        const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
+                        if (!issueRefs.some((ref) => ref.id === r.id)) {
+                            issueRefs.push({
+                                id: r.id,
+                                identifier: r.identifier,
+                                title: r.title,
+                                status: r.status,
+                                priority: r.priority,
+                            });
+                        }
+                    }
+                    if (tr.toolName === 'delete_issue' && tr.result && typeof tr.result === 'object' && 'issue_id' in tr.result) {
+                        const r = tr.result as { issue_id: string; status: string };
+                        issueRefs.push({
+                            id: r.issue_id,
+                            identifier: '(deleted)',
+                            title: 'Deleted issue',
+                            status: 'deleted',
+                            priority: 'none',
+                        });
+                    }
                 }
             }
             if (step.text) {
@@ -168,5 +195,6 @@ Analyze this conversation and take appropriate action. If the conversation seems
     return {
         summary: result.text,
         actions_taken: actionsTaken,
+        issue_refs: issueRefs,
     };
 }

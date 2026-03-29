@@ -1,7 +1,7 @@
 // Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import type { Project, Issue, IssueLabel, Cycle, IssueListResponse, ChannelHistoryResponse } from './types';
+import type { Project, Issue, IssueLabel, Cycle, IssueListResponse, ChannelHistoryResponse, CompanyInfo } from './types';
 
 export class PluginClient {
     private baseURL: string;
@@ -89,5 +89,16 @@ export class PluginClient {
         if (before) params.set('before', String(before));
         const query = params.toString() ? `?${params.toString()}` : '';
         return this.request<ChannelHistoryResponse>(`/internal/channels/${channelID}/history${query}`);
+    }
+
+    async getCompanyInfo(): Promise<CompanyInfo> {
+        return this.request<CompanyInfo>('/internal/company');
+    }
+
+    async updateCompanyInfo(data: Partial<CompanyInfo>): Promise<CompanyInfo> {
+        return this.request<CompanyInfo>('/internal/company', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
     }
 }

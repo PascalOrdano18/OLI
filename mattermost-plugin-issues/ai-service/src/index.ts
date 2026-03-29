@@ -5,8 +5,9 @@ import express from 'express';
 import multer from 'multer';
 
 import { analyzeConversation } from './agent';
+import { chatWithOli } from './oli-agent';
 import { transcribeAudio } from './transcriber';
-import type { AnalyzeRequest, TranscribeAndAnalyzeRequest } from './types';
+import type { AnalyzeRequest, ChatRequest, TranscribeAndAnalyzeRequest } from './types';
 
 const app = express();
 app.use(express.json());
@@ -40,6 +41,28 @@ app.post('/analyze', async (req, res) => {
     } catch (error) {
         console.error('[AI Service] Error:', error);
         res.status(500).json({ error: 'analysis failed' });
+    }
+});
+
+app.post('/chat', async (req, res) => {
+    const request = req.body as ChatRequest;
+
+    if (!request.message || !request.openai_api_key) {
+        res.status(400).json({ error: 'missing message or openai_api_key' });
+        return;
+    }
+
+    console.log(
+        `[AI Service] Chat request from @${request.username}: ${request.message.substring(0, 100)}`,
+    );
+
+    try {
+        const result = await chatWithOli(request);
+        console.log(`[AI Service] Chat done: ${result.code_snippets.length} snippets, ${result.issue_refs.length} issue refs`);
+        res.json(result);
+    } catch (error) {
+        console.error('[AI Service] Chat error:', error);
+        res.status(500).json({ error: 'chat failed' });
     }
 });
 

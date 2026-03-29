@@ -51,8 +51,9 @@ type AnalyzeRequest struct {
 
 // AnalyzeResponse is the response from the AI service.
 type AnalyzeResponse struct {
-	Summary      string `json:"summary"`
-	ActionsTaken int    `json:"actions_taken"`
+	Summary      string     `json:"summary"`
+	ActionsTaken int        `json:"actions_taken"`
+	IssueRefs    []IssueRef `json:"issue_refs"`
 }
 
 // TranscribeAndAnalyzeMetadata is the JSON metadata sent alongside the audio file.
@@ -104,6 +105,37 @@ func (c *AIClient) Analyze(req *AnalyzeRequest) (*AnalyzeResponse, error) {
 	}
 
 	var result AnalyzeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// Chat sends a user question to the AI service for Oli to answer.
+func (c *AIClient) Chat(req *ChatRequest) (*ChatResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequest(http.MethodPost, c.serviceURL+"/chat", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call AI service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("AI service returned status %d", resp.StatusCode)
+	}
+
+	var result ChatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
