@@ -162,6 +162,21 @@ declare global {
                 onOutputUpdate: (cb: (data: {data: string; isInitial?: boolean}) => void) => void;
                 offOutputUpdate: (cb: (data: {data: string; isInitial?: boolean}) => void) => void;
                 openTerminal: (projectId: string) => Promise<void>;
+                getDiff: (projectId: string) => Promise<string>;
+                getGitFiles: (projectId: string) => Promise<{name: string; type: 'file' | 'dir'}[]>;
+                getGitChanges: (projectId: string) => Promise<{path: string; status: string; additions: number; deletions: number}[]>;
+                gitAction: (projectId: string, action: string, extraArgs?: string) => Promise<string>;
+                getGitStatus: (projectId: string) => Promise<{
+                    hasWorktree: boolean;
+                    branch: string;
+                    defaultBranch: string;
+                    hasUncommittedChanges: boolean;
+                    hasUnpushedCommits: boolean;
+                    hasPR: boolean;
+                    prUrl: string;
+                    uncommittedFileCount: number;
+                    unpushedCommitCount: number;
+                }>;
             };
 
             downloadsDropdown: {

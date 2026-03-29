@@ -121,6 +121,11 @@ export const AO_KILL_SESSION = 'ao-kill-session';
 export const AO_GET_SESSION_STATUS = 'ao-get-session-status';
 export const AO_OUTPUT_UPDATE = 'ao-output-update';
 export const AO_OPEN_TERMINAL = 'ao-open-terminal';
+export const AO_GET_DIFF = 'ao-get-diff';
+export const AO_GET_GIT_FILES = 'ao-get-git-files';
+export const AO_GET_GIT_CHANGES = 'ao-get-git-changes';
+export const AO_GIT_ACTION = 'ao-git-action';
+export const AO_GET_GIT_STATUS = 'ao-get-git-status';
 
 export const GET_LANGUAGE_INFORMATION = 'get-language-information';
 export const GET_AVAILABLE_LANGUAGES = 'get-available-languages';

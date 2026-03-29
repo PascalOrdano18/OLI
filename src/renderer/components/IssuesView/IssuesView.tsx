@@ -405,44 +405,87 @@ const SubTabBar: React.FC<{active: SubTab; onChange: (t: SubTab) => void}> = ({a
 
 // ── DiffTab ────────────────────────────────────────────────────────────────
 
-interface DiffFile { path: string; additions: number; deletions: number; collapsed: boolean; hunks: DiffHunk[] }
+interface DiffFile { path: string; additions: number; deletions: number; hunks: DiffHunk[] }
 interface DiffHunk { header: string; lines: DiffLine[] }
 interface DiffLine { type: 'context' | 'add' | 'remove'; oldNum?: number; newNum?: number; content: string }
 
-const HARDCODED_DIFF: DiffFile[] = [
-    {
-        path: 'src/renderer/components/IssuesView/IssuesView.tsx',
-        additions: 47, deletions: 12, collapsed: false,
-        hunks: [{
-            header: "@@ -1,7 +1,7 @@ import React from 'react';",
-            lines: [
-                {type: 'context', oldNum: 1, newNum: 1, content: ' // Copyright (c) 2016-present Mattermost, Inc.'},
-                {type: 'remove', oldNum: 4, content: "-import React, { useState } from 'react';"},
-                {type: 'add', newNum: 4, content: "+import React, { useEffect, useState, useCallback } from 'react';"},
-            ],
-        }],
-    },
-    {
-        path: 'src/common/communication.ts',
-        additions: 3, deletions: 0, collapsed: true, hunks: [],
-    },
-];
+function parseDiff(raw: string): DiffFile[] {
+    const files: DiffFile[] = [];
+    const fileSections = raw.split(/^diff --git /m).filter(Boolean);
 
-const DiffFileBlock: React.FC<{file: DiffFile}> = ({file}) => {
-    const [collapsed, setCollapsed] = useState(file.collapsed);
-    const addBar = Math.min(5, file.additions);
-    const delBar = Math.min(5, file.deletions);
+    for (const section of fileSections) {
+        const lines = section.split('\n');
+
+        // Extract file path from "a/path b/path"
+        const headerMatch = lines[0]?.match(/a\/(.+?) b\/(.+)/);
+        const path = headerMatch ? headerMatch[2] : 'unknown';
+
+        let additions = 0;
+        let deletions = 0;
+        const hunks: DiffHunk[] = [];
+        let currentHunk: DiffHunk | null = null;
+        let oldNum = 0;
+        let newNum = 0;
+
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+
+            // Hunk header
+            const hunkMatch = line.match(/^@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@(.*)/);
+            if (hunkMatch) {
+                oldNum = parseInt(hunkMatch[1], 10);
+                newNum = parseInt(hunkMatch[2], 10);
+                currentHunk = {header: line, lines: []};
+                hunks.push(currentHunk);
+                continue;
+            }
+
+            if (!currentHunk) { continue; }
+
+            // Skip binary / no-newline markers
+            if (line.startsWith('\\')) { continue; }
+
+            if (line.startsWith('+')) {
+                additions++;
+                currentHunk.lines.push({type: 'add', newNum, content: line.slice(1)});
+                newNum++;
+            } else if (line.startsWith('-')) {
+                deletions++;
+                currentHunk.lines.push({type: 'remove', oldNum, content: line.slice(1)});
+                oldNum++;
+            } else if (line.startsWith(' ') || line === '') {
+                currentHunk.lines.push({type: 'context', oldNum, newNum, content: line.slice(1)});
+                oldNum++;
+                newNum++;
+            }
+        }
+
+        if (hunks.length > 0 || additions > 0 || deletions > 0) {
+            files.push({path, additions, deletions, hunks});
+        }
+    }
+
+    return files;
+}
+
+const DiffFileBlock: React.FC<{file: DiffFile; defaultCollapsed?: boolean}> = ({file, defaultCollapsed}) => {
+    const [collapsed, setCollapsed] = useState(defaultCollapsed ?? false);
+    const total = file.additions + file.deletions;
+    const blocks = Math.min(5, total);
+    const addBlocks = total > 0 ? Math.round((file.additions / total) * blocks) : 0;
+    const delBlocks = blocks - addBlocks;
+
     return (
         <div className='IV__diffFile'>
             <div className='IV__diffFileHeader' onClick={() => setCollapsed((c) => !c)}>
                 <span className='IV__diffFileCaret'>{collapsed ? '▸' : '▾'}</span>
                 <span className='IV__diffFilePath'>{file.path}</span>
                 <div className='IV__diffFileMeta'>
-                    <span className='IV__diffAdd'>+{file.additions}</span>
-                    <span className='IV__diffDel'>-{file.deletions}</span>
+                    <span className='IV__diffAdd'>{`+${file.additions}`}</span>
+                    <span className='IV__diffDel'>{`-${file.deletions}`}</span>
                     <div className='IV__diffBar'>
                         {Array.from({length: 5}).map((_, i) => (
-                            <span key={i} className={`IV__diffBarCell ${i < addBar ? 'IV__diffBarCell--add' : i < addBar + delBar ? 'IV__diffBarCell--del' : 'IV__diffBarCell--empty'}`}/>
+                            <span key={i} className={`IV__diffBarCell ${i < addBlocks ? 'IV__diffBarCell--add' : i < addBlocks + delBlocks ? 'IV__diffBarCell--del' : 'IV__diffBarCell--empty'}`}/>
                         ))}
                     </div>
                 </div>
@@ -452,8 +495,8 @@ const DiffFileBlock: React.FC<{file: DiffFile}> = ({file}) => {
                     <div className='IV__diffHunkHeader'>{hunk.header}</div>
                     {hunk.lines.map((line, li) => (
                         <div key={li} className={`IV__diffLine IV__diffLine--${line.type}`}>
-                            <span className='IV__diffLineNum'>{line.oldNum ?? ''}</span>
-                            <span className='IV__diffLineNum'>{line.newNum ?? ''}</span>
+                            <span className='IV__diffLineNum IV__diffLineNum--old'>{line.type === 'add' ? '' : line.oldNum ?? ''}</span>
+                            <span className='IV__diffLineNum IV__diffLineNum--new'>{line.type === 'remove' ? '' : line.newNum ?? ''}</span>
                             <span className='IV__diffLineSign'>{line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}</span>
                             <span className='IV__diffLineContent'>{line.content}</span>
                         </div>
@@ -464,18 +507,69 @@ const DiffFileBlock: React.FC<{file: DiffFile}> = ({file}) => {
     );
 };
 
-const DiffTab: React.FC = () => (
-    <div className='IV__diffTab'>
-        <div className='IV__diffHeader'>
-            <span className='IV__diffSummary'>{'2 files changed'}</span>
-            <span className='IV__diffSummaryAdd'>{'+50'}</span>
-            <span className='IV__diffSummaryDel'>{'-12'}</span>
+const DiffTab: React.FC<{projectId: string; visible: boolean}> = ({projectId, visible}) => {
+    const [files, setFiles] = useState<DiffFile[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const hasFetched = useRef(false);
+
+    const fetchDiff = useCallback(async () => {
+        if (!projectId) { return; }
+        setLoading(true);
+        setError('');
+        try {
+            const raw = await window.desktop.ao.getDiff(projectId);
+            setFiles(parseDiff(raw));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setLoading(false);
+        }
+    }, [projectId]);
+
+    useEffect(() => {
+        if (visible && projectId) {
+            fetchDiff();
+            hasFetched.current = true;
+        }
+    }, [visible, projectId, fetchDiff]);
+
+    const totalAdd = files.reduce((s, f) => s + f.additions, 0);
+    const totalDel = files.reduce((s, f) => s + f.deletions, 0);
+
+    if (loading) {
+        return <div className='IV__diffTab'><div className='IV__diffEmpty'>{'Loading diff...'}</div></div>;
+    }
+
+    if (error) {
+        return <div className='IV__diffTab'><div className='IV__diffEmpty IV__diffEmpty--error'>{error}</div></div>;
+    }
+
+    if (files.length === 0) {
+        return (
+            <div className='IV__diffTab'>
+                <div className='IV__diffEmpty'>
+                    <div>{'No changes yet'}</div>
+                    <button className='IV__btn IV__btn--ghost IV__btn--sm' onClick={fetchDiff}>{'Refresh'}</button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className='IV__diffTab'>
+            <div className='IV__diffHeader'>
+                <span className='IV__diffSummary'>{`${files.length} file${files.length === 1 ? '' : 's'} changed`}</span>
+                <span className='IV__diffSummaryAdd'>{`+${totalAdd}`}</span>
+                <span className='IV__diffSummaryDel'>{`-${totalDel}`}</span>
+                <button className='IV__btn IV__btn--ghost IV__btn--xs' onClick={fetchDiff} title='Refresh diff'>{'↻'}</button>
+            </div>
+            <div className='IV__diffBody'>
+                {files.map((file) => <DiffFileBlock key={file.path} file={file}/>)}
+            </div>
         </div>
-        <div className='IV__diffBody'>
-            {HARDCODED_DIFF.map((file) => <DiffFileBlock key={file.path} file={file}/>)}
-        </div>
-    </div>
-);
+    );
+};
 
 // ── DocsTab ────────────────────────────────────────────────────────────────
 
@@ -726,6 +820,192 @@ const WorkArea: React.FC<{
     );
 };
 
+// ── GitActionsPanel ────────────────────────────────────────────────────────
+
+interface GitStatus {
+    hasWorktree: boolean;
+    branch: string;
+    defaultBranch: string;
+    hasUncommittedChanges: boolean;
+    hasUnpushedCommits: boolean;
+    hasPR: boolean;
+    prUrl: string;
+    uncommittedFileCount: number;
+    unpushedCommitCount: number;
+}
+
+const EMPTY_STATUS: GitStatus = {
+    hasWorktree: false, branch: '', defaultBranch: 'main',
+    hasUncommittedChanges: false, hasUnpushedCommits: false,
+    hasPR: false, prUrl: '', uncommittedFileCount: 0, unpushedCommitCount: 0,
+};
+
+const GitActionsPanel: React.FC<{projectId: string; visible: boolean}> = ({projectId, visible}) => {
+    const [status, setStatus] = useState<GitStatus>(EMPTY_STATUS);
+    const [commitMsg, setCommitMsg] = useState('');
+    const [busy, setBusy] = useState<string | null>(null);
+    const [result, setResult] = useState<{type: 'success' | 'error'; text: string} | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const refresh = useCallback(async () => {
+        if (!projectId) { return; }
+        setLoading(true);
+        try {
+            const s = await window.desktop.ao.getGitStatus(projectId);
+            setStatus(s);
+        } catch { /* ignore */ } finally {
+            setLoading(false);
+        }
+    }, [projectId]);
+
+    useEffect(() => {
+        if (visible && projectId) { refresh(); }
+    }, [visible, projectId, refresh]);
+
+    const runAction = async (action: string, extraArgs?: string) => {
+        setBusy(action);
+        setResult(null);
+        try {
+            const res = await window.desktop.ao.gitAction(projectId, action, extraArgs);
+            setResult({type: 'success', text: res || `${action} completed`});
+            if (action === 'commit') { setCommitMsg(''); }
+            await refresh();
+        } catch (err) {
+            setResult({type: 'error', text: err instanceof Error ? err.message : String(err)});
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    if (!visible) { return null; }
+
+    if (!status.hasWorktree) {
+        return (
+            <div className='IV__gitPanel'>
+                <div className='IV__gitPanelHeader'>
+                    <span className='IV__gitPanelTitle'>{'Git'}</span>
+                    <button className='IV__gitPanelRefresh' onClick={refresh} title='Refresh'>{'↻'}</button>
+                </div>
+                <div className='IV__gitPanelEmpty'>
+                    {loading ? 'Loading...' : 'No active worktree. Start an agent to begin.'}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className='IV__gitPanel'>
+            <div className='IV__gitPanelHeader'>
+                <span className='IV__gitPanelTitle'>{'Git'}</span>
+                <button className='IV__gitPanelRefresh' onClick={refresh} title='Refresh'>{'↻'}</button>
+            </div>
+
+            <div className='IV__gitPanelBranch'>
+                <span className='IV__gitPanelBranchIcon'>{'⎇'}</span>
+                <span className='IV__gitPanelBranchName'>{status.branch}</span>
+            </div>
+
+            {/* Step 1: Commit — show only when there are uncommitted changes */}
+            {status.hasUncommittedChanges && (
+                <>
+                    <div className='IV__gitPanelSection'>
+                        <div className='IV__gitPanelStepHeader'>
+                            <span className='IV__gitPanelStepNum'>{'1'}</span>
+                            <span className='IV__gitPanelStepTitle'>{`Commit ${status.uncommittedFileCount} changed file${status.uncommittedFileCount === 1 ? '' : 's'}`}</span>
+                        </div>
+                        <textarea
+                            className='IV__gitPanelCommitInput'
+                            value={commitMsg}
+                            onChange={(e) => setCommitMsg(e.target.value)}
+                            placeholder='Commit message...'
+                            rows={2}
+                        />
+                        <button
+                            className='IV__gitPanelBtn IV__gitPanelBtn--commit'
+                            onClick={() => runAction('commit', commitMsg)}
+                            disabled={busy !== null || !commitMsg.trim()}
+                        >
+                            {busy === 'commit' ? 'Committing...' : 'Commit'}
+                        </button>
+                    </div>
+                    <div className='IV__gitPanelDivider'/>
+                </>
+            )}
+
+            {/* Step 2: Push — show when there are unpushed commits and nothing to commit */}
+            {!status.hasUncommittedChanges && status.hasUnpushedCommits && (
+                <>
+                    <div className='IV__gitPanelSection'>
+                        <div className='IV__gitPanelStepHeader'>
+                            <span className='IV__gitPanelStepNum'>{status.hasUncommittedChanges ? '2' : '1'}</span>
+                            <span className='IV__gitPanelStepTitle'>{`Push ${status.unpushedCommitCount} commit${status.unpushedCommitCount === 1 ? '' : 's'}`}</span>
+                        </div>
+                        <button
+                            className='IV__gitPanelBtn'
+                            onClick={() => runAction('push')}
+                            disabled={busy !== null}
+                        >
+                            {busy === 'push' ? 'Pushing...' : `Push to origin/${status.branch}`}
+                        </button>
+                    </div>
+                    <div className='IV__gitPanelDivider'/>
+                </>
+            )}
+
+            {/* Step 3: Create PR — show when pushed but no PR exists */}
+            {!status.hasUncommittedChanges && !status.hasUnpushedCommits && !status.hasPR && status.branch !== status.defaultBranch && (
+                <>
+                    <div className='IV__gitPanelSection'>
+                        <div className='IV__gitPanelStepHeader'>
+                            <span className='IV__gitPanelStepNum'>{'1'}</span>
+                            <span className='IV__gitPanelStepTitle'>{'Create pull request'}</span>
+                        </div>
+                        <button
+                            className='IV__gitPanelBtn IV__gitPanelBtn--primary'
+                            onClick={() => runAction('create-pr')}
+                            disabled={busy !== null}
+                        >
+                            {busy === 'create-pr' ? 'Creating...' : `Create PR → ${status.defaultBranch}`}
+                        </button>
+                    </div>
+                    <div className='IV__gitPanelDivider'/>
+                </>
+            )}
+
+            {/* Step 4: Merge — show when PR exists */}
+            {status.hasPR && (
+                <div className='IV__gitPanelSection'>
+                    <div className='IV__gitPanelStepHeader'>
+                        <span className='IV__gitPanelStepNum'>{'✓'}</span>
+                        <span className='IV__gitPanelStepTitle'>{'PR ready'}</span>
+                    </div>
+                    {status.prUrl && (
+                        <div className='IV__gitPanelPrLink'>{status.prUrl}</div>
+                    )}
+                    <button
+                        className='IV__gitPanelBtn IV__gitPanelBtn--merge'
+                        onClick={() => runAction('merge')}
+                        disabled={busy !== null}
+                    >
+                        {busy === 'merge' ? 'Merging...' : `Merge to ${status.defaultBranch}`}
+                    </button>
+                </div>
+            )}
+
+            {/* All done state */}
+            {!status.hasUncommittedChanges && !status.hasUnpushedCommits && !status.hasPR && status.branch === status.defaultBranch && (
+                <div className='IV__gitPanelEmpty'>{'All changes merged. Nothing to do.'}</div>
+            )}
+
+            {result && (
+                <div className={`IV__gitPanelResult IV__gitPanelResult--${result.type}`}>
+                    {result.text}
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ── Main IssuesView ────────────────────────────────────────────────────────
 
 const IssuesView: React.FC = () => {
@@ -839,22 +1119,26 @@ const IssuesView: React.FC = () => {
             <div className='IV__main'>
                 <SubTabBar active={subTab} onChange={setSubTab}/>
                 <div className='IV__mainContent'>
-                    {subTab === 'agents' && (
+                    <div className='IV__tabPanel' style={{display: subTab === 'agents' ? 'flex' : 'none'}}>
                         <WorkArea
                             activeIssue={activeIssue}
                             activeProjectId={activeProjectId}
                             activeProject={projects.find((p) => p.id === activeProjectId) ?? null}
                             hasRepoPath={hasRepoPath}
                         />
-                    )}
-                    {subTab === 'diff' && <DiffTab/>}
-                    {subTab === 'docs' && <DocsTab issue={activeIssue} labelsMap={labelsMap} labelsList={labelsList} onSave={handleUpdateActiveIssue}/>}
+                    </div>
+                    <div className='IV__tabPanel' style={{display: subTab === 'diff' ? 'flex' : 'none'}}>
+                        <DiffTab projectId={activeProjectId} visible={subTab === 'diff'}/>
+                    </div>
+                    <div className='IV__tabPanel' style={{display: subTab === 'docs' ? 'flex' : 'none'}}>
+                        <DocsTab issue={activeIssue} labelsMap={labelsMap} labelsList={labelsList} onSave={handleUpdateActiveIssue}/>
+                    </div>
                 </div>
             </div>
 
-            <div className='IV__rightSidebar'>
-                {/* Future: git control */}
-            </div>
+            {subTab === 'agents' && (
+                <GitActionsPanel projectId={activeProjectId} visible={subTab === 'agents'}/>
+            )}
 
             {showCreateProject && (
                 <CreateProjectModal
