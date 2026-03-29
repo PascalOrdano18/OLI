@@ -8,6 +8,7 @@ import * as path from 'path';
 import fg from 'fast-glob';
 
 import type { PluginClient } from './plugin-client';
+import type { CompanyInfo } from './types';
 import { safe, createIssueTools, createContextTools } from './shared-tools';
 
 const REPO_PATH = process.env.REPO_PATH || process.cwd();
@@ -184,7 +185,7 @@ function createCompanyTools(client: PluginClient) {
                 }).optional().describe('Current state to update'),
             }),
             execute: safe(async (args) => {
-                return client.updateCompanyInfo(args);
+                return client.updateCompanyInfo(args as Partial<CompanyInfo>);
             }),
         }),
     };
