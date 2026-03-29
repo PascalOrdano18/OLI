@@ -24,6 +24,8 @@ type Store interface {
 	ListIssues(projectID string, params IssueFilterParams) ([]*Issue, error)
 	UpdateIssue(issue *Issue) error
 	DeleteIssue(id string) error
+	GetIssueByIdentifier(identifier string) (*Issue, error)
+	SearchAllIssues(query string, limit int) ([]*Issue, error)
 
 	// Labels
 	CreateLabel(label *IssueLabel) error

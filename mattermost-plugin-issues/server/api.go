@@ -27,6 +27,8 @@ func (p *Plugin) initRouter() *mux.Router {
 	// Issues
 	api.HandleFunc("/projects/{id}/issues", p.handleListIssues).Methods(http.MethodGet)
 	api.HandleFunc("/projects/{id}/issues", p.handleCreateIssue).Methods(http.MethodPost)
+	api.HandleFunc("/issues/by-identifier/{identifier}", p.handleGetIssueByIdentifier).Methods(http.MethodGet)
+	api.HandleFunc("/issues/search", p.handleSearchAllIssues).Methods(http.MethodGet)
 	api.HandleFunc("/issues/{id}", p.handleGetIssue).Methods(http.MethodGet)
 	api.HandleFunc("/issues/{id}", p.handleUpdateIssue).Methods(http.MethodPut)
 	api.HandleFunc("/issues/{id}", p.handleDeleteIssue).Methods(http.MethodDelete)
