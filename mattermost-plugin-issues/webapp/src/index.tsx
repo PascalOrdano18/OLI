@@ -8,6 +8,8 @@ import ActionTypes from './actions/action_types';
 import {fetchProjects} from './actions';
 
 import CreateIssueModal from './components/create_issue_modal/create_issue_modal';
+import IssueAutocomplete from './components/issue_autocomplete/issue_autocomplete';
+import IssueRefRenderer from './components/issue_ref_renderer/issue_ref_renderer';
 import SidebarHeader from './components/sidebar_header/sidebar_header';
 import OliResponsePost from './components/oli/oli_response_post';
 
@@ -35,6 +37,12 @@ class Plugin {
 
         // Register the create/edit issue modal (rendered globally).
         registry.registerRootComponent(CreateIssueModal);
+
+        // Register issue autocomplete overlay (listens to chat textarea).
+        registry.registerRootComponent(IssueAutocomplete);
+
+        // Register issue reference renderer (scans posts for {{issue:ID}} patterns).
+        registry.registerRootComponent(IssueRefRenderer);
 
         // Register left sidebar header component.
         registry.registerLeftSidebarHeaderComponent(SidebarHeader);
