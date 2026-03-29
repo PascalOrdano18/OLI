@@ -35,7 +35,8 @@ const IssueRefCard: React.FC<Props> = ({issueRef, onClick}) => {
     const priorityColor = PRIORITY_COLORS[priority] || '#909399';
     const isClickable = Boolean(onClick);
 
-    const handleClick = useCallback(() => {
+    const handleClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
         if (onClick) {
             onClick(issueRef);
         }

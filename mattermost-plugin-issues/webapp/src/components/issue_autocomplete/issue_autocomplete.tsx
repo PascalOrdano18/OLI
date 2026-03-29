@@ -67,11 +67,23 @@ const IssueAutocomplete: React.FC = () => {
     }, [getTextbox]);
 
     const search = useCallback(async (query: string) => {
-        if (query.length < 1) {
-            setResults([]);
-            return;
-        }
         try {
+            if (query.length === 0) {
+                // Show recent issues across all projects when just # is typed.
+                const projects = await client.getProjects();
+                const allIssues: Issue[] = [];
+                for (const p of projects) {
+                    if (allIssues.length >= MAX_RESULTS) {
+                        break;
+                    }
+                    const resp = await client.getIssues(p.id);
+                    const list = resp.issues || [];
+                    allIssues.push(...list);
+                }
+                setResults(allIssues.slice(0, MAX_RESULTS));
+                setHighlightIndex(0);
+                return;
+            }
             const issues = await client.searchAllIssues(query, MAX_RESULTS);
             setResults(issues || []);
             setHighlightIndex(0);
@@ -125,7 +137,11 @@ const IssueAutocomplete: React.FC = () => {
             if (debounceRef.current) {
                 clearTimeout(debounceRef.current);
             }
-            debounceRef.current = setTimeout(() => search(query), DEBOUNCE_MS);
+            if (query.length === 0) {
+                search(query);
+            } else {
+                debounceRef.current = setTimeout(() => search(query), DEBOUNCE_MS);
+            }
         };
 
         const handleKeyDown = (e: KeyboardEvent) => {

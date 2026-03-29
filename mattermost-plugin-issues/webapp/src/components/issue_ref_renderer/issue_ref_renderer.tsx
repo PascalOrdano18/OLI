@@ -29,9 +29,15 @@ async function resolveIssue(identifier: string): Promise<Issue | null> {
 }
 
 function handleIssueClick(issueRef: IssueRefData) {
+    console.log('[IssueRefRenderer] Card clicked!', issueRef.id, issueRef.identifier);
+    console.log('[IssueRefRenderer] desktopAPI:', (window as any).desktopAPI);
+    console.log('[IssueRefRenderer] navigateToIssue:', (window as any).desktopAPI?.navigateToIssue);
     const api = (window as any).desktopAPI;
     if (api?.navigateToIssue) {
+        console.log('[IssueRefRenderer] Calling navigateToIssue...');
         api.navigateToIssue(issueRef.id);
+    } else {
+        console.log('[IssueRefRenderer] navigateToIssue NOT available!');
     }
 }
 

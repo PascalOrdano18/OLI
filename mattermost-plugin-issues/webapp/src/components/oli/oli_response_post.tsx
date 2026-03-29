@@ -60,7 +60,9 @@ const OliResponsePost: React.FC<Props> = ({post}) => {
                             key={ref.id}
                             issueRef={ref}
                             onClick={(ir) => {
+                                console.log('[OliResponsePost] Card clicked!', ir.id, ir.identifier);
                                 const api = (window as any).desktopAPI;
+                                console.log('[OliResponsePost] desktopAPI available:', !!api, 'navigateToIssue:', !!api?.navigateToIssue);
                                 if (api?.navigateToIssue) {
                                     api.navigateToIssue(ir.id);
                                 }

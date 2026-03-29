@@ -2,7 +2,7 @@
 // See LICENSE.txt for license information.
 
 import type {IpcMainEvent, IpcMainInvokeEvent} from 'electron';
-import {ipcMain, nativeTheme, session, shell} from 'electron';
+import {BrowserWindow, ipcMain, nativeTheme, session, shell} from 'electron';
 import isDev from 'electron-is-dev';
 
 import type {Theme} from '@mattermost/desktop-api';
@@ -26,6 +26,8 @@ import {
     UPDATE_SERVER_THEME,
     DARK_MODE_CHANGE,
     UPDATE_THEME,
+    NAVIGATE_TO_ISSUE,
+    SET_VIEW_MODE,
 } from 'common/communication';
 import Config from 'common/config';
 import {DEFAULT_CHANGELOG_LINK} from 'common/constants';
@@ -70,6 +72,23 @@ export class WebContentsManager {
 
         ServerManager.on(SERVER_URL_CHANGED, this.handleServerURLChanged);
     }
+
+    private handleNavigateToIssue = (_event: IpcMainEvent, issueId: string) => {
+        log.info(`NAVIGATE_TO_ISSUE received, issueId: ${issueId}`);
+
+        // Lazy import to avoid circular dependency
+        // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+        const TabManager = require('app/tabs/tabManager').default;
+        TabManager.setViewMode('issues');
+
+        // Send to ALL windows to ensure the main renderer gets it
+        const allWindows = BrowserWindow.getAllWindows();
+        log.info(`Sending to ${allWindows.length} windows`);
+        for (const win of allWindows) {
+            win.webContents.send(SET_VIEW_MODE, 'issues');
+            win.webContents.send(NAVIGATE_TO_ISSUE, issueId);
+        }
+    };
 
     private handleServerURLChanged = (serverId: string) => {
         const view = this.getView(serverId);

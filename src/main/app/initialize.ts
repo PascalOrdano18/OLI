@@ -39,6 +39,8 @@ import {
     SERVER_URL_CHANGED,
     GET_AUTH_TOKEN,
     ISSUES_API_REQUEST,
+    NAVIGATE_TO_ISSUE,
+    SET_VIEW_MODE,
     AO_PICK_REPO_PATH,
     AO_SPAWN_SESSION,
     AO_SEND_MESSAGE,
@@ -347,6 +349,17 @@ function initializeInterCommunicationEventListeners() {
             return null;
         }
         return response.json();
+    });
+
+    ipcMain.on(NAVIGATE_TO_ISSUE, (_event, issueId: string) => {
+        log.info(`NAVIGATE_TO_ISSUE received in initialize.ts, issueId: ${issueId}`);
+        TabManager.setViewMode('issues');
+        const mainWindow = MainWindow.get();
+        if (mainWindow) {
+            mainWindow.webContents.send(SET_VIEW_MODE, 'issues');
+            mainWindow.webContents.send(NAVIGATE_TO_ISSUE, issueId);
+            log.info('Forwarded to renderer');
+        }
     });
 
     ipcMain.handle(AO_PICK_REPO_PATH, (_event, serverId: string, projectId: string) => {

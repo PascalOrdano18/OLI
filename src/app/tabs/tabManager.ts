@@ -40,7 +40,6 @@ import {
     UPDATE_TARGET_URL,
     WINDOW_CLOSE,
     SET_VIEW_MODE,
-    NAVIGATE_TO_ISSUE,
 } from 'common/communication';
 import {Logger} from 'common/log';
 import ServerManager from 'common/servers/serverManager';
@@ -80,14 +79,7 @@ export class TabManager extends EventEmitter {
         ipcMain.on(SWITCH_TAB, (event, viewId) => this.switchToTab(viewId));
         ipcMain.on(CLOSE_TAB, (event, viewId) => ViewManager.removeView(viewId));
         ipcMain.on(SET_VIEW_MODE, (event, mode: 'strategy' | 'issues') => this.setViewMode(mode));
-        ipcMain.on(NAVIGATE_TO_ISSUE, (event, issueId: string) => {
-            this.setViewMode('issues');
-            const mainWindow = MainWindow.get();
-            if (mainWindow) {
-                mainWindow.webContents.send(SET_VIEW_MODE, 'issues');
-                mainWindow.webContents.send(NAVIGATE_TO_ISSUE, issueId);
-            }
-        });
+        // NAVIGATE_TO_ISSUE is handled in webContentsManager.ts (must be there for external preload IPC)
         ipcMain.on(CLEAR_CACHE_AND_RELOAD, this.handleClearCacheAndReload);
 
         // Subscribe to ViewManager events
