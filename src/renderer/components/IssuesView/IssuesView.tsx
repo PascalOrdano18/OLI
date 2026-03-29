@@ -1087,6 +1087,35 @@ const IssuesView: React.FC = () => {
         });
     }, [projects]);
 
+    useEffect(() => {
+        const handler = async (issueId: string) => {
+            // Try to find in already-loaded issues first.
+            for (const projIssues of Object.values(allIssues)) {
+                const found = projIssues.find((i) => i.id === issueId);
+                if (found) {
+                    setActiveProjectId(found.project_id);
+                    setActiveIssue(found);
+                    setSubTab('docs');
+                    return;
+                }
+            }
+
+            // Issues not loaded yet — fetch directly.
+            try {
+                const issue = await api<Issue>('GET', `/issues/${issueId}`);
+                if (issue) {
+                    setActiveProjectId(issue.project_id);
+                    setActiveIssue(issue);
+                    setSubTab('docs');
+                }
+            } catch {
+                // Issue not found
+            }
+        };
+        const off = (window as any).desktop.onNavigateToIssue(handler);
+        return off;
+    }, [allIssues]);
+
     const handleSaveIssue = async (data: Partial<Issue>) => {
         const projId = newIssueProjectId || activeProjectId;
         if (modalIssue) {

@@ -353,6 +353,65 @@ func (s *KVStore) DeleteIssue(id string) error {
 	return s.removeFromIndex(keyIssueIndex+issue.ProjectID, id)
 }
 
+func (s *KVStore) GetIssueByIdentifier(identifier string) (*Issue, error) {
+	// Get all projects to iterate their issue indices.
+	projects, err := s.ListProjects()
+	if err != nil {
+		return nil, fmt.Errorf("list projects: %w", err)
+	}
+	upper := strings.ToUpper(identifier)
+	for _, p := range projects {
+		ids, err := s.getIndex(keyIssueIndex + p.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			var issue Issue
+			found, err := s.get(keyIssuePrefix+id, &issue)
+			if err != nil {
+				return nil, err
+			}
+			if found && strings.ToUpper(issue.Identifier) == upper {
+				return &issue, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("issue not found: %s", identifier)
+}
+
+func (s *KVStore) SearchAllIssues(query string, limit int) ([]*Issue, error) {
+	projects, err := s.ListProjects()
+	if err != nil {
+		return nil, fmt.Errorf("list projects: %w", err)
+	}
+	q := strings.ToLower(query)
+	var results []*Issue
+	for _, p := range projects {
+		ids, err := s.getIndex(keyIssueIndex + p.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			var issue Issue
+			found, err := s.get(keyIssuePrefix+id, &issue)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
+				continue
+			}
+			if strings.Contains(strings.ToLower(issue.Identifier), q) ||
+				strings.Contains(strings.ToLower(issue.Title), q) {
+				results = append(results, &issue)
+				if len(results) >= limit {
+					return results, nil
+				}
+			}
+		}
+	}
+	return results, nil
+}
+
 // --- Labels ---
 
 func (s *KVStore) CreateLabel(label *IssueLabel) error {

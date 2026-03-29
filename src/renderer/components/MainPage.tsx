@@ -181,6 +181,10 @@ class MainPage extends React.PureComponent<Props, State> {
         await this.updateServers();
         await this.updateIsViewLimitReached();
 
+        window.desktop.onSetViewMode((mode: 'strategy' | 'issues') => {
+            this.setState({activeMode: mode});
+        });
+
         window.desktop.onServerAdded(this.handleServerAdded);
         window.desktop.onServerRemoved(this.updateServers);
         window.desktop.onServerUrlChanged(this.updateServers);

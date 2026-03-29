@@ -79,6 +79,7 @@ export class TabManager extends EventEmitter {
         ipcMain.on(SWITCH_TAB, (event, viewId) => this.switchToTab(viewId));
         ipcMain.on(CLOSE_TAB, (event, viewId) => ViewManager.removeView(viewId));
         ipcMain.on(SET_VIEW_MODE, (event, mode: 'strategy' | 'issues') => this.setViewMode(mode));
+        // NAVIGATE_TO_ISSUE is handled in webContentsManager.ts (must be there for external preload IPC)
         ipcMain.on(CLEAR_CACHE_AND_RELOAD, this.handleClearCacheAndReload);
 
         // Subscribe to ViewManager events
