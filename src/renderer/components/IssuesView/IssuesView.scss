@@ -103,7 +103,7 @@
     &:hover { background: rgba(var(--center-channel-color-rgb), 0.06); }
 
     &--active {
-        background: rgba(22, 109, 224, 0.13);
+        background: rgba(var(--sidebar-teambar-bg-rgb), 0.45);
         border-radius: 4px;
 
         .IV__issueTitle { font-weight: 600; }
@@ -195,7 +195,7 @@
     &--active {
         color: var(--center-channel-color);
         font-weight: 700;
-        border-bottom-color: var(--button-bg, #166de0);
+        border-bottom-color: var(--sidebar-teambar-bg);
     }
 }
 
@@ -319,7 +319,7 @@
     font-family: 'Menlo', 'Monaco', monospace;
     font-size: 11px;
     font-weight: 600;
-    color: var(--button-bg, #166de0);
+    color: rgba(0, 0, 0, 0.68);
 }
 
 .IV__terminalPulse {
@@ -462,8 +462,8 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #ddf4ff;
-    color: #0969da;
+    background: rgba(var(--sidebar-teambar-bg-rgb), 0.58);
+    color: #000000;
     font-size: 11px;
     font-weight: 700;
     display: flex;
@@ -481,7 +481,7 @@
 .IV__gitPanelPrLink {
     font-size: 11px;
     font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Courier New', monospace;
-    color: #0969da;
+    color: rgba(0, 0, 0, 0.72);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -501,7 +501,7 @@
     box-sizing: border-box;
 
     &::placeholder { color: #8c959f; }
-    &:focus { border-color: #0969da; box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.12); }
+    &:focus { border-color: var(--sidebar-teambar-bg); box-shadow: 0 0 0 3px rgba(var(--sidebar-teambar-bg-rgb), 0.2); }
 }
 
 .IV__gitPanelBtn {
@@ -526,11 +526,11 @@
     }
 
     &--primary {
-        background: #0969da;
-        color: #ffffff;
-        border-color: #0969da;
+        background: var(--sidebar-teambar-bg);
+        color: #000000;
+        border-color: var(--sidebar-teambar-bg);
 
-        &:hover:not(:disabled) { background: #0860ca; }
+        &:hover:not(:disabled) { background: var(--sidebar-header-bg); }
     }
 
     &--commit {
@@ -667,7 +667,7 @@
     outline: none;
     box-sizing: border-box;
 
-    &:focus { border-color: var(--button-bg, #166de0); }
+    &:focus { border-color: var(--sidebar-teambar-bg); box-shadow: 0 0 0 3px rgba(var(--sidebar-teambar-bg-rgb), 0.16); }
 
     &--search {
         background: rgba(var(--center-channel-color-rgb), 0.06);
@@ -698,8 +698,8 @@
     &:hover:not(:disabled) { filter: brightness(1.1); }
 
     &--primary {
-        background: var(--button-bg, #166de0);
-        color: var(--button-color, #fff);
+        background: var(--sidebar-teambar-bg);
+        color: #000000;
     }
 
     &--danger {
@@ -927,7 +927,7 @@
     padding: 6px 10px 6px 76px;
     font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Courier New', monospace;
     font-size: 12px;
-    background: #ddf4ff;
+    background: rgba(var(--sidebar-bg-rgb), 0.9);
     color: #656d76;
     border-bottom: 1px solid #d1d9e0;
 }

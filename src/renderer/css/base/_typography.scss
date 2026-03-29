@@ -67,7 +67,12 @@ a {
     }
 }
 
-body {
+body,
+button,
+input,
+textarea,
+select,
+option {
     @include mixins.font-smoothing;
 
     font-family: 'Open Sans', sans-serif;
