@@ -266,3 +266,58 @@ func nowMillis() int64 {
 func normalizePrefix(prefix string) string {
 	return strings.ToUpper(strings.TrimSpace(prefix))
 }
+
+// ChatRequest is the request body sent to the AI service /chat endpoint.
+type ChatRequest struct {
+	Message        string `json:"message"`
+	ChannelID      string `json:"channel_id"`
+	Username       string `json:"username"`
+	CallbackURL    string `json:"callback_url"`
+	InternalSecret string `json:"internal_secret"`
+	OpenAIAPIKey   string `json:"openai_api_key"`
+}
+
+// ChatResponse is the response from the AI service /chat endpoint.
+type ChatResponse struct {
+	Text         string        `json:"text"`
+	CodeSnippets []CodeSnippet `json:"code_snippets"`
+	IssueRefs    []IssueRef    `json:"issue_refs"`
+}
+
+// CodeSnippet is a code block returned by Oli.
+type CodeSnippet struct {
+	File     string `json:"file"`
+	Lines    string `json:"lines"`
+	Language string `json:"language"`
+	Content  string `json:"content"`
+}
+
+// ToMap converts a CodeSnippet to a map for gob-safe post Props.
+func (c CodeSnippet) ToMap() map[string]interface{} {
+	return map[string]interface{}{
+		"file":     c.File,
+		"lines":    c.Lines,
+		"language": c.Language,
+		"content":  c.Content,
+	}
+}
+
+// IssueRef is a reference to an issue returned by Oli.
+type IssueRef struct {
+	ID         string `json:"id"`
+	Identifier string `json:"identifier"`
+	Title      string `json:"title"`
+	Status     string `json:"status"`
+	Priority   string `json:"priority"`
+}
+
+// ToMap converts an IssueRef to a map for gob-safe post Props.
+func (r IssueRef) ToMap() map[string]interface{} {
+	return map[string]interface{}{
+		"id":         r.ID,
+		"identifier": r.Identifier,
+		"title":      r.Title,
+		"status":     r.Status,
+		"priority":   r.Priority,
+	}
+}

@@ -61,6 +61,8 @@ func (p *Plugin) initRouter() *mux.Router {
 	internal.HandleFunc("/projects/{id}/labels", p.handleInternalListLabels).Methods(http.MethodGet)
 	internal.HandleFunc("/projects/{id}/cycles", p.handleInternalListCycles).Methods(http.MethodGet)
 	internal.HandleFunc("/channels/{id}/history", p.handleInternalGetChannelHistory).Methods(http.MethodGet)
+	internal.HandleFunc("/company", p.handleInternalGetCompanyInfo).Methods(http.MethodGet)
+	internal.HandleFunc("/company", p.handleInternalUpdateCompanyInfo).Methods(http.MethodPut)
 
 	// Call audio upload (from Desktop App) — uses internal secret auth
 	// so the desktop app doesn't need Mattermost session cookies.

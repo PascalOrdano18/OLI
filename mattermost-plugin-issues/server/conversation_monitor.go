@@ -46,6 +46,7 @@ type conversationEndCallback func(conv *conversationState, usernameCache map[str
 type ConversationMonitor struct {
 	api                   plugin.API
 	botUserID             string
+	oliAgentUserID        string
 	notificationChannelID string
 	onEnd                 conversationEndCallback
 	mu                    sync.Mutex
@@ -53,10 +54,11 @@ type ConversationMonitor struct {
 }
 
 // NewConversationMonitor creates a new monitor instance.
-func NewConversationMonitor(api plugin.API, botUserID string, notificationChannelID string, onEnd conversationEndCallback) *ConversationMonitor {
+func NewConversationMonitor(api plugin.API, botUserID string, oliAgentUserID string, notificationChannelID string, onEnd conversationEndCallback) *ConversationMonitor {
 	return &ConversationMonitor{
 		api:                   api,
 		botUserID:             botUserID,
+		oliAgentUserID:        oliAgentUserID,
 		notificationChannelID: notificationChannelID,
 		onEnd:                 onEnd,
 		conversations:         make(map[string]*conversationState),
@@ -66,8 +68,8 @@ func NewConversationMonitor(api plugin.API, botUserID string, notificationChanne
 // HandlePost processes a new post, tracking the conversation and
 // resetting the inactivity timer.
 func (cm *ConversationMonitor) HandlePost(post *model.Post) {
-	// Don't track messages posted by the bot itself.
-	if post.UserId == cm.botUserID {
+	// Don't track messages posted by either bot.
+	if post.UserId == cm.botUserID || post.UserId == cm.oliAgentUserID {
 		return
 	}
 
@@ -160,50 +162,18 @@ func (cm *ConversationMonitor) endConversation(channelID string) {
 	cm.postConversationSummary(conv)
 }
 
-// postConversationSummary sends a message to the notification channel
-// with the full transcript of the ended conversation.
+// postConversationSummary resolves usernames and invokes the onEnd callback
+// so the plugin can forward the conversation to the AI service.
 func (cm *ConversationMonitor) postConversationSummary(conv *conversationState) {
-	// Resolve usernames for readable output.
+	// Resolve usernames for the callback.
 	allUserIDs := collectUserIDs(conv)
 	usernameCache := cm.resolveUsernames(allUserIDs)
 
-	label := channelTypeLabel(conv.channelType)
-	duration := conv.lastMsgAt.Sub(conv.startedAt)
-
-	// Build member display names.
-	memberNames := make([]string, len(conv.memberIDs))
-	for i, id := range conv.memberIDs {
-		memberNames[i] = usernameCache[id]
-	}
-
-	// Build the message.
-	var sb strings.Builder
-	if conv.channelType == model.ChannelTypeOpen || conv.channelType == model.ChannelTypePrivate {
-		sb.WriteString(fmt.Sprintf("#### %s conversation ended — ~%s\n", label, conv.channelName))
-	} else {
-		sb.WriteString(fmt.Sprintf("#### %s conversation ended\n", label))
-	}
-	sb.WriteString(fmt.Sprintf("**Participants:** %s\n", strings.Join(memberNames, ", ")))
-	sb.WriteString(fmt.Sprintf("**Duration:** %s | **Messages:** %d\n", duration.Round(time.Second), len(conv.messages)))
-	sb.WriteString("\n---\n")
-
-	for _, msg := range conv.messages {
-		username := usernameCache[msg.UserID]
-		if username == "" {
-			username = msg.UserID
-		}
-		ts := time.UnixMilli(msg.Timestamp).Format("15:04:05")
-		sb.WriteString(fmt.Sprintf("**[%s] %s:** %s\n", ts, username, msg.Message))
-	}
-
-	post := &model.Post{
-		UserId:    cm.botUserID,
-		ChannelId: cm.notificationChannelID,
-		Message:   sb.String(),
-	}
-	if _, appErr := cm.api.CreatePost(post); appErr != nil {
-		cm.api.LogError("[ConversationMonitor] failed to post summary", "error", appErr.Error())
-	}
+	cm.api.LogInfo("[ConversationMonitor] conversation ended",
+		"channel_id", conv.channelID,
+		"channel_type", string(conv.channelType),
+		"messages", fmt.Sprintf("%d", len(conv.messages)),
+	)
 
 	// Invoke the callback so the plugin can forward to the AI service.
 	if cm.onEnd != nil {
@@ -265,15 +235,3 @@ func (cm *ConversationMonitor) getChannelMemberIDs(channel *model.Channel) []str
 	return ids
 }
 
-func channelTypeLabel(ct model.ChannelType) string {
-	switch ct {
-	case model.ChannelTypeDirect:
-		return "DM"
-	case model.ChannelTypeGroup:
-		return "Group"
-	case model.ChannelTypePrivate:
-		return "Private Channel"
-	default:
-		return "Channel"
-	}
-}
