@@ -304,6 +304,13 @@ func (p *Plugin) onConversationEnd(conv *conversationState, usernameCache map[st
 		} else {
 			p.API.LogInfo("[ConversationMonitor] action summary posted to notification channel")
 		}
+
+		// Post action notification as a reply to the last conversation message.
+		lastPostID := ""
+		if len(conv.messages) > 0 {
+			lastPostID = conv.messages[len(conv.messages)-1].PostID
+		}
+		p.postActionNotification(conv.channelID, lastPostID, result.IssueRefs)
 	}()
 }
 
@@ -467,7 +474,50 @@ func (p *Plugin) handleOliChat(post *model.Post, stripMention bool) {
 		if _, appErr := p.API.CreatePost(replyPost); appErr != nil {
 			p.API.LogError("[Oli] failed to post response", "error", appErr.Error())
 		}
+
+		// Post action notification in the same thread.
+		p.postActionNotification(channelID, rootID, result.IssueRefs)
 	}()
+}
+
+// postActionNotification posts a concise action summary to the given channel.
+// It filters issue_refs to only those with action = "created", "edited", or "deleted",
+// then formats the message accordingly.
+func (p *Plugin) postActionNotification(channelID string, rootID string, issueRefs []IssueRef) {
+	var actionRefs []IssueRef
+	for _, ref := range issueRefs {
+		if ref.Action == "created" || ref.Action == "edited" || ref.Action == "deleted" {
+			actionRefs = append(actionRefs, ref)
+		}
+	}
+
+	if len(actionRefs) == 0 {
+		return
+	}
+
+	var message string
+	if len(actionRefs) == 1 {
+		ref := actionRefs[0]
+		message = fmt.Sprintf("@oli %s issue **%s** — %s", ref.Action, ref.Identifier, ref.Title)
+	} else {
+		message = fmt.Sprintf("@oli took %d actions:\n", len(actionRefs))
+		for _, ref := range actionRefs {
+			message += fmt.Sprintf("- %s **%s** — %s\n", ref.Action, ref.Identifier, ref.Title)
+		}
+	}
+
+	post := &model.Post{
+		UserId:    p.oliAgentUserID,
+		ChannelId: channelID,
+		RootId:    rootID,
+		Message:   message,
+	}
+	if _, appErr := p.API.CreatePost(post); appErr != nil {
+		p.API.LogError("[Oli] failed to post action notification",
+			"channel_id", channelID,
+			"error", appErr.Error(),
+		)
+	}
 }
 
 // ensureNotificationChannel finds or creates the "all-the-actions" channel.

@@ -80,19 +80,35 @@ Channel ID (for fetching history if needed): ${channel_id}`;
                         });
                     }
 
-                    // Capture issue refs from single-issue tool results.
-                    if (['get_issue', 'create_issue', 'update_issue'].includes(tr.toolName) &&
-                        tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                    // Capture issue refs from single-issue tool results with action type.
+                    if (tr.toolName === 'create_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
                         const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
                         if (!issueRefs.some((ref) => ref.id === r.id)) {
-                            issueRefs.push({
-                                id: r.id,
-                                identifier: r.identifier,
-                                title: r.title,
-                                status: r.status,
-                                priority: r.priority,
-                            });
+                            issueRefs.push({ ...r, action: 'created' });
                         }
+                    }
+                    if (tr.toolName === 'update_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                        const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
+                        if (!issueRefs.some((ref) => ref.id === r.id)) {
+                            issueRefs.push({ ...r, action: 'edited' });
+                        }
+                    }
+                    if (tr.toolName === 'get_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                        const r = tr.result as { id: string; identifier: string; title: string; status: string; priority: string };
+                        if (!issueRefs.some((ref) => ref.id === r.id)) {
+                            issueRefs.push(r);
+                        }
+                    }
+                    if (tr.toolName === 'delete_issue' && tr.result && typeof tr.result === 'object' && 'identifier' in tr.result) {
+                        const r = tr.result as { issue_id: string; identifier: string; title: string };
+                        issueRefs.push({
+                            id: r.issue_id,
+                            identifier: r.identifier,
+                            title: r.title,
+                            status: 'deleted',
+                            priority: 'none',
+                            action: 'deleted',
+                        });
                     }
 
                     // Capture issue refs from list_issues and search_all_issues results.
@@ -142,8 +158,12 @@ Channel ID (for fetching history if needed): ${channel_id}`;
         responseText = responseText.replace(codeBlockRegex, '').trim();
     }
 
-    // Only show issue cards for identifiers the LLM explicitly mentioned in its response.
-    const filteredIssueRefs = issueRefs.filter((ref) => responseText.includes(ref.identifier));
+    // Only show issue cards for identifiers the LLM explicitly mentioned in its response,
+    // but always include refs with actions (created/edited/deleted) for notification purposes.
+    const filteredIssueRefs = issueRefs.filter((ref) =>
+        responseText.includes(ref.identifier) ||
+        (ref.action && ['created', 'edited', 'deleted'].includes(ref.action)),
+    );
 
     console.log(`[Oli] Snippets: ${codeSnippets.length}, Issues: ${filteredIssueRefs.length} (of ${issueRefs.length} captured)`);
 
