@@ -134,8 +134,20 @@ func (p *Plugin) onConversationEnd(conv *conversationState, usernameCache map[st
 	p.configLock.RUnlock()
 
 	if client == nil || config == nil || !config.isAIEnabled() {
+		p.API.LogWarn("[ConversationMonitor] AI not enabled, skipping analysis",
+			"client_nil", fmt.Sprintf("%t", client == nil),
+			"config_nil", fmt.Sprintf("%t", config == nil),
+		)
 		return
 	}
+
+	p.API.LogInfo("[ConversationMonitor] onConversationEnd triggered",
+		"channel_id", conv.channelID,
+		"channel_type", string(conv.channelType),
+		"channel_name", conv.channelName,
+		"messages", fmt.Sprintf("%d", len(conv.messages)),
+		"ai_service_url", config.AIServiceURL,
+	)
 
 	// Build participants list.
 	participants := make([]ConversationParticipant, len(conv.memberIDs))
@@ -202,14 +214,34 @@ func (p *Plugin) onConversationEnd(conv *conversationState, usernameCache map[st
 	go func() {
 		p.API.LogInfo("[ConversationMonitor] sending conversation to AI service",
 			"channel_id", conv.channelID,
+			"channel_type", string(conv.channelType),
 			"messages", fmt.Sprintf("%d", len(messages)),
+			"callback_url", callbackURL,
+			"ai_service_url", config.AIServiceURL,
+			"has_secret", fmt.Sprintf("%t", config.AIServiceSecret != ""),
+			"has_openai_key", fmt.Sprintf("%t", config.OpenAIAPIKey != ""),
 		)
+
+		// Log each message being sent
+		for i, m := range messages {
+			p.API.LogInfo("[ConversationMonitor] message payload",
+				"index", fmt.Sprintf("%d", i),
+				"username", m.Username,
+				"message", m.Message,
+			)
+		}
 
 		result, err := client.Analyze(req)
 		if err != nil {
 			p.API.LogError("[ConversationMonitor] AI analysis failed", "error", err.Error())
 			return
 		}
+
+		p.API.LogInfo("[ConversationMonitor] AI analysis complete",
+			"actions_taken", fmt.Sprintf("%d", result.ActionsTaken),
+			"summary_length", fmt.Sprintf("%d", len(result.Summary)),
+			"summary", result.Summary,
+		)
 
 		if result.Summary == "" && result.ActionsTaken == 0 {
 			p.API.LogInfo("[ConversationMonitor] AI found no actionable items")
@@ -269,6 +301,8 @@ func (p *Plugin) onConversationEnd(conv *conversationState, usernameCache map[st
 		}
 		if _, appErr := p.API.CreatePost(post); appErr != nil {
 			p.API.LogError("[ConversationMonitor] failed to post action summary", "error", appErr.Error())
+		} else {
+			p.API.LogInfo("[ConversationMonitor] action summary posted to notification channel")
 		}
 	}()
 }

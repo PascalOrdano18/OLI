@@ -26,6 +26,17 @@ export interface ConversationPayload {
 
 export interface AnalyzeRequest {
     conversation: ConversationPayload;
+    call_transcription?: string;
+    callback_url: string;
+    internal_secret: string;
+    openai_api_key: string;
+}
+
+export interface TranscribeAndAnalyzeRequest {
+    channel_id: string;
+    channel_type: string;
+    channel_name: string;
+    participants: ConversationParticipant[];
     callback_url: string;
     internal_secret: string;
     openai_api_key: string;

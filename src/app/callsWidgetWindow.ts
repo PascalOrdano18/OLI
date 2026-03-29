@@ -4,6 +4,7 @@
 import type {IpcMainEvent, Rectangle, Event, IpcMainInvokeEvent} from 'electron';
 import {BrowserWindow, desktopCapturer, dialog, ipcMain, systemPreferences} from 'electron';
 
+import {startCallAudioCapture, stopCallAudioCapture, uploadCallAudio} from 'app/callsAudioCapture';
 import MainWindow from 'app/mainWindow/mainWindow';
 import NavigationManager from 'app/navigationManager';
 import TabManager from 'app/tabs/tabManager';
@@ -501,7 +502,7 @@ export class CallsWidgetWindow {
     };
 
     private handleCreateCallsWidgetWindow = async (event: IpcMainInvokeEvent, msg: CallsJoinCallMessage) => {
-        log.debug('createCallsWidgetWindow');
+        log.info('>>> CALLS_JOIN_CALL received — creating widget window', {callID: msg.callID, channelURL: msg.channelURL, title: msg.title});
 
         if (this.mainView && event.sender.id !== this.mainView.webContentsId) {
             WebContentsManager.getViewByWebContentsId(event.sender.id)?.sendToRenderer(CALLS_ERROR);
@@ -544,19 +545,36 @@ export class CallsWidgetWindow {
 
         const promise = new Promise((resolve) => {
             const connected = (ev: IpcMainEvent, incomingCallId: string, incomingSessionId: string) => {
-                log.debug('onJoinedCall', {incomingCallId});
+                log.info('>>> CALLS_JOINED_CALL received', {incomingCallId, incomingSessionId, expectedCallId: msg.callID});
 
                 if (!this.isCallsWidget(ev.sender.id)) {
-                    log.debug('onJoinedCall', 'blocked on wrong webContentsId');
+                    log.info('onJoinedCall BLOCKED: wrong webContentsId', {senderId: ev.sender.id});
                     return;
                 }
 
                 if (msg.callID !== incomingCallId) {
-                    log.debug('onJoinedCall', 'blocked on wrong callId');
+                    log.info('onJoinedCall BLOCKED: wrong callId', {expected: msg.callID, got: incomingCallId});
                     return;
                 }
 
                 ipcMain.off(CALLS_JOINED_CALL, connected);
+
+                // Start audio capture for transcription after a delay
+                // to allow WebRTC tracks to be established.
+                if (this.win) {
+                    log.info('Call joined, scheduling audio capture injection', {callID: msg.callID});
+                    setTimeout(() => {
+                        if (this.win && !this.win.isDestroyed()) {
+                            log.info('Injecting audio capture now...');
+                            startCallAudioCapture(this.win).catch((err) => {
+                                log.error('Failed to start call audio capture', {err});
+                            });
+                        } else {
+                            log.warn('Cannot inject audio capture: widget window gone');
+                        }
+                    }, 3000);
+                }
+
                 resolve({callID: msg.callID, sessionID: incomingSessionId});
             };
             ipcMain.on(CALLS_JOINED_CALL, connected);
@@ -572,10 +590,124 @@ export class CallsWidgetWindow {
         return promise;
     };
 
-    private handleCallsLeave = () => {
-        log.debug('handleCallsLeave');
+    private handleCallsLeave = async () => {
+        log.info('handleCallsLeave — stopping audio capture');
+
+        // Stop audio capture and upload for transcription before closing.
+        if (this.win && !this.win.isDestroyed()) {
+            try {
+                log.info('Stopping audio capture...');
+                const audioBuffer = await stopCallAudioCapture(this.win);
+                log.info('Audio capture result', {hasAudio: !!audioBuffer, size: audioBuffer?.length ?? 0});
+
+                if (audioBuffer && audioBuffer.length > 0) {
+                    const serverURL = this.getViewURL();
+                    const channelURL = this.options?.channelURL;
+
+                    log.info('Preparing audio upload', {
+                        serverURL: serverURL?.toString(),
+                        channelURL,
+                        audioSize: audioBuffer.length,
+                    });
+
+                    if (serverURL && channelURL) {
+                        // Upload happens asynchronously — don't block the close.
+                        this.uploadCallAudioAsync(serverURL.toString(), channelURL, audioBuffer);
+                    } else {
+                        log.warn('Cannot upload call audio: missing serverURL or channelURL');
+                    }
+                } else {
+                    log.warn('No audio data captured from call');
+                }
+            } catch (err) {
+                log.error('Error during call audio capture stop', {err});
+            }
+        } else {
+            log.warn('Widget window not available for audio capture stop');
+        }
 
         this.close();
+    };
+
+    private uploadCallAudioAsync = (serverURL: string, channelURL: string, audioBuffer: Buffer) => {
+        log.info('uploadCallAudioAsync starting', {serverURL, channelURL, audioSize: audioBuffer.length});
+        this.resolveChannelIDAndUpload(serverURL, channelURL, audioBuffer).catch((err) => {
+            log.error('Failed to upload call audio', {err});
+        });
+    };
+
+    private resolveChannelIDAndUpload = async (serverURL: string, channelURL: string, audioBuffer: Buffer) => {
+        const baseURL = serverURL.replace(/\/$/, '');
+
+        // Parse the channel identifier from the URL.
+        // Format: /teamname/channels/channelname OR /teamname/messages/@username
+        const parts = channelURL.split('/').filter(Boolean);
+        log.info('Parsing channelURL', {channelURL, parts});
+
+        if (parts.length < 3) {
+            log.error('Cannot parse channelURL — not enough segments', {channelURL, parts});
+            return;
+        }
+
+        const teamName = parts[0];
+        const channelType = parts[1]; // 'channels' or 'messages'
+        const channelName = parts[2];
+
+        log.info('Resolved URL parts', {teamName, channelType, channelName});
+
+        let channelID: string | undefined;
+
+        if (channelType === 'channels') {
+            try {
+                const {net: electronNet, session: electronSession} = await import('electron');
+                const apiURL = `${baseURL}/api/v4/teams/name/${teamName}/channels/name/${channelName}`;
+                log.info('Resolving channel ID via API', {apiURL});
+
+                channelID = await new Promise<string>((resolve, reject) => {
+                    const req = electronNet.request({
+                        url: apiURL,
+                        session: electronSession.defaultSession,
+                        useSessionCookies: true,
+                    });
+                    let body = '';
+                    req.on('response', (resp) => {
+                        resp.on('data', (chunk: Buffer) => {
+                            body += chunk.toString();
+                        });
+                        resp.on('end', () => {
+                            log.info('Channel resolve response', {status: resp.statusCode, body: body.substring(0, 200)});
+                            try {
+                                const data = JSON.parse(body);
+                                if (data.id) {
+                                    resolve(data.id);
+                                } else {
+                                    reject(new Error('No channel ID in response'));
+                                }
+                            } catch (e) {
+                                reject(e);
+                            }
+                        });
+                    });
+                    req.on('error', reject);
+                    req.end();
+                });
+                log.info('Channel ID resolved', {channelID});
+            } catch (err) {
+                log.error('Failed to resolve channel ID', {err, teamName, channelName});
+                return;
+            }
+        } else if (channelType === 'messages') {
+            log.warn('DM/GM channel resolution not yet implemented for audio upload', {channelURL});
+            return;
+        }
+
+        if (!channelID) {
+            log.error('Could not resolve channel ID', {channelURL});
+            return;
+        }
+
+        log.info('Uploading call audio to plugin', {channelID, audioSize: audioBuffer.length});
+        await uploadCallAudio(serverURL, channelID, audioBuffer);
     };
 
     private focusChannelView() {
