@@ -100,6 +100,7 @@ export const GET_MODAL_UNCLOSEABLE = 'get-modal-uncloseable';
 export const SET_VIEW_MODE = 'set-view-mode';
 export const GET_AUTH_TOKEN = 'get-auth-token';
 export const ISSUES_API_REQUEST = 'issues-api-request';
+export const NAVIGATE_TO_ISSUE = 'navigate-to-issue';
 
 export const UPDATE_PATHS = 'update-paths';
 

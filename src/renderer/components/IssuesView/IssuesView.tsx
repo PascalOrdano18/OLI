@@ -1072,6 +1072,21 @@ const IssuesView: React.FC = () => {
         });
     }, [projects]);
 
+    useEffect(() => {
+        const handler = (issueId: string) => {
+            for (const projIssues of Object.values(allIssues)) {
+                const found = projIssues.find((i) => i.id === issueId);
+                if (found) {
+                    setActiveProjectId(found.project_id);
+                    setActiveIssue(found);
+                    setSubTab('docs');
+                    return;
+                }
+            }
+        };
+        (window as any).desktop.onNavigateToIssue(handler);
+    }, [allIssues]);
+
     const handleSaveIssue = async (data: Partial<Issue>) => {
         const projId = newIssueProjectId || activeProjectId;
         if (modalIssue) {

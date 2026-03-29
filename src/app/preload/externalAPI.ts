@@ -51,6 +51,7 @@ import {
     MESSAGE_FROM_POPOUT,
     POPOUT_CLOSED,
     WINDOW_CLOSE,
+    NAVIGATE_TO_ISSUE,
     UPDATE_POPOUT_TITLE_TEMPLATE,
 } from 'common/communication';
 
@@ -136,6 +137,7 @@ const desktopAPI: DesktopAPI = {
     // Utility
     unregister: (channel) => ipcRenderer.removeAllListeners(channel),
     closeWindow: () => ipcRenderer.send(WINDOW_CLOSE),
+    navigateToIssue: (issueId: string) => ipcRenderer.send(NAVIGATE_TO_ISSUE, issueId),
 
     // Popouts
     canPopout: () => ipcRenderer.invoke(CAN_POPOUT),

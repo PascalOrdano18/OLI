@@ -145,6 +145,7 @@ import {
     AO_GET_GIT_CHANGES,
     AO_GIT_ACTION,
     AO_GET_GIT_STATUS,
+    NAVIGATE_TO_ISSUE,
 } from 'common/communication';
 
 console.log('Preload initialized');
@@ -168,6 +169,7 @@ contextBridge.exposeInMainWorld('desktop', {
     openServersDropdown: () => ipcRenderer.send(OPEN_SERVERS_DROPDOWN),
     switchTab: (viewId) => ipcRenderer.send(SWITCH_TAB, viewId),
     setViewMode: (mode) => ipcRenderer.send(SET_VIEW_MODE, mode),
+    onNavigateToIssue: (listener) => ipcRenderer.on(NAVIGATE_TO_ISSUE, (_, issueId) => listener(issueId)),
     getAuthToken: () => ipcRenderer.invoke(GET_AUTH_TOKEN),
     issuesApiRequest: (method, path, body) => ipcRenderer.invoke(ISSUES_API_REQUEST, method, path, body),
     closeTab: (viewId) => ipcRenderer.send(CLOSE_TAB, viewId),
