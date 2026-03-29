@@ -112,6 +112,9 @@ func (p *Plugin) handleCallAudioUpload(w http.ResponseWriter, r *http.Request) {
 		if _, appErr := p.API.CreatePost(post); appErr != nil {
 			p.API.LogError("[CallAudio] failed to post AI call summary", "error", appErr.Error())
 		}
+
+		// Post action notification to the original channel where the call happened.
+		p.postActionNotification(channelID, "", result.IssueRefs)
 	}()
 
 	respondJSON(w, http.StatusAccepted, map[string]string{"status": "processing"})

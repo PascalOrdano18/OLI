@@ -132,6 +132,7 @@ export interface IssueRef {
     title: string;
     status: string;
     priority: string;
+    action?: 'created' | 'edited' | 'deleted';
 }
 
 export interface ChatResponse {
