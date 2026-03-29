@@ -434,7 +434,7 @@ export async function uploadCallAudio(
         });
 
         req.setHeader('Content-Type', `multipart/form-data; boundary=${boundary}`);
-        req.setHeader('X-Internal-Secret', 'fiona-secret-2024');
+        req.setHeader('X-Internal-Secret', 'oli-shared-secret-2026');
 
         req.on('response', (response) => {
             let responseBody = '';

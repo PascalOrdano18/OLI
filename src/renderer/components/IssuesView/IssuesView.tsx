@@ -68,7 +68,14 @@ const IssueSidebar: React.FC<IssueSidebarProps> = ({
     <div className='IV__sidebar'>
         <div className='IV__workspacesHeader'>
             <span className='IV__workspacesLabel'>{'Workspaces'}</span>
-            <button className='IV__iconBtn' onClick={onCreateProject} title='New project'>{'⊕'}</button>
+            <button
+                className='IV__iconBtn'
+                onClick={() => {
+                    console.log('[Issues: create project] opened inline create form (+)');
+                    onCreateProject();
+                }}
+                title='New project'
+            >{'⊕'}</button>
         </div>
         <div className='IV__sidebarList'>
             {loading && projects.length === 0 ? (
@@ -127,9 +134,17 @@ const CreateProjectModal: React.FC<{
     const derivePrefix = (n: string) => n.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5) || 'PRJ';
 
     const handleCreate = async () => {
-        if (!name.trim() || creating) { return; }
+        const trimmedName = name.trim();
+        const prefix = derivePrefix(name);
+        if (!trimmedName || !prefix) {
+            console.log('[Issues: create project] submit blocked — need non-empty name and prefix', {name: trimmedName, prefix});
+            return;
+        }
+        if (creating) { return; }
+
+        console.log('[Issues: create project] submitting from ProjectSelector', {name: trimmedName, prefix});
         setCreating(true);
-        try { await onCreate({name: name.trim(), prefix: derivePrefix(name)}); } finally { setCreating(false); }
+        try { await onCreate({name: trimmedName, prefix}); } finally { setCreating(false); }
     };
 
     return (
@@ -1145,15 +1160,21 @@ const IssuesView: React.FC = () => {
                     serverId={serverId}
                     onClose={() => setShowCreateProject(false)}
                     onCreate={async (data) => {
-                        const proj = await api<Project>('POST', '/projects', data);
-                        setProjects((prev) => [...prev, proj]);
-                        setActiveProjectId(proj.id);
-                        setAllIssues((prev) => ({...prev, [proj.id]: []}));
-                        setShowCreateProject(false);
+                        console.log('[Issues: create project] POST /projects via issuesApiRequest', data);
                         try {
-                            const picked = await window.desktop.ao.pickRepoPath(serverId, proj.id);
-                            if (picked) { setHasRepoPath(true); }
-                        } catch { /* user cancelled */ }
+                            const proj = await api<Project>('POST', '/projects', data);
+                            console.log('[Issues: create project] success', proj);
+                            setProjects((prev) => [...prev, proj]);
+                            setActiveProjectId(proj.id);
+                            setAllIssues((prev) => ({...prev, [proj.id]: []}));
+                            setShowCreateProject(false);
+                            try {
+                                const picked = await window.desktop.ao.pickRepoPath(serverId, proj.id);
+                                if (picked) { setHasRepoPath(true); }
+                            } catch { /* user cancelled */ }
+                        } catch (err) {
+                            console.error('[Issues: create project] failed', err);
+                        }
                     }}
                 />
             )}
