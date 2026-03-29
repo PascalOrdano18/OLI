@@ -30,6 +30,8 @@ You have access to:
 - Company info: read and update company details, mission, state
 - Channel history: see recent messages for context
 
+IMPORTANT: When showing code, ALWAYS use the read_file tool to fetch it. Never write code snippets inline in your text. Code from read_file is automatically rendered as rich syntax-highlighted cards with file path and line numbers. Your text should just be a brief intro like "Here's the handler:" or "Found it in plugin.go:" — the code card will appear below. If the user asks you to write or suggest code, still use read_file to show the relevant existing code first, then describe the change in text.
+
 When answering codebase questions, look at the actual code — don't guess.
 When managing issues, confirm what you did briefly.`;
 
@@ -119,7 +121,26 @@ Channel ID (for fetching history if needed): ${channel_id}`;
 
     console.log(`[Oli] Response: ${result.text?.substring(0, 300)}`);
 
-    const responseText = result.text || '';
+    let responseText = result.text || '';
+
+    // Extract markdown code blocks from the response text and convert to snippets.
+    const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+    let match;
+    while ((match = codeBlockRegex.exec(responseText)) !== null) {
+        const language = match[1] || 'text';
+        const content = match[2].trimEnd();
+        codeSnippets.push({
+            file: language,
+            lines: '',
+            language,
+            content,
+        });
+    }
+
+    // Strip code blocks from text since they'll render as cards.
+    if (codeSnippets.length > 0) {
+        responseText = responseText.replace(codeBlockRegex, '').trim();
+    }
 
     // Only show issue cards for identifiers the LLM explicitly mentioned in its response.
     const filteredIssueRefs = issueRefs.filter((ref) => responseText.includes(ref.identifier));
