@@ -332,6 +332,7 @@ func (p *Plugin) MessageHasBeenPosted(_ *plugin.Context, post *model.Post) {
 	}
 
 	// Handle @oli mentions.
+	p.API.LogInfo("[Oli] checking mention", "message", post.Message, "contains_oli", fmt.Sprintf("%t", containsOliMention(post.Message)))
 	if containsOliMention(post.Message) {
 		p.handleOliChat(post, true)
 		return
