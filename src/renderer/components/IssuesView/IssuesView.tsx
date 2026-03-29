@@ -1084,7 +1084,8 @@ const IssuesView: React.FC = () => {
                 }
             }
         };
-        (window as any).desktop.onNavigateToIssue(handler);
+        const off = (window as any).desktop.onNavigateToIssue(handler);
+        return off;
     }, [allIssues]);
 
     const handleSaveIssue = async (data: Partial<Issue>) => {

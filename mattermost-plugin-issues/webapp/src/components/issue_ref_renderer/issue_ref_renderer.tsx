@@ -141,6 +141,7 @@ async function processPost(postEl: Element) {
 
 const IssueRefRenderer: React.FC = () => {
     const observerRef = useRef<MutationObserver | null>(null);
+    const scanPendingRef = useRef(false);
 
     const scanPosts = useCallback(() => {
         const posts = document.querySelectorAll(`.post:not([${PROCESSED_ATTR}])`);
@@ -151,10 +152,17 @@ const IssueRefRenderer: React.FC = () => {
         // Initial scan.
         scanPosts();
 
-        // Observe for new posts.
+        // Observe for new posts with RAF throttling to avoid feedback loops.
         const container = document.getElementById('post-list') || document.body;
         observerRef.current = new MutationObserver(() => {
-            scanPosts();
+            if (scanPendingRef.current) {
+                return;
+            }
+            scanPendingRef.current = true;
+            requestAnimationFrame(() => {
+                scanPosts();
+                scanPendingRef.current = false;
+            });
         });
         observerRef.current.observe(container, {childList: true, subtree: true});
 
