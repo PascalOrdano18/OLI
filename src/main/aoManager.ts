@@ -178,7 +178,7 @@ export class AoManager {
             `    repo: local/${projectName}`,
             `    path: ${repoPath}`,
             `    defaultBranch: ${defaultBranch}`,
-            `    sessionPrefix: ${sessionPrefix}`,
+            `    sessionPrefix: "${sessionPrefix}"`,
             `    agentRules: |`,
             `      You are working in an isolated git worktree on a dedicated feature branch.`,
             `      Your job is to implement the changes described in the issue.`,
@@ -513,6 +513,323 @@ export class AoManager {
             await this.runAo(['session', 'kill', entry.sessionId], configDir);
         } catch (err) {
             log.warn('Failed to kill session (may already be dead)', {err});
+        }
+    }
+
+    async getDiff(projectId: string): Promise<string> {
+        const wtPath = this.getWorktreePath(projectId);
+        if (!wtPath) {
+            return '';
+        }
+
+        try {
+            const repoPath = this.getRepoPath(projectId);
+            const defaultBranch = repoPath ? await this.detectDefaultBranch(repoPath) : 'main';
+
+            // Compare the default branch directly against the worktree's current state
+            // (committed + uncommitted changes). This is a straight diff of master..HEAD
+            // plus any working tree changes.
+            try {
+                // First: committed changes vs default branch
+                const {stdout: committedDiff} = await execFileAsync('git', [
+                    '-C', wtPath, 'diff', defaultBranch + '..HEAD',
+                ], {maxBuffer: 10 * 1024 * 1024});
+                if (committedDiff.trim()) {
+                    return committedDiff;
+                }
+            } catch { /* default branch ref may not exist in worktree */ }
+
+            // Try origin/defaultBranch as fallback
+            try {
+                const {stdout} = await execFileAsync('git', [
+                    '-C', wtPath, 'diff', `origin/${defaultBranch}..HEAD`,
+                ], {maxBuffer: 10 * 1024 * 1024});
+                if (stdout.trim()) {
+                    return stdout;
+                }
+            } catch { /* fall through */ }
+
+            // Last resort: show all changes in the worktree (uncommitted)
+            const {stdout} = await execFileAsync('git', ['-C', wtPath, 'diff', 'HEAD'], {maxBuffer: 10 * 1024 * 1024});
+            return stdout;
+        } catch (err) {
+            log.warn('Failed to get diff', {err, wtPath});
+            return '';
+        }
+    }
+
+    private getWorktreePath(projectId: string): string | null {
+        const homedir = require('os').homedir();
+        const projectWorktreeDir = join(homedir, '.worktrees', projectId);
+        if (!existsSync(projectWorktreeDir)) {
+            return null;
+        }
+        const {readdirSync, statSync} = require('fs');
+        const entries = readdirSync(projectWorktreeDir).filter((e: string) => {
+            try {
+                return statSync(join(projectWorktreeDir, e)).isDirectory();
+            } catch {
+                return false;
+            }
+        });
+        if (entries.length === 0) {
+            return null;
+        }
+        return join(projectWorktreeDir, entries[entries.length - 1]);
+    }
+
+    async getGitFiles(projectId: string): Promise<{name: string; type: 'file' | 'dir'}[]> {
+        const wtPath = this.getWorktreePath(projectId);
+        if (!wtPath) {
+            return [];
+        }
+        try {
+            const {stdout} = await execFileAsync('git', [
+                '-C', wtPath, 'ls-tree', '-r', '--name-only', 'HEAD',
+            ], {maxBuffer: 10 * 1024 * 1024});
+
+            // Get top-level entries (dirs and files)
+            const paths = stdout.trim().split('\n').filter(Boolean);
+            const topLevel = new Map<string, 'file' | 'dir'>();
+            for (const p of paths) {
+                const parts = p.split('/');
+                if (parts.length === 1) {
+                    topLevel.set(parts[0], 'file');
+                } else {
+                    topLevel.set(parts[0], 'dir');
+                }
+            }
+            return Array.from(topLevel.entries())
+                .map(([name, type]) => ({name, type}))
+                .sort((a, b) => {
+                    if (a.type !== b.type) {
+                        return a.type === 'dir' ? -1 : 1;
+                    }
+                    return a.name.localeCompare(b.name);
+                });
+        } catch {
+            return [];
+        }
+    }
+
+    async getGitChanges(projectId: string): Promise<{path: string; status: string; additions: number; deletions: number}[]> {
+        const wtPath = this.getWorktreePath(projectId);
+        if (!wtPath) {
+            return [];
+        }
+        try {
+            const repoPath = this.getRepoPath(projectId);
+            const defaultBranch = repoPath ? await this.detectDefaultBranch(repoPath) : 'main';
+
+            // Try to get numstat from default branch
+            let diffOutput = '';
+            try {
+                const {stdout} = await execFileAsync('git', [
+                    '-C', wtPath, 'diff', '--numstat', `${defaultBranch}..HEAD`,
+                ], {maxBuffer: 10 * 1024 * 1024});
+                diffOutput = stdout;
+            } catch { /* ignore */ }
+
+            if (!diffOutput.trim()) {
+                try {
+                    const {stdout} = await execFileAsync('git', [
+                        '-C', wtPath, 'diff', '--numstat', `origin/${defaultBranch}..HEAD`,
+                    ], {maxBuffer: 10 * 1024 * 1024});
+                    diffOutput = stdout;
+                } catch { /* ignore */ }
+            }
+
+            if (!diffOutput.trim()) {
+                const {stdout} = await execFileAsync('git', [
+                    '-C', wtPath, 'diff', '--numstat', 'HEAD',
+                ], {maxBuffer: 10 * 1024 * 1024});
+                diffOutput = stdout;
+            }
+
+            // Also get name-status for M/A/D info
+            let statusOutput = '';
+            try {
+                const {stdout} = await execFileAsync('git', [
+                    '-C', wtPath, 'diff', '--name-status', `${defaultBranch}..HEAD`,
+                ], {maxBuffer: 10 * 1024 * 1024});
+                statusOutput = stdout;
+            } catch { /* ignore */ }
+
+            if (!statusOutput.trim()) {
+                try {
+                    const {stdout} = await execFileAsync('git', [
+                        '-C', wtPath, 'diff', '--name-status', `origin/${defaultBranch}..HEAD`,
+                    ], {maxBuffer: 10 * 1024 * 1024});
+                    statusOutput = stdout;
+                } catch { /* ignore */ }
+            }
+
+            if (!statusOutput.trim()) {
+                const {stdout} = await execFileAsync('git', [
+                    '-C', wtPath, 'diff', '--name-status', 'HEAD',
+                ], {maxBuffer: 10 * 1024 * 1024});
+                statusOutput = stdout;
+            }
+
+            const statusMap = new Map<string, string>();
+            for (const line of statusOutput.trim().split('\n').filter(Boolean)) {
+                const parts = line.split('\t');
+                if (parts.length >= 2) {
+                    statusMap.set(parts[parts.length - 1], parts[0]);
+                }
+            }
+
+            const results: {path: string; status: string; additions: number; deletions: number}[] = [];
+            for (const line of diffOutput.trim().split('\n').filter(Boolean)) {
+                const parts = line.split('\t');
+                if (parts.length >= 3) {
+                    const additions = parseInt(parts[0], 10) || 0;
+                    const deletions = parseInt(parts[1], 10) || 0;
+                    const filePath = parts[2];
+                    const status = statusMap.get(filePath) || 'M';
+                    results.push({path: filePath, status, additions, deletions});
+                }
+            }
+            return results;
+        } catch {
+            return [];
+        }
+    }
+
+    async getGitFullStatus(projectId: string): Promise<{
+        hasWorktree: boolean;
+        branch: string;
+        defaultBranch: string;
+        hasUncommittedChanges: boolean;
+        hasUnpushedCommits: boolean;
+        hasPR: boolean;
+        prUrl: string;
+        uncommittedFileCount: number;
+        unpushedCommitCount: number;
+    }> {
+        const empty = {
+            hasWorktree: false, branch: '', defaultBranch: 'main',
+            hasUncommittedChanges: false, hasUnpushedCommits: false,
+            hasPR: false, prUrl: '', uncommittedFileCount: 0, unpushedCommitCount: 0,
+        };
+        const wtPath = this.getWorktreePath(projectId);
+        if (!wtPath) { return empty; }
+
+        const repoPath = this.getRepoPath(projectId);
+        const defaultBranch = repoPath ? await this.detectDefaultBranch(repoPath) : 'main';
+
+        let branch = '';
+        try {
+            const {stdout} = await execFileAsync('git', ['-C', wtPath, 'rev-parse', '--abbrev-ref', 'HEAD']);
+            branch = stdout.trim();
+        } catch { return {...empty, hasWorktree: true, defaultBranch}; }
+
+        // Uncommitted changes (staged + unstaged + untracked)
+        let uncommittedFileCount = 0;
+        let hasUncommittedChanges = false;
+        try {
+            const {stdout} = await execFileAsync('git', ['-C', wtPath, 'status', '--porcelain']);
+            const lines = stdout.trim().split('\n').filter(Boolean);
+            uncommittedFileCount = lines.length;
+            hasUncommittedChanges = uncommittedFileCount > 0;
+        } catch { /* ignore */ }
+
+        // Unpushed commits
+        let unpushedCommitCount = 0;
+        let hasUnpushedCommits = false;
+        try {
+            const {stdout} = await execFileAsync('git', ['-C', wtPath, 'log', `origin/${branch}..HEAD`, '--oneline']);
+            const lines = stdout.trim().split('\n').filter(Boolean);
+            unpushedCommitCount = lines.length;
+            hasUnpushedCommits = unpushedCommitCount > 0;
+        } catch {
+            // Remote branch may not exist yet — any local commits count as unpushed
+            try {
+                const {stdout} = await execFileAsync('git', ['-C', wtPath, 'log', `origin/${defaultBranch}..HEAD`, '--oneline']);
+                const lines = stdout.trim().split('\n').filter(Boolean);
+                unpushedCommitCount = lines.length;
+                hasUnpushedCommits = unpushedCommitCount > 0;
+            } catch { /* ignore */ }
+        }
+
+        // Check if PR exists
+        let hasPR = false;
+        let prUrl = '';
+        try {
+            const {stdout} = await execFileAsync('gh', [
+                'pr', 'view', branch, '--json', 'url', '--jq', '.url',
+            ], {cwd: wtPath});
+            if (stdout.trim()) {
+                hasPR = true;
+                prUrl = stdout.trim();
+            }
+        } catch { /* no PR */ }
+
+        return {
+            hasWorktree: true, branch, defaultBranch,
+            hasUncommittedChanges, hasUnpushedCommits,
+            hasPR, prUrl, uncommittedFileCount, unpushedCommitCount,
+        };
+    }
+
+    async gitAction(projectId: string, action: string, extraArgs?: string): Promise<string> {
+        const wtPath = this.getWorktreePath(projectId);
+        if (!wtPath) {
+            throw new Error('No worktree found. Start an agent session first.');
+        }
+
+        const repoPath = this.getRepoPath(projectId);
+        const defaultBranch = repoPath ? await this.detectDefaultBranch(repoPath) : 'main';
+
+        switch (action) {
+        case 'commit': {
+            if (!extraArgs?.trim()) {
+                throw new Error('Commit message is required.');
+            }
+            await execFileAsync('git', ['-C', wtPath, 'add', '-A']);
+            const {stdout} = await execFileAsync('git', ['-C', wtPath, 'commit', '-m', extraArgs.trim()]);
+            return stdout.trim() || 'Committed successfully.';
+        }
+        case 'push': {
+            // Get current branch name
+            const {stdout: branch} = await execFileAsync('git', ['-C', wtPath, 'rev-parse', '--abbrev-ref', 'HEAD']);
+            const branchName = branch.trim();
+            const {stdout} = await execFileAsync('git', ['-C', wtPath, 'push', '-u', 'origin', branchName]);
+            return stdout.trim() || `Pushed ${branchName} to origin.`;
+        }
+        case 'create-pr': {
+            const {stdout: branch} = await execFileAsync('git', ['-C', wtPath, 'rev-parse', '--abbrev-ref', 'HEAD']);
+            const branchName = branch.trim();
+            // Push first
+            await execFileAsync('git', ['-C', wtPath, 'push', '-u', 'origin', branchName]);
+            // Create PR using gh CLI
+            const {stdout} = await execFileAsync('gh', [
+                'pr', 'create',
+                '--base', defaultBranch,
+                '--head', branchName,
+                '--title', branchName.replace(/[-_]/g, ' '),
+                '--body', 'Created from OLI Issues',
+            ], {cwd: wtPath});
+            return stdout.trim() || 'Pull request created.';
+        }
+        case 'merge': {
+            const {stdout: branch} = await execFileAsync('git', ['-C', wtPath, 'rev-parse', '--abbrev-ref', 'HEAD']);
+            const branchName = branch.trim();
+            // Try to merge via gh if a PR exists
+            try {
+                const {stdout} = await execFileAsync('gh', [
+                    'pr', 'merge', branchName, '--merge', '--delete-branch',
+                ], {cwd: wtPath});
+                return stdout.trim() || 'Merged successfully.';
+            } catch {
+                // Fallback: merge locally
+                await execFileAsync('git', ['-C', wtPath, 'checkout', defaultBranch]);
+                await execFileAsync('git', ['-C', wtPath, 'merge', branchName]);
+                return `Merged ${branchName} into ${defaultBranch}.`;
+            }
+        }
+        default:
+            throw new Error(`Unknown git action: ${action}`);
         }
     }
 

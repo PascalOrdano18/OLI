@@ -47,6 +47,11 @@ import {
     AO_KILL_SESSION,
     AO_GET_SESSION_STATUS,
     AO_OPEN_TERMINAL,
+    AO_GET_DIFF,
+    AO_GET_GIT_FILES,
+    AO_GET_GIT_CHANGES,
+    AO_GIT_ACTION,
+    AO_GET_GIT_STATUS,
 } from 'common/communication';
 import aoManager from 'main/aoManager';
 import Config from 'common/config';
@@ -375,6 +380,26 @@ function initializeInterCommunicationEventListeners() {
 
     ipcMain.handle(AO_OPEN_TERMINAL, (_event, projectId: string) => {
         return aoManager.openTerminal(projectId);
+    });
+
+    ipcMain.handle(AO_GET_DIFF, (_event, projectId: string) => {
+        return aoManager.getDiff(projectId);
+    });
+
+    ipcMain.handle(AO_GET_GIT_FILES, (_event, projectId: string) => {
+        return aoManager.getGitFiles(projectId);
+    });
+
+    ipcMain.handle(AO_GET_GIT_CHANGES, (_event, projectId: string) => {
+        return aoManager.getGitChanges(projectId);
+    });
+
+    ipcMain.handle(AO_GIT_ACTION, (_event, projectId: string, action: string, extraArgs?: string) => {
+        return aoManager.gitAction(projectId, action, extraArgs);
+    });
+
+    ipcMain.handle(AO_GET_GIT_STATUS, (_event, projectId: string) => {
+        return aoManager.getGitFullStatus(projectId);
     });
 }
 

@@ -140,6 +140,11 @@ import {
     AO_GET_SESSION_STATUS,
     AO_OUTPUT_UPDATE,
     AO_OPEN_TERMINAL,
+    AO_GET_DIFF,
+    AO_GET_GIT_FILES,
+    AO_GET_GIT_CHANGES,
+    AO_GIT_ACTION,
+    AO_GET_GIT_STATUS,
 } from 'common/communication';
 
 console.log('Preload initialized');
@@ -334,6 +339,11 @@ contextBridge.exposeInMainWorld('desktop', {
         onOutputUpdate: (cb) => ipcRenderer.on(AO_OUTPUT_UPDATE, (_e, data) => cb(data)),
         offOutputUpdate: (cb) => ipcRenderer.off(AO_OUTPUT_UPDATE, cb),
         openTerminal: (projectId) => ipcRenderer.invoke(AO_OPEN_TERMINAL, projectId),
+        getDiff: (projectId) => ipcRenderer.invoke(AO_GET_DIFF, projectId),
+        getGitFiles: (projectId) => ipcRenderer.invoke(AO_GET_GIT_FILES, projectId),
+        getGitChanges: (projectId) => ipcRenderer.invoke(AO_GET_GIT_CHANGES, projectId),
+        gitAction: (projectId, action, extraArgs) => ipcRenderer.invoke(AO_GIT_ACTION, projectId, action, extraArgs),
+        getGitStatus: (projectId) => ipcRenderer.invoke(AO_GET_GIT_STATUS, projectId),
     },
 
     modals: {

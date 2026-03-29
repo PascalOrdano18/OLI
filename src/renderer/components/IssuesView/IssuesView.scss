@@ -206,6 +206,13 @@
     display: flex;
 }
 
+.IV__tabPanel {
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 // ── Work area (center — terminal or spawn panel) ────────────────────────────
 
 .IV__workArea {
@@ -363,16 +370,211 @@
     .xterm-viewport { overflow-y: auto; }
 }
 
-// ── Right sidebar (future git control) ────────────────────────────────────
+// ── Git actions panel (right, agents tab only) ───────────────────────────
 
-.IV__rightSidebar {
-    width: 220px;
+.IV__gitPanel {
+    width: 240px;
+    min-width: 200px;
     flex-shrink: 0;
-    border-left: 1px solid rgba(var(--center-channel-color-rgb), 0.1);
+    border-left: 1px solid #d1d9e0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: rgba(var(--center-channel-color-rgb), 0.02);
+    background: #ffffff;
+    color: #1f2328;
+}
+
+.IV__gitPanelHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #d1d9e0;
+    flex-shrink: 0;
+}
+
+.IV__gitPanelTitle {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2328;
+}
+
+.IV__gitPanelRefresh {
+    background: none;
+    border: none;
+    color: #656d76;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    line-height: 1;
+
+    &:hover { color: #1f2328; background: #f6f8fa; }
+}
+
+.IV__gitPanelBranch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #656d76;
+    border-bottom: 1px solid #d1d9e0;
+}
+
+.IV__gitPanelBranchIcon {
+    font-size: 13px;
+    color: #8c959f;
+}
+
+.IV__gitPanelBranchName {
+    font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2328;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.IV__gitPanelEmpty {
+    padding: 20px 14px;
+    text-align: center;
+    font-size: 12px;
+    color: #8c959f;
+    line-height: 1.5;
+}
+
+.IV__gitPanelSection {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+}
+
+.IV__gitPanelStepHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.IV__gitPanelStepNum {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ddf4ff;
+    color: #0969da;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.IV__gitPanelStepTitle {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2328;
+}
+
+.IV__gitPanelPrLink {
+    font-size: 11px;
+    font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Courier New', monospace;
+    color: #0969da;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.IV__gitPanelCommitInput {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: inherit;
+    background: #f6f8fa;
+    border: 1px solid #d1d9e0;
+    border-radius: 6px;
+    color: #1f2328;
+    outline: none;
+    resize: vertical;
+    box-sizing: border-box;
+
+    &::placeholder { color: #8c959f; }
+    &:focus { border-color: #0969da; box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.12); }
+}
+
+.IV__gitPanelBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid #d1d9e0;
+    background: #f6f8fa;
+    color: #1f2328;
+    cursor: pointer;
+    transition: background 0.12s;
+
+    &:hover:not(:disabled) { background: #eaeef2; }
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    &--primary {
+        background: #0969da;
+        color: #ffffff;
+        border-color: #0969da;
+
+        &:hover:not(:disabled) { background: #0860ca; }
+    }
+
+    &--commit {
+        background: #1a7f37;
+        color: #ffffff;
+        border-color: #1a7f37;
+
+        &:hover:not(:disabled) { background: #1a6c2e; }
+    }
+
+    &--merge {
+        background: #8250df;
+        color: #ffffff;
+        border-color: #8250df;
+
+        &:hover:not(:disabled) { background: #7340c9; }
+    }
+}
+
+.IV__gitPanelDivider {
+    height: 1px;
+    background: #d1d9e0;
+    margin: 0;
+}
+
+.IV__gitPanelResult {
+    margin: 8px 14px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.4;
+    word-break: break-word;
+
+    &--success {
+        background: #dafbe1;
+        color: #1a7f37;
+        border: 1px solid #aceebb;
+    }
+
+    &--error {
+        background: #ffebe9;
+        color: #cf222e;
+        border: 1px solid #ffd7d5;
+    }
 }
 
 // ── Shared controls ────────────────────────────────────────────────────────
@@ -628,31 +830,45 @@
     overflow: hidden;
 }
 
+.IV__diffEmpty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #656d76;
+    font-size: 13px;
+
+    &--error { color: #cf222e; }
+}
+
 .IV__diffHeader {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 16px;
-    border-bottom: 1px solid rgba(var(--center-channel-color-rgb), 0.1);
+    padding: 8px 16px;
+    border-bottom: 1px solid #d1d9e0;
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: 13px;
+    color: #1f2328;
 }
 
-.IV__diffSummary { opacity: 0.6; }
-.IV__diffSummaryAdd { color: #3dc779; font-weight: 700; }
-.IV__diffSummaryDel { color: #e05c5c; font-weight: 700; }
+.IV__diffSummary { color: #656d76; }
+.IV__diffSummaryAdd { color: #1a7f37; font-weight: 700; }
+.IV__diffSummaryDel { color: #cf222e; font-weight: 700; }
 
 .IV__diffBody {
     flex: 1;
     overflow-y: auto;
-    padding: 12px 16px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 16px;
 }
 
 .IV__diffFile {
-    border: 1px solid rgba(var(--center-channel-color-rgb), 0.1);
+    border: 1px solid #d1d9e0;
     border-radius: 6px;
     overflow: hidden;
 }
@@ -661,76 +877,117 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 12px;
-    background: rgba(var(--center-channel-color-rgb), 0.04);
+    padding: 8px 12px;
+    background: #f6f8fa;
     cursor: pointer;
     user-select: none;
     font-size: 12px;
+    border-bottom: 1px solid #d1d9e0;
+    position: sticky;
+    top: 0;
+    z-index: 1;
 
-    &:hover { background: rgba(var(--center-channel-color-rgb), 0.07); }
+    &:hover { background: #eaeef2; }
 }
 
-.IV__diffFileCaret { font-size: 10px; opacity: 0.5; }
-.IV__diffFilePath { flex: 1; font-family: monospace; font-size: 12px; font-weight: 500; }
+.IV__diffFileCaret {
+    font-size: 10px;
+    color: #656d76;
+    width: 14px;
+    text-align: center;
+}
+.IV__diffFilePath {
+    flex: 1;
+    font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2328;
+}
 
 .IV__diffFileMeta {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
 }
 
-.IV__diffAdd { font-size: 11px; font-weight: 700; color: #3dc779; }
-.IV__diffDel { font-size: 11px; font-weight: 700; color: #e05c5c; }
+.IV__diffAdd { font-size: 12px; font-weight: 700; color: #1a7f37; }
+.IV__diffDel { font-size: 12px; font-weight: 700; color: #cf222e; }
 
-.IV__diffBar { display: flex; gap: 2px; }
+.IV__diffBar { display: flex; gap: 1px; margin-left: 4px; }
 .IV__diffBarCell {
-    width: 10px; height: 10px; border-radius: 2px;
-    &--add   { background: #3dc779; }
-    &--del   { background: #e05c5c; }
-    &--empty { background: rgba(var(--center-channel-color-rgb), 0.12); }
+    width: 8px; height: 8px; border-radius: 1px;
+    &--add   { background: #1a7f37; }
+    &--del   { background: #cf222e; }
+    &--empty { background: #d1d9e0; }
 }
 
-.IV__diffHunk { border-top: 1px solid rgba(var(--center-channel-color-rgb), 0.07); }
+.IV__diffHunk { border-top: 1px solid #d1d9e0; }
 .IV__diffHunkHeader {
-    padding: 4px 12px;
-    font-family: monospace;
-    font-size: 11px;
-    background: rgba(var(--center-channel-color-rgb), 0.03);
-    opacity: 0.55;
+    padding: 6px 10px 6px 76px;
+    font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    background: #ddf4ff;
+    color: #656d76;
+    border-bottom: 1px solid #d1d9e0;
 }
 
 .IV__diffLine {
     display: flex;
-    font-family: monospace;
+    font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Courier New', monospace;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 20px;
 
-    &--add    { background: rgba(61, 199, 121, 0.08); }
-    &--remove { background: rgba(224, 92, 92, 0.08); }
+    &--add {
+        background: #dafbe1;
+        .IV__diffLineNum { color: #1a7f37; }
+        .IV__diffLineSign { color: #1a7f37; }
+        .IV__diffLineContent { color: #1f2328; }
+    }
+
+    &--remove {
+        background: #ffebe9;
+        .IV__diffLineNum { color: #cf222e; }
+        .IV__diffLineSign { color: #cf222e; }
+        .IV__diffLineContent { color: #1f2328; }
+    }
+
+    &:hover { background: #eaeef2; }
+    &--add:hover { background: #aceebb; }
+    &--remove:hover { background: #ffd7d5; }
 }
 
 .IV__diffLineNum {
-    width: 36px;
+    width: 30px;
+    min-width: 30px;
     text-align: right;
-    padding: 0 8px;
-    opacity: 0.3;
+    padding: 0 8px 0 0;
+    color: #8c959f;
     user-select: none;
     flex-shrink: 0;
-    font-size: 11px;
+    font-size: 12px;
+    box-sizing: content-box;
+
+    &--old { border-right: none; }
+    &--new { padding-right: 4px; }
 }
 
 .IV__diffLineSign {
-    width: 16px;
+    width: 20px;
+    min-width: 20px;
     text-align: center;
     flex-shrink: 0;
-    opacity: 0.6;
+    color: #656d76;
+    user-select: none;
 }
 
 .IV__diffLineContent {
     flex: 1;
     padding-right: 12px;
     white-space: pre;
-    overflow: hidden;
+    overflow-x: auto;
+    color: #1f2328;
+    tab-size: 4;
 }
 
 // ── Docs tab ───────────────────────────────────────────────────────────────
