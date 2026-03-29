@@ -292,6 +292,16 @@ type CodeSnippet struct {
 	Content  string `json:"content"`
 }
 
+// ToMap converts a CodeSnippet to a map for gob-safe post Props.
+func (c CodeSnippet) ToMap() map[string]interface{} {
+	return map[string]interface{}{
+		"file":     c.File,
+		"lines":    c.Lines,
+		"language": c.Language,
+		"content":  c.Content,
+	}
+}
+
 // IssueRef is a reference to an issue returned by Oli.
 type IssueRef struct {
 	ID         string `json:"id"`
@@ -299,4 +309,15 @@ type IssueRef struct {
 	Title      string `json:"title"`
 	Status     string `json:"status"`
 	Priority   string `json:"priority"`
+}
+
+// ToMap converts an IssueRef to a map for gob-safe post Props.
+func (r IssueRef) ToMap() map[string]interface{} {
+	return map[string]interface{}{
+		"id":         r.ID,
+		"identifier": r.Identifier,
+		"title":      r.Title,
+		"status":     r.Status,
+		"priority":   r.Priority,
+	}
 }
