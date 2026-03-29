@@ -46,6 +46,197 @@ enum Status {
     WAITING_MM,
     ERROR = -1,
 }
+
+const DESKTOP_SIDEBAR_THEME_OVERRIDE_SCRIPT = `
+(() => {
+    const themeVars = {
+        '--sidebar-bg': '#edf4f8',
+        '--sidebar-header-bg': '#e3edf3',
+        '--sidebar-team-bar-bg': '#d7e5ee',
+        '--sidebar-text-hover-bg': '#f7fafc',
+        '--sidebar-text-active-border': '#ffffff',
+        '--sidebar-text-active-color': '#000000',
+        '--sidebar-text': '#000000',
+        '--sidebar-unread-text': '#000000',
+        '--sidebar-header-text-color': '#000000',
+    };
+
+    const sidebarSurfaceColors = new Map([
+        ['rgb(30, 50, 92)', '#edf4f8'],
+        ['rgb(25, 42, 77)', '#e3edf3'],
+        ['rgb(22, 37, 69)', '#d7e5ee'],
+        ['rgb(40, 66, 123)', '#f7fafc'],
+    ]);
+
+    const sidebarStyle = \`
+        #SidebarContainer,
+        .SidebarContainer,
+        .sidebar-left,
+        [class*="sidebar-left"] {
+            background: #edf4f8 !important;
+            color: #000000 !important;
+        }
+
+        #SidebarContainer *,
+        .SidebarContainer *,
+        .sidebar-left *,
+        [class*="sidebar-left"] * {
+            color: #000000 !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        #SidebarContainer svg,
+        #SidebarContainer svg path,
+        .SidebarContainer svg,
+        .SidebarContainer svg path,
+        .sidebar-left svg,
+        .sidebar-left svg path,
+        [class*="sidebar-left"] svg,
+        [class*="sidebar-left"] svg path {
+            fill: currentColor !important;
+        }
+
+        #SidebarContainer input,
+        .SidebarContainer input,
+        .sidebar-left input,
+        [class*="sidebar-left"] input {
+            color: #000000 !important;
+            caret-color: #000000 !important;
+        }
+
+        #SidebarContainer input::placeholder,
+        .SidebarContainer input::placeholder,
+        .sidebar-left input::placeholder,
+        [class*="sidebar-left"] input::placeholder {
+            color: rgba(0, 0, 0, 0.6) !important;
+        }
+
+        #SidebarContainer button,
+        .SidebarContainer button,
+        .sidebar-left button,
+        [class*="sidebar-left"] button {
+            color: #000000 !important;
+        }
+    \`;
+
+    const headerStyle = \`
+        header,
+        .global-header,
+        [class*="global-header"],
+        .channel-header,
+        [class*="channel-header"],
+        .top-bar,
+        [class*="top-bar"] {
+            background: #edf4f8 !important;
+            color: #000000 !important;
+        }
+
+        header *,
+        .global-header *,
+        [class*="global-header"] *,
+        .channel-header *,
+        [class*="channel-header"] *,
+        .top-bar *,
+        [class*="top-bar"] * {
+            color: #000000 !important;
+            text-shadow: none !important;
+        }
+
+        header svg,
+        header svg path,
+        .global-header svg,
+        .global-header svg path,
+        [class*="global-header"] svg,
+        [class*="global-header"] svg path,
+        .channel-header svg,
+        .channel-header svg path,
+        [class*="channel-header"] svg,
+        [class*="channel-header"] svg path,
+        .top-bar svg,
+        .top-bar svg path,
+        [class*="top-bar"] svg,
+        [class*="top-bar"] svg path {
+            fill: currentColor !important;
+        }
+    \`;
+
+    const hideMattermostBranding = () => {
+        const headerRoots = Array.from(document.querySelectorAll('header, .global-header, [class*="global-header"], .top-bar, [class*="top-bar"]'));
+        const brandedLabels = new Set(['mattermost', 'team edition']);
+
+        for (const root of headerRoots) {
+            for (const element of root.querySelectorAll('a, button, div, span')) {
+                const label = element.textContent?.trim().toLowerCase();
+                if (!label || !brandedLabels.has(label)) {
+                    continue;
+                }
+
+                const hideTarget = element.closest('a, button') || element.parentElement || element;
+                if (hideTarget instanceof HTMLElement) {
+                    hideTarget.style.setProperty('display', 'none', 'important');
+                }
+            }
+        }
+
+        for (const element of document.querySelectorAll('[aria-label*="Mattermost"], [title*="Mattermost"]')) {
+            if (element instanceof HTMLElement) {
+                element.style.setProperty('display', 'none', 'important');
+            }
+        }
+    };
+
+    const applyTheme = () => {
+        const targets = [document.documentElement, document.body].filter(Boolean);
+        for (const target of targets) {
+            for (const [name, value] of Object.entries(themeVars)) {
+                target.style.setProperty(name, value, 'important');
+            }
+        }
+
+        let styleEl = document.getElementById('desktop-sidebar-theme-override');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'desktop-sidebar-theme-override';
+            document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = sidebarStyle + headerStyle;
+
+        const wrapper = document.querySelector('.main-wrapper');
+        if (wrapper) {
+            wrapper.style.setProperty('background-color', '#edf4f8', 'important');
+            wrapper.style.setProperty('background-image', 'none', 'important');
+
+            for (const el of wrapper.querySelectorAll('*')) {
+                const bg = getComputedStyle(el).backgroundColor;
+                const replacement = sidebarSurfaceColors.get(bg);
+                if (replacement) {
+                    el.style.setProperty('background-color', replacement, 'important');
+                    el.style.setProperty('background-image', 'none', 'important');
+                }
+            }
+        }
+
+        hideMattermostBranding();
+    };
+
+    applyTheme();
+    window.addEventListener('load', applyTheme, {once: true});
+    setTimeout(applyTheme, 50);
+    setTimeout(applyTheme, 250);
+    setTimeout(applyTheme, 1000);
+
+    if (!window.__desktopSidebarThemeObserver) {
+        const observer = new MutationObserver(() => applyTheme());
+        observer.observe(document.documentElement, {attributes: true, attributeFilter: ['style', 'class']});
+        if (document.body) {
+            observer.observe(document.body, {attributes: true, attributeFilter: ['style', 'class']});
+        }
+        window.__desktopSidebarThemeObserver = observer;
+    }
+})();
+`;
+
 export class MattermostWebContentsView extends EventEmitter {
     private view: MattermostView;
     private parentWindow: BrowserWindow;
@@ -423,6 +614,10 @@ export class MattermostWebContentsView extends EventEmitter {
                 this.status = Status.ERROR;
             }
         };
+    };
+
+    applyDesktopThemeOverride = () => {
+        void this.webContentsView.webContents.executeJavaScript(DESKTOP_SIDEBAR_THEME_OVERRIDE_SCRIPT);
     };
 
     /**

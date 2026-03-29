@@ -5,7 +5,7 @@
 .alternate-link {
     margin-left: auto;
     margin-bottom: 18px;
-    font-family: 'Open Sans';
+    font-family: 'Open Sans', sans-serif;
 
     .alternate-link__message {
         color: var(--center-channel-color);
@@ -44,7 +44,7 @@
         display: flex;
         flex-direction: column;
         margin: auto;
-        font-family: 'Open Sans';
+        font-family: 'Open Sans', sans-serif;
 
         .ConfigureServer__content {
             display: flex;
@@ -67,7 +67,7 @@
                     margin-bottom: 24px;
                     padding-right: 60px;
                     color: var(--center-channel-color);
-                    font-family: 'Metropolis';
+                    font-family: 'Open Sans', sans-serif;
                     font-size: 80px;
                     font-weight: 600;
                     letter-spacing: -0.05em;
@@ -137,7 +137,7 @@
 
                     .ConfigureServer__card-title {
                         color: var(--center-channel-color);
-                        font-family: 'Metropolis';
+                        font-family: 'Open Sans', sans-serif;
                         font-size: 22px;
                         font-style: normal;
                         font-weight: 600;

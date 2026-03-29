@@ -4,7 +4,7 @@
 
 .ErrorView {
   color: var(--center-channel-color);
-  font-family: 'Open Sans';
+  font-family: 'Open Sans', sans-serif;
   font-size: 14px;
   line-height: 20px;
   display: flex;
@@ -22,7 +22,7 @@
   }
 
   .ErrorView-header {
-    font-family: 'Metropolis';
+    font-family: 'Open Sans', sans-serif;
     font-style: normal;
     font-weight: 600;
     font-size: 40px;
