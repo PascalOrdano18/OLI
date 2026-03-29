@@ -2,7 +2,7 @@
 // See LICENSE.txt for license information.
 
 import React, {useEffect, useRef, useCallback} from 'react';
-import ReactDOM from 'react-dom/client';
+import ReactDOM from 'react-dom';
 
 import client from '../../client/client';
 import type {Issue} from '../../types/model';
@@ -119,8 +119,7 @@ async function processPost(postEl: Element) {
     cardsContainer.style.marginTop = '8px';
     messageEl.parentElement?.appendChild(cardsContainer);
 
-    const root = ReactDOM.createRoot(cardsContainer);
-    root.render(
+    ReactDOM.render(
         <React.Fragment>
             {issues.map((issue) => (
                 <IssueRefCard
@@ -136,6 +135,7 @@ async function processPost(postEl: Element) {
                 />
             ))}
         </React.Fragment>,
+        cardsContainer,
     );
 }
 
