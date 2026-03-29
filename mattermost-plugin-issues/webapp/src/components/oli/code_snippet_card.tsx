@@ -15,8 +15,14 @@ interface Props {
 }
 
 const CodeSnippetCard: React.FC<Props> = ({snippet}) => {
-    // Strip line numbers from content for display (they come as "123: code").
     const lines = snippet.content.split('\n');
+
+    // Detect whether content has line numbers (e.g. "123: code") from read_file tool.
+    const hasLineNumbers = lines.length > 0 && /^\d+:/.test(lines[0]);
+
+    // If file equals the language name, this is a generated snippet (no real file path).
+    const isGenerated = snippet.file === snippet.language;
+    const headerLabel = isGenerated ? snippet.language : snippet.file;
 
     return (
         <div
@@ -46,9 +52,10 @@ const CodeSnippetCard: React.FC<Props> = ({snippet}) => {
                         backgroundColor: 'rgba(0, 0, 0, 0.08)',
                         padding: '2px 8px',
                         borderRadius: '4px',
+                        textTransform: isGenerated ? 'uppercase' : 'none',
                     }}
                 >
-                    {snippet.file}
+                    {headerLabel}
                 </span>
                 {snippet.lines && (
                     <span
@@ -60,17 +67,19 @@ const CodeSnippetCard: React.FC<Props> = ({snippet}) => {
                         {'L'}{snippet.lines}
                     </span>
                 )}
-                <span
-                    style={{
-                        fontSize: '10px',
-                        color: '#909399',
-                        marginLeft: 'auto',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                    }}
-                >
-                    {snippet.language}
-                </span>
+                {!isGenerated && (
+                    <span
+                        style={{
+                            fontSize: '10px',
+                            color: '#909399',
+                            marginLeft: 'auto',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                        }}
+                    >
+                        {snippet.language}
+                    </span>
+                )}
             </div>
             <pre
                 style={{
@@ -87,20 +96,22 @@ const CodeSnippetCard: React.FC<Props> = ({snippet}) => {
                 <code>
                     {lines.map((line, i) => (
                         <div key={i} style={{display: 'flex'}}>
-                            <span
-                                style={{
-                                    color: '#858585',
-                                    userSelect: 'none',
-                                    minWidth: '40px',
-                                    textAlign: 'right',
-                                    paddingRight: '12px',
-                                    flexShrink: 0,
-                                }}
-                            >
-                                {line.match(/^(\d+):/)?.[1] || ''}
-                            </span>
+                            {hasLineNumbers && (
+                                <span
+                                    style={{
+                                        color: '#858585',
+                                        userSelect: 'none',
+                                        minWidth: '40px',
+                                        textAlign: 'right',
+                                        paddingRight: '12px',
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    {line.match(/^(\d+):/)?.[1] || ''}
+                                </span>
+                            )}
                             <span style={{flex: 1}}>
-                                {line.replace(/^\d+:\s?/, '')}
+                                {hasLineNumbers ? line.replace(/^\d+:\s?/, '') : line}
                             </span>
                         </div>
                     ))}
