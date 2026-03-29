@@ -287,12 +287,6 @@ func (p *Plugin) onConversationEnd(conv *conversationState, usernameCache map[st
 			p.API.LogInfo("[ConversationMonitor] action summary posted to notification channel")
 		}
 
-		// Post action notification as a reply to the last conversation message.
-		lastPostID := ""
-		if len(conv.messages) > 0 {
-			lastPostID = conv.messages[len(conv.messages)-1].PostID
-		}
-		p.postActionNotification(conv.channelID, lastPostID, result.IssueRefs)
 	}()
 }
 
@@ -305,12 +299,6 @@ func (p *Plugin) MessageHasBeenPosted(_ *plugin.Context, post *model.Post) {
 	// Skip messages from our own bots to avoid loops.
 	if post.UserId == p.botUserID || post.UserId == p.oliAgentUserID {
 		return
-	}
-
-	p.conversationMonitor.HandlePost(post)
-
-	if containsFionaMention(post.Message) {
-		p.conversationMonitor.FlushConversation(post.ChannelId)
 	}
 
 	// Handle @oli mentions.
@@ -332,6 +320,15 @@ func (p *Plugin) MessageHasBeenPosted(_ *plugin.Context, post *model.Post) {
 				}
 			}
 		}
+	}
+
+	// Only track messages in the conversation monitor if they are NOT
+	// directed at @oli. Messages to @oli are handled above and should
+	// not be analyzed again as part of a conversation.
+	p.conversationMonitor.HandlePost(post)
+
+	if containsFionaMention(post.Message) {
+		p.conversationMonitor.FlushConversation(post.ChannelId)
 	}
 }
 
@@ -458,15 +455,15 @@ func (p *Plugin) handleOliChat(post *model.Post, stripMention bool) {
 			p.API.LogError("[Oli] failed to post response", "error", appErr.Error())
 		}
 
-		// Post action notification in the same thread.
-		p.postActionNotification(channelID, rootID, result.IssueRefs)
+		// Post action summary to notification channel (oli_actions).
+		p.postActionsToNotificationChannel(result.IssueRefs, username)
 	}()
 }
 
-// postActionNotification posts a concise action summary to the given channel.
-// It filters issue_refs to only those with action = "created", "edited", or "deleted",
-// then formats the message accordingly.
-func (p *Plugin) postActionNotification(channelID string, rootID string, issueRefs []IssueRef) {
+// postActionsToNotificationChannel posts a concise action summary to the
+// oli_actions notification channel with rich issue formatting (oli_data props).
+// It filters issue_refs to only those with action = "created", "edited", or "deleted".
+func (p *Plugin) postActionsToNotificationChannel(issueRefs []IssueRef, username string) {
 	var actionRefs []IssueRef
 	for _, ref := range issueRefs {
 		if ref.Action == "created" || ref.Action == "edited" || ref.Action == "deleted" {
@@ -478,32 +475,96 @@ func (p *Plugin) postActionNotification(channelID string, rootID string, issueRe
 		return
 	}
 
+	notifChannelID := p.conversationMonitor.notificationChannelID
+
 	var message string
 	if len(actionRefs) == 1 {
 		ref := actionRefs[0]
-		message = fmt.Sprintf("@oli %s issue **%s** — %s", ref.Action, ref.Identifier, ref.Title)
+		message = fmt.Sprintf("Responded to @%s — %s issue **%s**: %s", username, ref.Action, ref.Identifier, ref.Title)
 	} else {
-		message = fmt.Sprintf("@oli took %d actions:\n", len(actionRefs))
+		message = fmt.Sprintf("Responded to @%s — took %d actions:\n", username, len(actionRefs))
 		for _, ref := range actionRefs {
-			message += fmt.Sprintf("- %s **%s** — %s\n", ref.Action, ref.Identifier, ref.Title)
+			message += fmt.Sprintf("- %s **%s**: %s\n", ref.Action, ref.Identifier, ref.Title)
 		}
 	}
 
+	// Build props with issue refs for rich rendering.
+	props := map[string]interface{}{}
+	oliData := map[string]interface{}{}
+	refs := make([]interface{}, len(actionRefs))
+	for i, r := range actionRefs {
+		refs[i] = r.ToMap()
+	}
+	oliData["issue_refs"] = refs
+	props["oli_data"] = oliData
+
 	post := &model.Post{
 		UserId:    p.oliAgentUserID,
-		ChannelId: channelID,
-		RootId:    rootID,
+		ChannelId: notifChannelID,
 		Message:   message,
+		Type:      "custom_oli_response",
+		Props:     props,
 	}
 	if _, appErr := p.API.CreatePost(post); appErr != nil {
-		p.API.LogError("[Oli] failed to post action notification",
-			"channel_id", channelID,
+		p.API.LogError("[Oli] failed to post action to notification channel",
 			"error", appErr.Error(),
 		)
 	}
 }
 
-// ensureNotificationChannel finds or creates the "all-the-actions" channel.
+// postCallActionsToNotificationChannel posts a call-analysis action summary
+// to the oli_actions notification channel with rich issue formatting.
+func (p *Plugin) postCallActionsToNotificationChannel(issueRefs []IssueRef, channelName string) {
+	var actionRefs []IssueRef
+	for _, ref := range issueRefs {
+		if ref.Action == "created" || ref.Action == "edited" || ref.Action == "deleted" {
+			actionRefs = append(actionRefs, ref)
+		}
+	}
+
+	if len(actionRefs) == 0 {
+		return
+	}
+
+	notifChannelID := p.conversationMonitor.notificationChannelID
+
+	var message string
+	if len(actionRefs) == 1 {
+		ref := actionRefs[0]
+		message = fmt.Sprintf("Call in %s — %s issue **%s**: %s", channelName, ref.Action, ref.Identifier, ref.Title)
+	} else {
+		message = fmt.Sprintf("Call in %s — took %d actions:\n", channelName, len(actionRefs))
+		for _, ref := range actionRefs {
+			message += fmt.Sprintf("- %s **%s**: %s\n", ref.Action, ref.Identifier, ref.Title)
+		}
+	}
+
+	// Build props with issue refs for rich rendering.
+	props := map[string]interface{}{}
+	oliData := map[string]interface{}{}
+	refs := make([]interface{}, len(actionRefs))
+	for i, r := range actionRefs {
+		refs[i] = r.ToMap()
+	}
+	oliData["issue_refs"] = refs
+	props["oli_data"] = oliData
+
+	post := &model.Post{
+		UserId:    p.oliAgentUserID,
+		ChannelId: notifChannelID,
+		Message:   message,
+		Type:      "custom_oli_response",
+		Props:     props,
+	}
+	if _, appErr := p.API.CreatePost(post); appErr != nil {
+		p.API.LogError("[Oli] failed to post call action to notification channel",
+			"error", appErr.Error(),
+		)
+	}
+}
+
+// ensureNotificationChannel finds or creates the "oli_actions" channel.
+// Migrates the old "all-the-actions" channel if it exists.
 func (p *Plugin) ensureNotificationChannel() (*model.Channel, error) {
 	teams, appErr := p.API.GetTeams()
 	if appErr != nil {
@@ -514,15 +575,29 @@ func (p *Plugin) ensureNotificationChannel() (*model.Channel, error) {
 	}
 	teamID := teams[0].Id
 
-	ch, appErr := p.API.GetChannelByName(teamID, "all-the-actions", false)
+	// Check if the new channel already exists.
+	ch, appErr := p.API.GetChannelByName(teamID, "oli_actions", false)
 	if appErr == nil {
 		return ch, nil
 	}
 
+	// Migrate old channel name if it exists.
+	ch, appErr = p.API.GetChannelByName(teamID, "all-the-actions", false)
+	if appErr == nil {
+		ch.Name = "oli_actions"
+		ch.DisplayName = "oli_actions"
+		ch, appErr = p.API.UpdateChannel(ch)
+		if appErr != nil {
+			return nil, fmt.Errorf("could not rename channel: %s", appErr.Error())
+		}
+		return ch, nil
+	}
+
+	// Create new channel.
 	ch, appErr = p.API.CreateChannel(&model.Channel{
 		TeamId:      teamID,
-		Name:        "all-the-actions",
-		DisplayName: "All The Actions",
+		Name:        "oli_actions",
+		DisplayName: "oli_actions",
 		Type:        model.ChannelTypeOpen,
 		Purpose:     "Activity feed: issues created, updated, and deleted by the AI agent.",
 	})

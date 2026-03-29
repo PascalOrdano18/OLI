@@ -113,8 +113,8 @@ func (p *Plugin) handleCallAudioUpload(w http.ResponseWriter, r *http.Request) {
 			p.API.LogError("[CallAudio] failed to post AI call summary", "error", appErr.Error())
 		}
 
-		// Post action notification to the original channel where the call happened.
-		p.postActionNotification(channelID, "", result.IssueRefs)
+		// Post action summary to notification channel (oli_actions).
+		p.postCallActionsToNotificationChannel(result.IssueRefs, channel.DisplayName)
 	}()
 
 	respondJSON(w, http.StatusAccepted, map[string]string{"status": "processing"})
