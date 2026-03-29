@@ -1,12 +1,12 @@
 // Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React from 'react';
+import React, {useCallback, useState} from 'react';
 
 import type {IssueStatus, IssuePriority} from '../../types/model';
 import {STATUS_COLORS, STATUS_LABELS, PRIORITY_COLORS} from '../../types/model';
 
-interface IssueRefData {
+export interface IssueRefData {
     id: string;
     identifier: string;
     title: string;
@@ -16,6 +16,7 @@ interface IssueRefData {
 
 interface Props {
     issueRef: IssueRefData;
+    onClick?: (issueRef: IssueRefData) => void;
 }
 
 const PRIORITY_ICONS: Record<string, string> = {
@@ -26,11 +27,19 @@ const PRIORITY_ICONS: Record<string, string> = {
     none: '\u25CB',
 };
 
-const IssueRefCard: React.FC<Props> = ({issueRef}) => {
+const IssueRefCard: React.FC<Props> = ({issueRef, onClick}) => {
+    const [hovered, setHovered] = useState(false);
     const status = issueRef.status as IssueStatus;
     const priority = issueRef.priority as IssuePriority;
     const statusColor = STATUS_COLORS[status] || '#909399';
     const priorityColor = PRIORITY_COLORS[priority] || '#909399';
+    const isClickable = Boolean(onClick);
+
+    const handleClick = useCallback(() => {
+        if (onClick) {
+            onClick(issueRef);
+        }
+    }, [onClick, issueRef]);
 
     return (
         <div
@@ -40,11 +49,16 @@ const IssueRefCard: React.FC<Props> = ({issueRef}) => {
                 alignItems: 'center',
                 gap: '10px',
                 padding: '8px 12px',
-                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                backgroundColor: hovered && isClickable ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.04)',
                 borderRadius: '8px',
                 border: '1px solid rgba(0, 0, 0, 0.08)',
                 marginTop: '4px',
+                cursor: isClickable ? 'pointer' : 'default',
+                transition: 'background-color 0.15s',
             }}
+            onClick={handleClick}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
         >
             <div
                 style={{
@@ -108,6 +122,9 @@ const IssueRefCard: React.FC<Props> = ({issueRef}) => {
                     {issueRef.title}
                 </div>
             </div>
+            {isClickable && (
+                <div style={{color: '#999', fontSize: '16px', flexShrink: 0}}>{'\u2192'}</div>
+            )}
         </div>
     );
 };
