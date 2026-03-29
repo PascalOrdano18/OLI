@@ -169,6 +169,7 @@ contextBridge.exposeInMainWorld('desktop', {
     openServersDropdown: () => ipcRenderer.send(OPEN_SERVERS_DROPDOWN),
     switchTab: (viewId) => ipcRenderer.send(SWITCH_TAB, viewId),
     setViewMode: (mode) => ipcRenderer.send(SET_VIEW_MODE, mode),
+    onSetViewMode: (listener) => ipcRenderer.on(SET_VIEW_MODE, (_, mode) => listener(mode)),
     onNavigateToIssue: (listener) => {
         const wrapped = (_, issueId) => listener(issueId);
         ipcRenderer.on(NAVIGATE_TO_ISSUE, wrapped);

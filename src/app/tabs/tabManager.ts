@@ -84,6 +84,7 @@ export class TabManager extends EventEmitter {
             this.setViewMode('issues');
             const mainWindow = MainWindow.get();
             if (mainWindow) {
+                mainWindow.webContents.send(SET_VIEW_MODE, 'issues');
                 mainWindow.webContents.send(NAVIGATE_TO_ISSUE, issueId);
             }
         });
