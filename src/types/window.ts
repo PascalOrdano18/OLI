@@ -177,6 +177,8 @@ declare global {
                     uncommittedFileCount: number;
                     unpushedCommitCount: number;
                 }>;
+                pickDefaultRepo: () => Promise<string | null>;
+                getDefaultRepo: () => Promise<string | null>;
             };
 
             downloadsDropdown: {

@@ -127,6 +127,9 @@ export const AO_GET_GIT_FILES = 'ao-get-git-files';
 export const AO_GET_GIT_CHANGES = 'ao-get-git-changes';
 export const AO_GIT_ACTION = 'ao-git-action';
 export const AO_GET_GIT_STATUS = 'ao-get-git-status';
+export const AO_PICK_DEFAULT_REPO = 'ao-pick-default-repo';
+export const AO_GET_DEFAULT_REPO = 'ao-get-default-repo';
+export const AO_AUTO_SPAWN_AGENT = 'ao-auto-spawn-agent';
 
 export const GET_LANGUAGE_INFORMATION = 'get-language-information';
 export const GET_AVAILABLE_LANGUAGES = 'get-available-languages';

@@ -54,6 +54,9 @@ import {
     AO_GET_GIT_CHANGES,
     AO_GIT_ACTION,
     AO_GET_GIT_STATUS,
+    AO_PICK_DEFAULT_REPO,
+    AO_GET_DEFAULT_REPO,
+    AO_AUTO_SPAWN_AGENT,
 } from 'common/communication';
 import aoManager from 'main/aoManager';
 import Config from 'common/config';
@@ -434,6 +437,19 @@ function initializeInterCommunicationEventListeners() {
 
     ipcMain.handle(AO_GET_GIT_STATUS, (_event, projectId: string) => {
         return aoManager.getGitFullStatus(projectId);
+    });
+
+    ipcMain.handle(AO_PICK_DEFAULT_REPO, () => {
+        const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined;
+        return aoManager.pickDefaultRepoPath(win);
+    });
+
+    ipcMain.handle(AO_GET_DEFAULT_REPO, () => {
+        return aoManager.getDefaultRepoPath();
+    });
+
+    ipcMain.handle(AO_AUTO_SPAWN_AGENT, (_event, issue: {id: string; project_id: string; identifier: string; title: string; description: string}) => {
+        return aoManager.autoSpawnAgent(issue);
     });
 }
 

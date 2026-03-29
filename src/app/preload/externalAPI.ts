@@ -53,6 +53,7 @@ import {
     WINDOW_CLOSE,
     NAVIGATE_TO_ISSUE,
     UPDATE_POPOUT_TITLE_TEMPLATE,
+    AO_AUTO_SPAWN_AGENT,
 } from 'common/communication';
 
 import type {ExternalAPI} from 'types/externalAPI';
@@ -133,6 +134,10 @@ const desktopAPI: DesktopAPI = {
     onOpenCallsUserSettings: (listener) => createListener(CALLS_WIDGET_OPEN_USER_SETTINGS, listener),
 
     onSendMetrics: (listener) => createListener(METRICS_SEND, listener),
+
+    // Agent orchestrator
+    autoSpawnAgent: (issue: {id: string; project_id: string; identifier: string; title: string; description: string}) =>
+        ipcRenderer.invoke(AO_AUTO_SPAWN_AGENT, issue),
 
     // Utility
     unregister: (channel) => ipcRenderer.removeAllListeners(channel),

@@ -1,7 +1,7 @@
 // Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import ReactDOM from 'react-dom';
 
 import IntlProvider from 'renderer/intl_provider';
@@ -11,18 +11,18 @@ import type {UniqueServer} from 'types/config';
 
 import ConfigureServer from '../../components/ConfigureServer';
 import WelcomeScreen from '../../components/WelcomeScreen';
+import RepoPickerStep from '../../components/WelcomeScreen/RepoPickerStep';
 
 const MOBILE_SCREEN_WIDTH = 1200;
 
-const onConnect = (data: UniqueServer) => {
-    window.desktop.modals.finishModal(data);
-};
+type OnboardingStep = 'welcome' | 'configureServer' | 'repoPicker';
 
 setupDarkMode();
 
 const WelcomeScreenModalWrapper = () => {
     const [data, setData] = useState<{prefillURL?: string}>();
-    const [getStarted, setGetStarted] = useState(false);
+    const [step, setStep] = useState<OnboardingStep>('welcome');
+    const [serverData, setServerData] = useState<UniqueServer | null>(null);
     const [mobileView, setMobileView] = useState(false);
 
     const handleWindowResize = () => {
@@ -34,7 +34,7 @@ const WelcomeScreenModalWrapper = () => {
             then((data) => {
                 setData(data);
                 if (data.prefillURL) {
-                    setGetStarted(true);
+                    setStep('configureServer');
                 }
             });
 
@@ -47,21 +47,42 @@ const WelcomeScreenModalWrapper = () => {
     }, []);
 
     const onGetStarted = () => {
-        setGetStarted(true);
+        setStep('configureServer');
     };
+
+    const onConnect = useCallback((data: UniqueServer) => {
+        setServerData(data);
+        setStep('repoPicker');
+    }, []);
+
+    const onRepoPickerContinue = useCallback(() => {
+        if (serverData) {
+            window.desktop.modals.finishModal(serverData);
+        }
+    }, [serverData]);
 
     return (
         <IntlProvider>
-            {getStarted ? (
+            {step === 'welcome' && (
+                <WelcomeScreen
+                    onGetStarted={onGetStarted}
+                />
+            )}
+            {step === 'configureServer' && (
                 <ConfigureServer
                     mobileView={mobileView}
                     onConnect={onConnect}
                     prefillURL={data?.prefillURL}
                 />
-            ) : (
-                <WelcomeScreen
-                    onGetStarted={onGetStarted}
-                />
+            )}
+            {step === 'repoPicker' && (
+                <div className='LoadingScreen WelcomeScreen'>
+                    <div className='WelcomeScreen__body'>
+                        <div className='WelcomeScreen__content'>
+                            <RepoPickerStep onContinue={onRepoPickerContinue}/>
+                        </div>
+                    </div>
+                </div>
             )}
         </IntlProvider>
     );

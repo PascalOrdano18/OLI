@@ -146,6 +146,8 @@ import {
     AO_GIT_ACTION,
     AO_GET_GIT_STATUS,
     NAVIGATE_TO_ISSUE,
+    AO_PICK_DEFAULT_REPO,
+    AO_GET_DEFAULT_REPO,
 } from 'common/communication';
 
 console.log('Preload initialized');
@@ -351,6 +353,8 @@ contextBridge.exposeInMainWorld('desktop', {
         getGitChanges: (projectId) => ipcRenderer.invoke(AO_GET_GIT_CHANGES, projectId),
         gitAction: (projectId, action, extraArgs) => ipcRenderer.invoke(AO_GIT_ACTION, projectId, action, extraArgs),
         getGitStatus: (projectId) => ipcRenderer.invoke(AO_GET_GIT_STATUS, projectId),
+        pickDefaultRepo: () => ipcRenderer.invoke(AO_PICK_DEFAULT_REPO),
+        getDefaultRepo: () => ipcRenderer.invoke(AO_GET_DEFAULT_REPO),
     },
 
     modals: {

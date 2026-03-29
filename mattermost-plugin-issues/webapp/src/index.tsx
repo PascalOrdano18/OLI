@@ -57,6 +57,29 @@ class Plugin {
                 try {
                     const issue = JSON.parse(msg.data.issue);
                     store.dispatch({type: ActionTypes.RECEIVED_ISSUE, data: issue});
+
+                    // Auto-spawn agent for bot-created issues (Fiona)
+                    const currentUserId = store.getState()?.entities?.users?.currentUserId;
+                    if (issue.created_by && issue.created_by !== currentUserId) {
+                        const desktopAPI = (window as any).desktopAPI;
+                        if (desktopAPI?.autoSpawnAgent) {
+                            desktopAPI.autoSpawnAgent({
+                                id: issue.id,
+                                project_id: issue.project_id,
+                                identifier: issue.identifier,
+                                title: issue.title,
+                                description: issue.description || '',
+                            }).then((result: any) => {
+                                if (result?.spawned) {
+                                    console.log(`[Issues Plugin] Auto-spawned agent for issue ${issue.identifier}`);
+                                } else {
+                                    console.log(`[Issues Plugin] Agent not spawned for ${issue.identifier}: ${result?.reason}`);
+                                }
+                            }).catch((err: any) => {
+                                console.error(`[Issues Plugin] Failed to auto-spawn agent for ${issue.identifier}:`, err);
+                            });
+                        }
+                    }
                 } catch (e) {
                     // Ignore parse errors.
                 }

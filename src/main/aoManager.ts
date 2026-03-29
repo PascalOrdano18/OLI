@@ -127,9 +127,23 @@ export class AoManager {
         writeFileSync(this.getPathsFile(), JSON.stringify(paths, null, 2));
     }
 
+    private getDefaultRepoKey(): string {
+        return `${this.getServerId()}:__default__`;
+    }
+
+    getDefaultRepoPath(): string | null {
+        return this.loadProjectPaths()[this.getDefaultRepoKey()] ?? null;
+    }
+
+    private setDefaultRepoPath(repoPath: string): void {
+        const paths = this.loadProjectPaths();
+        paths[this.getDefaultRepoKey()] = repoPath;
+        this.saveProjectPaths(paths);
+    }
+
     private getRepoPath(projectId: string): string | null {
         const key = `${this.getServerId()}:${projectId}`;
-        return this.loadProjectPaths()[key] ?? null;
+        return this.loadProjectPaths()[key] ?? this.getDefaultRepoPath();
     }
 
     private setRepoPath(projectId: string, repoPath: string): void {
@@ -360,6 +374,29 @@ export class AoManager {
             clearInterval(entry.pollInterval);
             entry.pollInterval = null;
         }
+    }
+
+    async pickDefaultRepoPath(win?: BrowserWindow): Promise<string | null> {
+        log.info('pickDefaultRepoPath called');
+        const opts = {
+            properties: ['openDirectory' as const, 'createDirectory' as const],
+            message: 'Select the default git repository for your workspace',
+        };
+        const result = await (win ? dialog.showOpenDialog(win, opts) : dialog.showOpenDialog(opts));
+
+        if (result.canceled || !result.filePaths[0]) {
+            return null;
+        }
+
+        const repoPath = result.filePaths[0];
+
+        if (!existsSync(join(repoPath, '.git'))) {
+            throw new Error(`"${repoPath}" is not a git repository (.git not found). Please select a valid git repo.`);
+        }
+
+        this.setDefaultRepoPath(repoPath);
+        log.info('Default repo path set', {repoPath});
+        return repoPath;
     }
 
     async pickRepoPath(serverId: string, projectId: string, win?: BrowserWindow): Promise<string | null> {
@@ -831,6 +868,75 @@ export class AoManager {
         default:
             throw new Error(`Unknown git action: ${action}`);
         }
+    }
+
+    async autoSpawnAgent(issue: AoIssue & {project_id: string}): Promise<{spawned: boolean; reason?: string; sessionId?: string}> {
+        log.info('autoSpawnAgent called', {issueId: issue.id, projectId: issue.project_id});
+
+        const projectId = issue.project_id;
+        const repoPath = this.getRepoPath(projectId);
+        if (!repoPath) {
+            log.warn('autoSpawnAgent: no repo path for project', {projectId});
+            return {spawned: false, reason: 'no_repo_path'};
+        }
+
+        // Check if there's already a session for this project
+        const existing = this.sessions.get(projectId);
+        if (existing) {
+            log.info('autoSpawnAgent: session already exists', {projectId});
+            return {spawned: false, reason: 'session_exists'};
+        }
+
+        const defaultBranch = await this.detectDefaultBranch(repoPath);
+        const projectName = issue.identifier.split('-')[0] || 'project';
+        const sessionPrefix = projectName.toLowerCase();
+
+        this.writeConfig(projectId, projectName, sessionPrefix, repoPath, defaultBranch);
+
+        const configDir = this.getConfigDir();
+        const spawnOutput = await this.runAo(['spawn'], configDir);
+
+        const match = spawnOutput.match(/SESSION=(\S+)/);
+        if (!match) {
+            throw new Error(`Could not parse session ID from ao spawn output: ${spawnOutput}`);
+        }
+        const sessionId = match[1];
+
+        const tmuxMatch = spawnOutput.match(/tmux attach -t (\S+)/);
+        const tmuxName = tmuxMatch ? tmuxMatch[1] : sessionId;
+
+        await this.autoAcceptBypassPrompt(tmuxName);
+
+        const baseline = await this.captureTmux(tmuxName);
+
+        const prompt = [
+            `Issue context:`,
+            `- ID: ${issue.id}`,
+            `- Identifier: ${issue.identifier}`,
+            `- Title: ${issue.title}`,
+            issue.description ? `- Description: ${issue.description}` : '',
+            ``,
+            `Task: Implement the changes described in the issue above.`,
+        ].filter(Boolean).join('\n');
+
+        await this.runAo(['send', sessionId, prompt], configDir);
+
+        const entry: SessionEntry = {
+            sessionId,
+            tmuxName,
+            projectId,
+            pollInterval: null,
+            pipeStream: null,
+            pipePath: null,
+            lastOutput: baseline,
+            webContentsId: -1,
+        };
+
+        this.sessions.set(projectId, entry);
+        this.persistSession(projectId, sessionId, tmuxName);
+
+        log.info('autoSpawnAgent: agent spawned successfully', {sessionId, projectId});
+        return {spawned: true, sessionId};
     }
 
     getSessionStatus(projectId: string, webContents?: WebContents): {sessionId: string | null; hasRepoPath: boolean; repoPath: string | null} {
