@@ -56,7 +56,18 @@ const OliResponsePost: React.FC<Props> = ({post}) => {
             {issueRefs.length > 0 && (
                 <div style={{display: 'flex', flexDirection: 'column', gap: '4px', marginTop: codeSnippets.length > 0 ? '8px' : 0}}>
                     {issueRefs.map((ref) => (
-                        <IssueRefCard key={ref.id} issueRef={ref} />
+                        <IssueRefCard
+                            key={ref.id}
+                            issueRef={ref}
+                            onClick={(ir) => {
+                                console.log('[OliResponsePost] Card clicked!', ir.id, ir.identifier);
+                                const api = (window as any).desktopAPI;
+                                console.log('[OliResponsePost] desktopAPI available:', !!api, 'navigateToIssue:', !!api?.navigateToIssue);
+                                if (api?.navigateToIssue) {
+                                    api.navigateToIssue(ir.id);
+                                }
+                            }}
+                        />
                     ))}
                 </div>
             )}

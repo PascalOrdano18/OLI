@@ -33,6 +33,8 @@ class Client {
     getIssue = (id: string): Promise<Issue> => this.doGet(`/issues/${id}`);
     updateIssue = (id: string, data: UpdateIssueRequest): Promise<Issue> => this.doPut(`/issues/${id}`, data);
     deleteIssue = (id: string): Promise<void> => this.doDelete(`/issues/${id}`);
+    getIssueByIdentifier = (identifier: string): Promise<Issue> => this.doGet(`/issues/by-identifier/${identifier}`);
+    searchAllIssues = (query: string, limit = 5): Promise<Issue[]> => this.doGet(`/issues/search?q=${encodeURIComponent(query)}&limit=${limit}`);
 
     // Labels
     getLabels = (projectId: string): Promise<IssueLabel[]> => this.doGet(`/projects/${projectId}/labels`);
