@@ -1,0 +1,26 @@
+// Configuration — all values come from environment variables
+
+const required = (name) => {
+    const val = process.env[name];
+    if (!val) {
+        throw new Error(`Missing required env var: ${name}`);
+    }
+    return val;
+};
+
+const config = {
+    port: process.env.PORT || 3002,
+    railwayApiToken: () => required('RAILWAY_API_TOKEN'),
+    supabaseUrl: () => required('SUPABASE_URL'),
+    supabaseServiceKey: () => required('SUPABASE_SERVICE_KEY'),
+    oliMattermostImage: () =>
+        process.env.OLI_MATTERMOST_IMAGE || 'docker.io/vosv/oli-mattermost:latest',
+    /**
+     * Railway free tier usually allows only one *service* per new project before upgrades.
+     * - lite: one Mattermost container + SQLite + one volume (works on free tier)
+     * - full: Postgres service + Mattermost service (needs a plan that allows 2+ services per project)
+     */
+    railwayStackMode: () => (process.env.OLI_RAILWAY_STACK_MODE || 'lite').toLowerCase(),
+};
+
+export default config;
