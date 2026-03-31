@@ -44,11 +44,8 @@ import {
     AO_PICK_REPO_PATH,
     AO_SPAWN_SESSION,
     AO_SEND_MESSAGE,
-    AO_SEND_RAW_INPUT,
-    AO_RESIZE_TERMINAL,
     AO_KILL_SESSION,
     AO_GET_SESSION_STATUS,
-    AO_OPEN_TERMINAL,
     AO_GET_DIFF,
     AO_GET_GIT_FILES,
     AO_GET_GIT_CHANGES,
@@ -397,24 +394,12 @@ function initializeInterCommunicationEventListeners() {
         return aoManager.sendMessage(projectId, message);
     });
 
-    ipcMain.handle(AO_SEND_RAW_INPUT, (_event, projectId: string, input: string) => {
-        return aoManager.sendRawInput(projectId, input);
-    });
-
-    ipcMain.handle(AO_RESIZE_TERMINAL, (_event, projectId: string, cols: number, rows: number) => {
-        return aoManager.resizeTerminal(projectId, cols, rows);
-    });
-
     ipcMain.handle(AO_KILL_SESSION, (_event, projectId: string) => {
         return aoManager.killSession(projectId);
     });
 
-    ipcMain.handle(AO_GET_SESSION_STATUS, (event, projectId: string) => {
-        return aoManager.getSessionStatus(projectId, event.sender);
-    });
-
-    ipcMain.handle(AO_OPEN_TERMINAL, (_event, projectId: string) => {
-        return aoManager.openTerminal(projectId);
+    ipcMain.handle(AO_GET_SESSION_STATUS, (_event, projectId: string) => {
+        return aoManager.getSessionStatus(projectId);
     });
 
     ipcMain.handle(AO_GET_DIFF, (_event, projectId: string) => {
