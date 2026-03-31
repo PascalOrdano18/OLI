@@ -11,6 +11,7 @@ services:
 
   mattermost:
     image: mattermost/mattermost-team-edition:latest
+    command: ["server"]
     depends_on:
       - postgres
     environment:

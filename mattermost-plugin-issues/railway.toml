@@ -1,0 +1,8 @@
+# Overrides Railway dashboard start command (config-as-code wins over UI).
+# Ensures the web server runs even if the service was set to bare `mattermost`.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "/mattermost/bin/mattermost server"

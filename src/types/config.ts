@@ -124,6 +124,7 @@ export type AnyConfig = ConfigV4 | ConfigV3 | ConfigV2 | ConfigV1 | ConfigV0;
 
 export type BuildConfig = {
     defaultServers?: Server[];
+    provisioningApiUrl: string;
     helpLink: string;
     academyLink: string;
     upgradeLink: string;

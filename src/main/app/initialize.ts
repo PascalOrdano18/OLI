@@ -57,6 +57,7 @@ import {
 } from 'common/communication';
 import aoManager from 'main/aoManager';
 import Config from 'common/config';
+import buildConfig from 'common/config/buildConfig';
 import {MATTERMOST_PROTOCOL} from 'common/constants';
 import {Logger} from 'common/log';
 import ServerManager from 'common/servers/serverManager';
@@ -495,10 +496,16 @@ async function initializeAfterAppReady() {
     defaultSession.webRequest.onHeadersReceived((details, callback) => {
         const url = parseURL(details.url);
         if (url?.protocol === 'mattermost-desktop:' && url?.pathname.endsWith('html')) {
+            let provisioningConnectSrc = '';
+            try {
+                provisioningConnectSrc = ` ${new URL(buildConfig.provisioningApiUrl).origin}`;
+            } catch {
+                // Invalid provisioningApiUrl — omit from CSP
+            }
             callback({
                 responseHeaders: {
                     ...details.responseHeaders,
-                    'Content-Security-Policy': [`default-src 'self'; style-src 'self' 'nonce-${NonceManager.create(details.url)}'; media-src data:; img-src 'self' data:`],
+                    'Content-Security-Policy': [`default-src 'self'; connect-src 'self'${provisioningConnectSrc}; style-src 'self' 'nonce-${NonceManager.create(details.url)}'; media-src data:; img-src 'self' data:`],
                 },
             });
             return;

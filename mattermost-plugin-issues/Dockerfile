@@ -29,7 +29,8 @@ COPY --from=go-builder /build/server/dist/ ./server/dist/
 COPY --from=node-builder /build/webapp/dist/ ./webapp/dist/
 
 # Stage 4: Mattermost with plugin pre-installed
-FROM mattermost/mattermost-team-edition:latest
+# Pin a release tag for reproducible builds (see Mattermost Docker docs).
+FROM mattermost/mattermost-team-edition:release-10.5
 
 # Pre-install the plugin
 COPY --from=bundler /bundle/ /mattermost/plugins/com.mattermost.issues/
@@ -45,3 +46,9 @@ ENV MM_SERVICESETTINGS_ENABLETESTING=true
 ENV MM_SERVICESETTINGS_ENABLEDEVELOPER=true
 
 EXPOSE 8065
+
+# Newer Mattermost images ship a Cobra CLI: bare `mattermost` prints help and exits, so Railway
+# restarts forever and public URLs show "Not Found". Match upstream layout: binary as ENTRYPOINT,
+# `server` as CMD (same as docker-compose `command: server`).
+ENTRYPOINT ["/mattermost/bin/mattermost"]
+CMD ["server"]
