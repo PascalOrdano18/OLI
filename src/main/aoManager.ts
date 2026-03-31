@@ -2,13 +2,13 @@
 // See LICENSE.txt for license information.
 
 import {createHash} from 'crypto';
-import {execFile} from 'child_process';
+import {execFile, spawn, ChildProcess} from 'child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
-import {join} from 'path';
+import {join, resolve} from 'path';
 import {promisify} from 'util';
+import {createInterface} from 'readline';
 
 import {app, BrowserWindow, dialog} from 'electron';
-import {claude} from '@anthropic-ai/claude-code';
 
 import {Logger} from 'common/log';
 import ServerManager from 'common/servers/serverManager';
@@ -18,6 +18,8 @@ import type {AgentEvent, AgentStatus} from 'common/agentEvents';
 
 const log = new Logger('AoManager');
 const execFileAsync = promisify(execFile);
+
+const CLAUDE_CLI_PATH = resolve(app.getAppPath(), '../node_modules/@anthropic-ai/claude-code/cli.js');
 
 interface AoIssue {
     id: string;
@@ -29,7 +31,7 @@ interface AoIssue {
 interface SessionEntry {
     sessionId: string;
     projectId: string;
-    abortController: AbortController | null;
+    claudeProcess: ChildProcess | null;
     status: AgentStatus;
     history: AgentEvent[];
     webContentsId: number;
@@ -105,43 +107,76 @@ export class AoManager {
         return toolName;
     }
 
-    // ─── Claude SDK runner ───────────────────────────────────────────
+    // ─── Claude CLI runner ────────────────────────────────────────────
 
-    private async runClaude(entry: SessionEntry, prompt: string): Promise<void> {
-        entry.abortController = new AbortController();
+    private runClaude(entry: SessionEntry, prompt: string, resumeSessionId?: string): void {
         entry.status = 'active';
+        this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'active' as AgentStatus}));
 
-        const statusEvent = createAgentEvent(entry.sessionId, 'status', {status: 'active' as AgentStatus});
-        this.broadcastEvent(entry, statusEvent);
+        const args = [
+            CLAUDE_CLI_PATH,
+            '--print',
+            '--output-format', 'stream-json',
+            '--verbose',
+            '--dangerously-skip-permissions',
+            '--bare',
+        ];
 
-        try {
-            const stream = claude(prompt, {
-                cwd: entry.repoPath,
-                abortController: entry.abortController,
-            });
+        if (resumeSessionId) {
+            args.push('--resume', resumeSessionId);
+        }
 
-            for await (const event of stream) {
-                if (entry.abortController?.signal.aborted) {
-                    break;
-                }
-                this.processSDKEvent(entry, event);
-            }
+        args.push(prompt);
 
-            entry.status = 'idle';
-            const idleEvent = createAgentEvent(entry.sessionId, 'status', {status: 'idle' as AgentStatus});
-            this.broadcastEvent(entry, idleEvent);
-        } catch (err) {
-            if (entry.abortController?.signal.aborted) {
+        const proc = spawn('node', args, {
+            cwd: entry.repoPath,
+            env: {...process.env},
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        entry.claudeProcess = proc;
+
+        // Parse newline-delimited JSON from stdout
+        const rl = createInterface({input: proc.stdout!});
+        rl.on('line', (line: string) => {
+            if (!line.trim()) {
                 return;
             }
-            entry.status = 'error';
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            const errorEvent = createAgentEvent(entry.sessionId, 'error', {message: errorMsg});
-            this.broadcastEvent(entry, errorEvent);
+            try {
+                const sdkEvent = JSON.parse(line);
+                this.processSDKEvent(entry, sdkEvent);
 
-            const errorStatusEvent = createAgentEvent(entry.sessionId, 'status', {status: 'error' as AgentStatus});
-            this.broadcastEvent(entry, errorStatusEvent);
-        }
+                // Capture the session ID from the init event for future --resume
+                if (sdkEvent.type === 'system' && sdkEvent.subtype === 'init' && sdkEvent.session_id) {
+                    entry.sessionId = sdkEvent.session_id;
+                }
+            } catch {
+                // Non-JSON output — ignore
+            }
+        });
+
+        proc.stderr?.on('data', (data: Buffer) => {
+            log.warn('Claude CLI stderr', {data: data.toString().slice(0, 200)});
+        });
+
+        proc.on('close', (code) => {
+            entry.claudeProcess = null;
+            if (code === 0 || code === null) {
+                entry.status = 'idle';
+                this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'idle' as AgentStatus}));
+            } else {
+                entry.status = 'error';
+                this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'error', {message: `Claude exited with code ${code}`}));
+                this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'error' as AgentStatus}));
+            }
+        });
+
+        proc.on('error', (err) => {
+            entry.claudeProcess = null;
+            entry.status = 'error';
+            this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'error', {message: err.message}));
+            this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'error' as AgentStatus}));
+        });
     }
 
     // ─── Server / path helpers (unchanged) ───────────────────────────
@@ -262,7 +297,7 @@ export class AoManager {
         const entry: SessionEntry = {
             sessionId,
             projectId,
-            abortController: null,
+            claudeProcess: null,
             status: 'spawning',
             history: [],
             webContentsId: webContents.id,
@@ -272,16 +307,11 @@ export class AoManager {
         this.sessions.set(projectId, entry);
 
         // Broadcast user message and spawning status
-        const userEvent = createAgentEvent(sessionId, 'user_message', {text: prompt});
-        this.broadcastEvent(entry, userEvent);
+        this.broadcastEvent(entry, createAgentEvent(sessionId, 'user_message', {text: prompt}));
+        this.broadcastEvent(entry, createAgentEvent(sessionId, 'status', {status: 'spawning' as AgentStatus}));
 
-        const spawningEvent = createAgentEvent(sessionId, 'status', {status: 'spawning' as AgentStatus});
-        this.broadcastEvent(entry, spawningEvent);
-
-        // Run Claude asynchronously — don't await so events stream back in real time
-        this.runClaude(entry, prompt).catch((err) => {
-            log.error('runClaude failed', {err, sessionId});
-        });
+        // Spawn Claude CLI — events stream back via processSDKEvent
+        this.runClaude(entry, prompt);
 
         return sessionId;
     }
@@ -293,13 +323,10 @@ export class AoManager {
         }
 
         // Broadcast user message
-        const userEvent = createAgentEvent(entry.sessionId, 'user_message', {text: message});
-        this.broadcastEvent(entry, userEvent);
+        this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'user_message', {text: message}));
 
-        // Run Claude for the follow-up
-        this.runClaude(entry, message).catch((err) => {
-            log.error('runClaude (sendMessage) failed', {err, sessionId: entry.sessionId});
-        });
+        // Resume the Claude session with the follow-up message
+        this.runClaude(entry, message, entry.sessionId);
     }
 
     async killSession(projectId: string): Promise<void> {
@@ -308,7 +335,10 @@ export class AoManager {
             return;
         }
 
-        entry.abortController?.abort();
+        if (entry.claudeProcess) {
+            entry.claudeProcess.kill('SIGTERM');
+            entry.claudeProcess = null;
+        }
         this.sessions.delete(projectId);
     }
 
