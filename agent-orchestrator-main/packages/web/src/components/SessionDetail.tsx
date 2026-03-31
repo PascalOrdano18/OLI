@@ -8,6 +8,7 @@ import { CI_STATUS } from "@composio/ao-core/types";
 import { cn } from "@/lib/cn";
 import { CICheckList } from "./CIBadge";
 import { DirectTerminal } from "./DirectTerminal";
+import { ChatPanel } from "./chat/ChatPanel";
 import { MobileBottomNav } from "./MobileBottomNav";
 
 interface OrchestratorZones {
@@ -394,17 +395,23 @@ export function SessionDetail({
                 style={{ background: isOrchestrator ? accentColor : activity.color, opacity: 0.75 }}
               />
               <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--color-text-tertiary)]">
-                Live Terminal
+                {session.metadata["useChatUI"] === "true" ? "Chat" : "Live Terminal"}
               </span>
             </div>
-            <DirectTerminal
-              sessionId={session.id}
-              startFullscreen={startFullscreen}
-              variant={terminalVariant}
-              height={terminalHeight}
-              isOpenCodeSession={isOpenCodeSession}
-              reloadCommand={isOpenCodeSession ? reloadCommand : undefined}
-            />
+            {session.metadata["useChatUI"] === "true" ? (
+              <div style={{ height: terminalHeight }}>
+                <ChatPanel sessionId={session.id} />
+              </div>
+            ) : (
+              <DirectTerminal
+                sessionId={session.id}
+                startFullscreen={startFullscreen}
+                variant={terminalVariant}
+                height={terminalHeight}
+                isOpenCodeSession={isOpenCodeSession}
+                reloadCommand={isOpenCodeSession ? reloadCommand : undefined}
+              />
+            )}
           </section>
 
           {pr ? (
