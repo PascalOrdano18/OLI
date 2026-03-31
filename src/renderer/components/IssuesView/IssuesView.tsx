@@ -1040,11 +1040,15 @@ const IssuesView: React.FC = () => {
     const initialized = useRef(false);
 
     const fetchProjects = useCallback(async () => {
+        console.log('[Issues] fetchProjects: GET /projects');
         try {
             const data = await api<Project[]>('GET', '/projects');
+            console.log('[Issues] fetchProjects: success', {count: data?.length ?? 0, projects: data?.map((p) => ({id: p.id, name: p.name}))});
             setProjects(data || []);
             if (data && data.length > 0) { setActiveProjectId((prev) => prev || data[0].id); }
-        } catch { /* plugin not installed */ } finally { setLoading(false); }
+        } catch (err) {
+            console.error('[Issues] fetchProjects: FAILED — plugin may not be installed or enabled', err);
+        } finally { setLoading(false); }
     }, []);
 
     useEffect(() => {
@@ -1066,11 +1070,15 @@ const IssuesView: React.FC = () => {
         if (!activeProjectId) { return; }
         (async () => {
             try {
+                console.log('[Issues] fetching labels for project', activeProjectId);
                 const lbls = await api<IssueLabel[]>('GET', `/projects/${activeProjectId}/labels`);
+                console.log('[Issues] labels fetched', {count: lbls?.length ?? 0});
                 const lmap: Record<string, IssueLabel> = {};
                 (lbls || []).forEach((l) => { lmap[l.id] = l; });
                 setLabelsMap(lmap); setLabelsList(lbls || []);
-            } catch { /* ignore */ }
+            } catch (err) {
+                console.error('[Issues] failed to fetch labels', err);
+            }
         })();
     }, [activeProjectId]);
 
@@ -1189,7 +1197,7 @@ const IssuesView: React.FC = () => {
                     serverId={serverId}
                     onClose={() => setShowCreateProject(false)}
                     onCreate={async (data) => {
-                        console.log('[Issues: create project] POST /projects via issuesApiRequest', data);
+                        console.log('[Issues: create project] POST /projects via issuesApiRequest', {data, serverId});
                         try {
                             const proj = await api<Project>('POST', '/projects', data);
                             console.log('[Issues: create project] success', proj);
@@ -1198,11 +1206,15 @@ const IssuesView: React.FC = () => {
                             setAllIssues((prev) => ({...prev, [proj.id]: []}));
                             setShowCreateProject(false);
                             try {
+                                console.log('[Issues: create project] opening repo picker', {serverId, projectId: proj.id});
                                 const picked = await window.desktop.ao.pickRepoPath(serverId, proj.id);
+                                console.log('[Issues: create project] repo picker result', {picked});
                                 if (picked) { setHasRepoPath(true); }
-                            } catch { /* user cancelled */ }
+                            } catch (pickErr) {
+                                console.warn('[Issues: create project] repo picker failed or cancelled', pickErr);
+                            }
                         } catch (err) {
-                            console.error('[Issues: create project] failed', err);
+                            console.error('[Issues: create project] FAILED — check plugin status and auth', err);
                         }
                     }}
                 />

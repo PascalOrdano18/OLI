@@ -21,6 +21,11 @@ const config = {
      * - full: Postgres service + Mattermost service (needs a plan that allows 2+ services per project)
      */
     railwayStackMode: () => (process.env.OLI_RAILWAY_STACK_MODE || 'lite').toLowerCase(),
+
+    // Shared AI service — all orgs use the same hosted instance
+    aiServiceUrl: () => required('OLI_AI_SERVICE_URL'),
+    aiServiceSecret: () => required('OLI_AI_SERVICE_SECRET'),
+    openaiApiKey: () => required('OLI_OPENAI_API_KEY'),
 };
 
 export default config;
