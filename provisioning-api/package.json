@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.49.0",
     "cors": "^2.8.6",
     "express": "^4.21.0",
-    "graphql-request": "^7.1.0"
+    "graphql-request": "^7.1.0",
+    "pg": "^8.20.0"
   }
 }
