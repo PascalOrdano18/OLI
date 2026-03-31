@@ -35,6 +35,9 @@ FROM mattermost/mattermost-team-edition:release-10.5
 # Pre-install the plugin
 COPY --from=bundler /bundle/ /mattermost/plugins/com.mattermost.issues/
 
+# Custom entrypoint that auto-enables the plugin on first boot
+COPY --chmod=755 entrypoint.sh /mattermost/entrypoint.sh
+
 # Mattermost configuration via environment variables
 # Database — Railway provides a Postgres addon; override MM_SQLSETTINGS_DATASOURCE in Railway vars
 ENV MM_SQLSETTINGS_DRIVERNAME=postgres
@@ -47,8 +50,4 @@ ENV MM_SERVICESETTINGS_ENABLEDEVELOPER=true
 
 EXPOSE 8065
 
-# Newer Mattermost images ship a Cobra CLI: bare `mattermost` prints help and exits, so Railway
-# restarts forever and public URLs show "Not Found". Match upstream layout: binary as ENTRYPOINT,
-# `server` as CMD (same as docker-compose `command: server`).
-ENTRYPOINT ["/mattermost/bin/mattermost"]
-CMD ["server"]
+ENTRYPOINT ["/mattermost/entrypoint.sh"]

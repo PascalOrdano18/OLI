@@ -279,27 +279,42 @@ async function getPublicDomain(projectId, serviceId, environmentId) {
 async function setupMattermost(serverUrl, orgName) {
     console.log(`[setup] Waiting for Mattermost at ${serverUrl} to be reachable...`);
 
-    // Poll until the server responds
-    const maxAttempts = 60; // 5 minutes at 5s intervals
+    // Require multiple consecutive successful pings before proceeding.
+    // On first boot, Postgres may restart (volume checks, init) causing
+    // Mattermost to briefly respond then crash-loop. Requiring consecutive
+    // successes ensures the server is truly stable.
+    const maxAttempts = 90; // 7.5 minutes at 5s intervals
+    const requiredConsecutive = 3;
+    let consecutiveOk = 0;
+
     for (let i = 0; i < maxAttempts; i++) {
         try {
             const res = await fetch(`${serverUrl}/api/v4/system/ping`);
             if (res.ok) {
-                console.log(`[setup] Mattermost is reachable (attempt ${i + 1})`);
-                break;
+                consecutiveOk++;
+                console.log(`[setup] Mattermost ping OK (${consecutiveOk}/${requiredConsecutive}, attempt ${i + 1})`);
+                if (consecutiveOk >= requiredConsecutive) {
+                    console.log(`[setup] Mattermost is stable after ${i + 1} attempts`);
+                    break;
+                }
+            } else {
+                if (consecutiveOk > 0) {
+                    console.log(`[setup] Mattermost ping failed (resetting consecutive count, attempt ${i + 1})`);
+                }
+                consecutiveOk = 0;
             }
         } catch {
-            // not ready yet
+            if (consecutiveOk > 0) {
+                console.log(`[setup] Mattermost unreachable (resetting consecutive count, attempt ${i + 1})`);
+            }
+            consecutiveOk = 0;
         }
         if (i === maxAttempts - 1) {
-            console.error('[setup] Mattermost never became reachable, skipping setup');
+            console.error('[setup] Mattermost never became stable, skipping setup');
             return;
         }
         await new Promise((r) => setTimeout(r, 5000));
     }
-
-    // Small extra delay for the server to fully initialize
-    await new Promise((r) => setTimeout(r, 3000));
 
     // Create the first admin user
     const adminEmail = `admin@${orgName.toLowerCase().replace(/[^a-z0-9]/g, '')}.oli.app`;
@@ -367,10 +382,84 @@ async function setupMattermost(serverUrl, orgName) {
         }
 
         console.log(`[setup] Default team "${orgName}" created`);
+
+        // Configure the issues plugin with the shared AI service
+        await configurePlugin(serverUrl, token);
+
         console.log(`[setup] Mattermost setup complete. Users can now sign up with email/password.`);
     } catch (err) {
         console.error(`[setup] Error during Mattermost setup:`, err);
     }
+}
+
+// Enable the issues plugin and configure it to use the shared AI service.
+async function configurePlugin(serverUrl, token) {
+    const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+    };
+
+    const pluginId = 'com.mattermost.issues';
+
+    // 1. Enable the plugin
+    console.log(`[setup] Enabling plugin ${pluginId}...`);
+    const enableRes = await fetch(`${serverUrl}/api/v4/plugins/${pluginId}/enable`, {
+        method: 'POST',
+        headers,
+    });
+    if (!enableRes.ok) {
+        const body = await enableRes.text();
+        console.error(`[setup] Failed to enable plugin: ${enableRes.status} ${body}`);
+        return;
+    }
+    console.log(`[setup] Plugin enabled`);
+
+    // Small delay for the plugin to activate
+    await new Promise((r) => setTimeout(r, 2000));
+
+    // 2. Set plugin configuration (AIServiceURL, AIServiceSecret, OpenAIAPIKey)
+    const aiServiceUrl = config.aiServiceUrl();
+    const aiServiceSecret = config.aiServiceSecret();
+    const openaiApiKey = config.openaiApiKey();
+
+    console.log(`[setup] Configuring plugin with AI service: ${aiServiceUrl}`);
+
+    // Fetch current plugin config to merge with
+    const getRes = await fetch(`${serverUrl}/api/v4/config`, {
+        method: 'GET',
+        headers,
+    });
+    if (!getRes.ok) {
+        const body = await getRes.text();
+        console.error(`[setup] Failed to get server config: ${getRes.status} ${body}`);
+        return;
+    }
+    const serverConfig = await getRes.json();
+
+    // Update plugin settings in the server config
+    if (!serverConfig.PluginSettings) {
+        serverConfig.PluginSettings = {};
+    }
+    if (!serverConfig.PluginSettings.Plugins) {
+        serverConfig.PluginSettings.Plugins = {};
+    }
+    serverConfig.PluginSettings.Plugins[pluginId] = {
+        aiserviceurl: aiServiceUrl,
+        aiservicesecret: aiServiceSecret,
+        openaiapikey: openaiApiKey,
+    };
+
+    const putRes = await fetch(`${serverUrl}/api/v4/config`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(serverConfig),
+    });
+    if (!putRes.ok) {
+        const body = await putRes.text();
+        console.error(`[setup] Failed to update plugin config: ${putRes.status} ${body}`);
+        return;
+    }
+    console.log(`[setup] Plugin configured with shared AI service`);
 }
 
 /** Postgres + Mattermost (two services). Requires Railway plan that allows both. */
