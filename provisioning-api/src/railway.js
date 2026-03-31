@@ -227,6 +227,34 @@ async function configureMattermostSqlite(projectId, serviceId, environmentId, si
     );
 }
 
+// Mattermost with shared Postgres — connection string points to pre-existing shared server.
+async function configureMattermostSharedPostgres(projectId, serviceId, environmentId, siteUrl, datasource) {
+    await railwayQuery(
+        `mutation($input: VariableCollectionUpsertInput!) {
+            variableCollectionUpsert(input: $input)
+        }`,
+        {
+            input: {
+                projectId,
+                serviceId,
+                environmentId,
+                variables: {
+                    MM_SQLSETTINGS_DRIVERNAME: 'postgres',
+                    MM_SQLSETTINGS_DATASOURCE: datasource,
+                    MM_SERVICESETTINGS_SITEURL: siteUrl,
+                    MM_SERVICESETTINGS_LISTENADDRESS: ':8065',
+                    MM_SERVICESETTINGS_ENABLELOCALMODE: 'true',
+                    MM_PLUGINSETTINGS_ENABLEUPLOADS: 'true',
+                    MM_PLUGINSETTINGS_ENABLE: 'true',
+                    MM_BLEVESETTINGS_INDEXDIR: '/mattermost/bleve-indexes',
+                    PORT: '8065',
+                    ...OPEN_ACCESS_VARS,
+                },
+            },
+        },
+    );
+}
+
 // Step 6: Expose Mattermost publicly (targetPort matches Mattermost HTTP listener)
 async function exposeService(_projectId, serviceId, environmentId) {
     const data = await railwayQuery(
@@ -534,8 +562,49 @@ async function provisionMattermostSqliteOnly(orgName) {
     };
 }
 
-export async function provisionOrganization(orgName) {
+/** Mattermost service only — connects to shared Postgres (fast provisioning). */
+async function provisionMattermostSharedPostgres(orgName, datasource) {
+    console.log(`[railway] Creating project for org: ${orgName}`);
+    const {projectId, environmentId} = await createProject(orgName);
+
+    console.log(`[railway] Creating Mattermost service (shared Postgres)...`);
+    const mattermostId = await createMattermost(projectId);
+
+    // Get domain BEFORE configuring so SITEURL is correct on first boot
+    const domain = await exposeService(projectId, mattermostId, environmentId);
+    const serverUrl = domain ? `https://${domain}` : null;
+    console.log(`[railway] Assigned domain: ${domain}`);
+
+    await configureMattermostSharedPostgres(projectId, mattermostId, environmentId, serverUrl, datasource);
+
+    console.log(`[railway] Deploying Mattermost...`);
+    await deployService(mattermostId, environmentId);
+
+    // Wait for Mattermost to boot and complete initial setup
+    if (serverUrl) {
+        await setupMattermost(serverUrl, orgName);
+    }
+
+    console.log(`[railway] Provisioned (shared postgres): ${serverUrl}`);
+
+    return {
+        projectId,
+        environmentId,
+        postgresServiceId: null,
+        mattermostServiceId: mattermostId,
+        serverUrl,
+    };
+}
+
+export async function provisionOrganization(orgName, options = {}) {
     const mode = config.railwayStackMode();
+    if (mode === 'shared') {
+        if (!options.datasource) {
+            throw new Error('datasource is required for shared stack mode');
+        }
+        console.log('[railway] Stack mode: shared (Mattermost + shared Postgres — one service)');
+        return provisionMattermostSharedPostgres(orgName, options.datasource);
+    }
     if (mode === 'full') {
         console.log('[railway] Stack mode: full (Postgres + Mattermost — two services)');
         return provisionPostgresAndMattermost(orgName);
