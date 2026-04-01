@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs/promises';
@@ -9,13 +9,13 @@ import {test, expect} from '../../fixtures/index';
 import {waitForAppReady} from '../../helpers/appReadiness';
 import {waitForLockFileRelease} from '../../helpers/cleanup';
 import {buildServerMap} from '../../helpers/serverMap';
-import {appDir, cmdOrCtrl, demoMattermostConfig, electronBinaryPath, writeConfigFile} from '../../helpers/config';
-import {loginToMattermost} from '../../helpers/login';
+import {appDir, cmdOrCtrl, demoOLIConfig, electronBinaryPath, writeConfigFile} from '../../helpers/config';
+import {loginToOLI} from '../../helpers/login';
 
 const windowMenuConfig = {
-    ...demoMattermostConfig,
+    ...demoOLIConfig,
     servers: [
-        ...demoMattermostConfig.servers,
+        ...demoOLIConfig.servers,
         {
             name: 'community',
             url: 'https://community.mattermost.com',
@@ -195,9 +195,9 @@ async function getActiveTabTitle(
     });
 }
 
-function getMattermostServer() {
+function getOLIServer() {
     const mmServer = serverMap[windowMenuConfig.servers[0].name]?.[0]?.win;
-    expect(mmServer, 'Mattermost server view should exist').toBeTruthy();
+    expect(mmServer, 'OLI server view should exist').toBeTruthy();
     return mmServer!;
 }
 
@@ -332,7 +332,7 @@ test.describe('Menu/window_menu', () => {
         mainWindow = await waitForWindow(electronApp, 'index');
         serverMap = await buildServerMap(electronApp);
 
-        await loginToMattermost(getMattermostServer());
+        await loginToOLI(getOLIServer());
         await focusMainWindow();
     });
 
@@ -373,14 +373,14 @@ test.describe('Menu/window_menu', () => {
             const secondTab = await mainWindow.waitForSelector('.TabBar li.serverTabItem:nth-child(2)', {timeout: 15_000});
             await secondTab.click();
             const secondView = updatedServerMap[windowMenuConfig.servers[0].name]?.[1]?.win;
-            expect(secondView, 'Second Mattermost tab should exist').toBeTruthy();
+            expect(secondView, 'Second OLI tab should exist').toBeTruthy();
             await secondView!.waitForSelector('#sidebarItem_off-topic', {timeout: 15_000});
             await secondView!.click('#sidebarItem_off-topic');
 
             const thirdTab = await mainWindow.waitForSelector('.TabBar li.serverTabItem:nth-child(3)', {timeout: 15_000});
             await thirdTab.click();
             const thirdView = updatedServerMap[windowMenuConfig.servers[0].name]?.[2]?.win;
-            expect(thirdView, 'Third Mattermost tab should exist').toBeTruthy();
+            expect(thirdView, 'Third OLI tab should exist').toBeTruthy();
             await thirdView!.waitForSelector('#sidebarItem_town-square', {timeout: 15_000});
             await thirdView!.click('#sidebarItem_town-square');
 
@@ -397,14 +397,14 @@ test.describe('Menu/window_menu', () => {
             const secondTab = await mainWindow.waitForSelector('.TabBar li.serverTabItem:nth-child(2)', {timeout: 15_000});
             await secondTab.click();
             const secondView = updatedServerMap[windowMenuConfig.servers[0].name]?.[1]?.win;
-            expect(secondView, 'Second Mattermost tab should exist').toBeTruthy();
+            expect(secondView, 'Second OLI tab should exist').toBeTruthy();
             await secondView!.waitForSelector('#sidebarItem_off-topic', {timeout: 15_000});
             await secondView!.click('#sidebarItem_off-topic');
 
             const thirdTab = await mainWindow.waitForSelector('.TabBar li.serverTabItem:nth-child(3)', {timeout: 15_000});
             await thirdTab.click();
             const thirdView = updatedServerMap[windowMenuConfig.servers[0].name]?.[2]?.win;
-            expect(thirdView, 'Third Mattermost tab should exist').toBeTruthy();
+            expect(thirdView, 'Third OLI tab should exist').toBeTruthy();
             await thirdView!.waitForSelector('#sidebarItem_town-square', {timeout: 15_000});
             await thirdView!.click('#sidebarItem_town-square');
 
@@ -419,14 +419,14 @@ test.describe('Menu/window_menu', () => {
             const secondTab = await mainWindow.waitForSelector('.TabBar li.serverTabItem:nth-child(2)', {timeout: 15_000});
             await secondTab.click();
             const secondView = updatedServerMap[windowMenuConfig.servers[0].name]?.[1]?.win;
-            expect(secondView, 'Second Mattermost tab should exist').toBeTruthy();
+            expect(secondView, 'Second OLI tab should exist').toBeTruthy();
             await secondView!.waitForSelector('#sidebarItem_off-topic', {timeout: 15_000});
             await secondView!.click('#sidebarItem_off-topic');
 
             const thirdTab = await mainWindow.waitForSelector('.TabBar li.serverTabItem:nth-child(3)', {timeout: 15_000});
             await thirdTab.click();
             const thirdView = updatedServerMap[windowMenuConfig.servers[0].name]?.[2]?.win;
-            expect(thirdView, 'Third Mattermost tab should exist').toBeTruthy();
+            expect(thirdView, 'Third OLI tab should exist').toBeTruthy();
             await thirdView!.waitForSelector('#sidebarItem_town-square', {timeout: 15_000});
             await thirdView!.click('#sidebarItem_town-square');
 
@@ -443,7 +443,7 @@ test.describe('Menu/window_menu', () => {
         const secondTab = await mainWindow.waitForSelector('.TabBar li.serverTabItem:nth-child(2)');
         await secondTab.click();
         const secondView = updatedServerMap[windowMenuConfig.servers[0].name]?.[1]?.win;
-        expect(secondView, 'Second Mattermost tab should exist').toBeTruthy();
+        expect(secondView, 'Second OLI tab should exist').toBeTruthy();
         await secondView!.waitForSelector('#sidebarItem_off-topic', {timeout: 10_000});
         await secondView!.click('#sidebarItem_off-topic');
 

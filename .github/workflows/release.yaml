@@ -30,7 +30,7 @@ jobs:
         uses: mattermost/action-mattermost-notify@d317daebed2a792679f68fd0248557a8d21d82b6
         with:
           MATTERMOST_WEBHOOK_URL: ${{ secrets.MM_DESKTOP_RELEASE_WEBHOOK_URL }}
-          MATTERMOST_USERNAME: MattermostRelease
+          MATTERMOST_USERNAME: OLIRelease
           MATTERMOST_ICON_URL: https://mattermost.com/wp-content/uploads/2022/02/icon.png
           TEXT: |
             [${{ steps.calc.outputs.VERSION }}] Release process for the desktop app has started, it should take about 30 minutes to complete.
@@ -259,7 +259,7 @@ jobs:
         uses: mattermost/action-mattermost-notify@d317daebed2a792679f68fd0248557a8d21d82b6
         with:
           MATTERMOST_WEBHOOK_URL: ${{ secrets.MM_DESKTOP_RELEASE_WEBHOOK_URL }}
-          MATTERMOST_USERNAME: MattermostRelease
+          MATTERMOST_USERNAME: OLIRelease
           MATTERMOST_ICON_URL: https://mattermost.com/wp-content/uploads/2022/02/icon.png
           TEXT: |
             ${{ steps.calc.outputs.BODY }}

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {CFPrefValue} from 'cf-prefs';
@@ -11,7 +11,7 @@ import {Logger} from 'common/log';
 import type {RegistryConfig as RegistryConfigType, Server} from 'types/config';
 
 const log = new Logger('PolicyConfigLoader');
-const WINDOWS_REGISTRY_PATH = 'SOFTWARE\\Policies\\Mattermost';
+const WINDOWS_REGISTRY_PATH = 'SOFTWARE\\Policies\\OLI';
 const WINDOWS_REGISTRY_HIVE_LIST = [HKEY.HKEY_LOCAL_MACHINE, HKEY.HKEY_CURRENT_USER];
 
 export class PolicyConfigLoader {

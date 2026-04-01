@@ -1,5 +1,5 @@
 // Copyright (c) 2015-2016 Yuya Ochiai
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 const path = require('path');
@@ -40,91 +40,91 @@ module.exports = merge(base, {
     },
     plugins: [
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop App',
+            title: 'OLI Desktop App',
             template: 'src/renderer/index.html',
             chunks: ['index'],
             filename: 'index.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['settings'],
             filename: 'settings.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['dropdown'],
             filename: 'dropdown.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Downloads',
+            title: 'OLI Desktop Downloads',
             template: 'src/renderer/index.html',
             chunks: ['downloadsDropdown'],
             filename: 'downloadsDropdown.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Downloads',
+            title: 'OLI Desktop Downloads',
             template: 'src/renderer/index.html',
             chunks: ['downloadsDropdownMenu'],
             filename: 'downloadsDropdownMenu.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['urlView'],
             filename: 'urlView.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['newServer'],
             filename: 'newServer.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['editServer'],
             filename: 'editServer.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['removeServer'],
             filename: 'removeServer.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['loginModal'],
             filename: 'loginModal.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['certificateModal'],
             filename: 'certificateModal.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['preAuthHeaderModal'],
             filename: 'preAuthHeaderModal.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['loadingScreen'],
             filename: 'loadingScreen.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['welcomeScreen'],
             filename: 'welcomeScreen.html',
         }),
         new HtmlWebpackPlugin({
-            title: 'Mattermost Desktop Settings',
+            title: 'OLI Desktop Settings',
             template: 'src/renderer/index.html',
             chunks: ['popout'],
             filename: 'popout.html',

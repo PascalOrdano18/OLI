@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {WebContents, Event} from 'electron';
@@ -30,7 +30,7 @@ import ViewManager from 'common/views/viewManager';
 import ContextMenu from 'main/contextMenu';
 import {localizeMessage} from 'main/i18nManager';
 
-import {generateHandleConsoleMessage, isCustomProtocol, isMattermostProtocol} from './webContentEventsCommon';
+import {generateHandleConsoleMessage, isCustomProtocol, isOLIProtocol} from './webContentEventsCommon';
 
 import allowProtocolDialog from '../../main/security/allowProtocolDialog';
 import {composeUserAgent} from '../../main/utils';
@@ -161,7 +161,7 @@ export class WebContentsEventManager {
             }
 
             // Check for mattermost protocol - handle internally
-            if (isMattermostProtocol(parsedURL)) {
+            if (isOLIProtocol(parsedURL)) {
                 NavigationManager.openLinkInNewTab(parsedURL);
                 return {action: 'deny'};
             }

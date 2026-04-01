@@ -1,18 +1,18 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 'use strict';
 
 import AppState from 'common/appState';
 import {LOAD_FAILED, UPDATE_TARGET_URL} from 'common/communication';
-import {MattermostServer} from 'common/servers/MattermostServer';
+import {OLIServer} from 'common/servers/OLIServer';
 import ServerManager from 'common/servers/serverManager';
-import {MattermostView, ViewType} from 'common/views/MattermostView';
+import {OLIView, ViewType} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
 import {updateServerInfos} from 'main/app/utils';
 import {getServerAPI} from 'main/server/serverAPI';
 
-import {MattermostWebContentsView} from './MattermostWebContentsView';
+import {OLIWebContentsView} from './OLIWebContentsView';
 
 import ContextMenu from '../../main/contextMenu';
 import MainWindow from '../mainWindow/mainWindow';
@@ -66,7 +66,7 @@ jest.mock('main/contextMenu', () => jest.fn());
 jest.mock('main/utils', () => ({
     getWindowBoundaries: jest.fn(),
     getLocalPreload: (file) => file,
-    composeUserAgent: () => 'Mattermost/5.0.0',
+    composeUserAgent: () => 'OLI/5.0.0',
     shouldHaveBackBar: jest.fn(),
 }));
 jest.mock('main/i18nManager', () => ({
@@ -107,13 +107,13 @@ jest.mock('common/views/viewManager', () => ({
     }),
 }));
 
-const server = new MattermostServer({name: 'server_name', url: 'http://server-1.com'}, false, undefined);
-const view = new MattermostView(server, ViewType.TAB);
+const server = new OLIServer({name: 'server_name', url: 'http://server-1.com'}, false, undefined);
+const view = new OLIView(server, ViewType.TAB);
 
-describe('main/views/MattermostWebContentsView', () => {
+describe('main/views/OLIWebContentsView', () => {
     describe('load', () => {
         const window = {on: jest.fn(), webContents: {send: jest.fn()}};
-        const mattermostView = new MattermostWebContentsView(view, {}, window);
+        const mattermostView = new OLIWebContentsView(view, {}, window);
 
         beforeEach(() => {
             MainWindow.get.mockReturnValue(window);
@@ -179,7 +179,7 @@ describe('main/views/MattermostWebContentsView', () => {
 
     describe('retry', () => {
         const window = {on: jest.fn(), webContents: {send: jest.fn()}};
-        const mattermostView = new MattermostWebContentsView(view, {}, window);
+        const mattermostView = new OLIWebContentsView(view, {}, window);
         const retryInBackgroundFn = jest.fn();
 
         beforeEach(() => {
@@ -243,7 +243,7 @@ describe('main/views/MattermostWebContentsView', () => {
 
     describe('retryInBackground', () => {
         const window = {on: jest.fn(), webContents: {send: jest.fn()}};
-        const mattermostView = new MattermostWebContentsView(view, {}, window);
+        const mattermostView = new OLIWebContentsView(view, {}, window);
         mattermostView.reload = jest.fn();
 
         beforeEach(() => {
@@ -261,7 +261,7 @@ describe('main/views/MattermostWebContentsView', () => {
 
     describe('goToOffset', () => {
         const window = {on: jest.fn(), webContents: {send: jest.fn()}};
-        const mattermostView = new MattermostWebContentsView(view, {}, window);
+        const mattermostView = new OLIWebContentsView(view, {}, window);
         mattermostView.reload = jest.fn();
 
         afterEach(() => {
@@ -291,7 +291,7 @@ describe('main/views/MattermostWebContentsView', () => {
 
     describe('loadSuccess', () => {
         const window = {on: jest.fn(), webContents: {send: jest.fn()}};
-        const mattermostView = new MattermostWebContentsView(view, {}, window);
+        const mattermostView = new OLIWebContentsView(view, {}, window);
 
         beforeEach(() => {
             jest.useFakeTimers();
@@ -320,7 +320,7 @@ describe('main/views/MattermostWebContentsView', () => {
 
     describe('updateHistoryButton', () => {
         const window = {on: jest.fn(), webContents: {send: jest.fn()}};
-        const mattermostView = new MattermostWebContentsView(view, {}, window);
+        const mattermostView = new OLIWebContentsView(view, {}, window);
 
         beforeEach(() => {
             MainWindow.get.mockReturnValue(window);
@@ -346,28 +346,28 @@ describe('main/views/MattermostWebContentsView', () => {
         });
 
         it('should remove browser view from window', () => {
-            const mattermostView = new MattermostWebContentsView(view, {}, window);
+            const mattermostView = new OLIWebContentsView(view, {}, window);
             mattermostView.webContentsView.webContents.close = jest.fn();
             mattermostView.destroy();
             expect(window.contentView.removeChildView).toBeCalledWith(mattermostView.webContentsView);
         });
 
         it('should clear mentions', () => {
-            const mattermostView = new MattermostWebContentsView(view, {}, window);
+            const mattermostView = new OLIWebContentsView(view, {}, window);
             mattermostView.webContentsView.webContents.close = jest.fn();
             mattermostView.destroy();
             expect(AppState.clear).toBeCalledWith(mattermostView.id);
         });
 
         it('should dispose context menu when context menu exists', () => {
-            const mattermostView = new MattermostWebContentsView(view, {}, window);
+            const mattermostView = new OLIWebContentsView(view, {}, window);
             mattermostView.webContentsView.webContents.close = jest.fn();
             mattermostView.destroy();
             expect(contextMenu.dispose).toHaveBeenCalled();
         });
 
         it('should clear outstanding timeouts', () => {
-            const mattermostView = new MattermostWebContentsView(view, {}, window);
+            const mattermostView = new OLIWebContentsView(view, {}, window);
             mattermostView.webContentsView.webContents.close = jest.fn();
             const spy = jest.spyOn(global, 'clearTimeout');
             mattermostView.retryLoad = 999;
@@ -379,7 +379,7 @@ describe('main/views/MattermostWebContentsView', () => {
 
     describe('handleUpdateTarget', () => {
         const window = {on: jest.fn(), webContents: {send: jest.fn()}};
-        const mattermostView = new MattermostWebContentsView(view, {}, window);
+        const mattermostView = new OLIWebContentsView(view, {}, window);
 
         beforeEach(() => {
             MainWindow.get.mockReturnValue(window);
@@ -411,7 +411,7 @@ describe('main/views/MattermostWebContentsView', () => {
 
     describe('handlePageTitleUpdated', () => {
         const window = {on: jest.fn(), webContents: {send: jest.fn()}};
-        const mattermostView = new MattermostWebContentsView(view, {}, window);
+        const mattermostView = new OLIWebContentsView(view, {}, window);
 
         beforeEach(() => {
             MainWindow.get.mockReturnValue(window);

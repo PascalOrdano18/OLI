@@ -5,14 +5,14 @@ name: CMT Provisioner
 # then dispatches compatibility-matrix-testing.yml with the CMT_MATRIX input.
 #
 # Usage: Go to Actions → CMT Provisioner → Run workflow
-#   server_versions: comma-separated Mattermost server versions
+#   server_versions: comma-separated OLI server versions
 #   Example: "v11.1.0, v11.2.0, v12.0.0"
 
 on:
   workflow_dispatch:
     inputs:
       server_versions:
-        description: "Comma-separated Mattermost server versions (e.g. v11.1.0, v11.2.0)"
+        description: "Comma-separated OLI server versions (e.g. v11.1.0, v11.2.0)"
         required: true
         type: string
 

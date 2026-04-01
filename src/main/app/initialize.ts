@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import path from 'path';
@@ -491,7 +491,7 @@ async function initializeAfterAppReady() {
     ServerManager.init();
     ServerManager.off(SERVER_ADDED, PreAuthManager.loadPreAuthSecretForServer);
 
-    app.setAppUserModelId('Mattermost.Desktop'); // Use explicit AppUserModelID
+    app.setAppUserModelId('OLI.Desktop'); // Use explicit AppUserModelID
     const defaultSession = session.defaultSession;
     defaultSession.webRequest.onHeadersReceived((details, callback) => {
         const url = parseURL(details.url);
@@ -519,7 +519,7 @@ async function initializeAfterAppReady() {
         downloadsManager.webRequestOnHeadersReceivedHandler(details, callback);
     });
 
-    // Inject X-Mattermost-Preauth-Secret header for all server requests
+    // Inject X-OLI-Preauth-Secret header for all server requests
     defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
         try {
             const server = ServerManager.lookupServerByURL(details.url);
@@ -527,10 +527,10 @@ async function initializeAfterAppReady() {
             if (server && server.preAuthSecret) {
                 const secret = server.preAuthSecret;
 
-                if (!('X-Mattermost-Preauth-Secret' in details.requestHeaders)) {
+                if (!('X-OLI-Preauth-Secret' in details.requestHeaders)) {
                     const requestHeaders = {
                         ...details.requestHeaders,
-                        'X-Mattermost-Preauth-Secret': secret,
+                        'X-OLI-Preauth-Secret': secret,
                     };
 
                     callback({requestHeaders});

@@ -12,7 +12,7 @@
     "type": "git",
     "url": "git+ssh://git@github.com/mattermost/desktop.git"
   },
-  "author": "Mattermost, Inc. <feedback@mattermost.com>",
+  "author": "OLI, Inc. <feedback@mattermost.com>",
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/mattermost/desktop/issues"

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 const {spawnSync} = require('child_process');
@@ -14,13 +14,13 @@ if (process.platform === 'linux') {
         fs.writeFileSync(
             path.resolve(xdgDir, 'mattermost-desktop-dev.desktop'),
             `[Desktop Entry]
-Name=Mattermost.Dev
+Name=OLI.Dev
 Exec=${path.resolve(process.cwd(), 'node_modules/electron/dist/electron')} ${path.resolve(process.cwd(), 'dist')} %U
 Terminal=false
 Type=Application
 Icon=mattermost-desktop
-StartupWMClass=Mattermost
-Comment=Mattermost
+StartupWMClass=OLI
+Comment=OLI
 MimeType=x-scheme-handler/mattermost-dev;
 Categories=contrib/net;
 `,

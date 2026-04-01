@@ -8,9 +8,9 @@ We are automatically generating Notice.txt by using first-level dependencies of 
 Sample:
 
 ```
-title: "Mattermost Desktop"
-copyright: "© 2016-2017 Mattermost, Inc.  All Rights Reserved.  See LICENSE.txt for license information."
-description: "This document includes a list of open source components used in Mattermost Desktop, including those that have been modified."
+title: "OLI Desktop"
+copyright: "© 2016-2017 OLI, Inc.  All Rights Reserved.  See LICENSE.txt for license information."
+description: "This document includes a list of open source components used in OLI Desktop, including those that have been modified."
 reviewers: 
   - mattermost/release-managers
   - mattermost/team-desktop

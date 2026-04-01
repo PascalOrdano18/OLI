@@ -6,7 +6,7 @@ Creating an organization is slow because the provisioning API spins up a dedicat
 
 ## Solution
 
-Replace per-org Postgres provisioning with a single shared Postgres server on Railway. Each org gets its own logical database (`CREATE DATABASE`) on the shared server. Mattermost instances remain separate Railway services but all connect to the shared Postgres host.
+Replace per-org Postgres provisioning with a single shared Postgres server on Railway. Each org gets its own logical database (`CREATE DATABASE`) on the shared server. OLI instances remain separate Railway services but all connect to the shared Postgres host.
 
 ## Architecture
 
@@ -14,15 +14,15 @@ Replace per-org Postgres provisioning with a single shared Postgres server on Ra
 
 - A single Railway project (`oli-shared-postgres`) hosts one Postgres service with a persistent volume.
 - Provisioned once manually, not by the provisioning API.
-- Shared credentials: all Mattermost instances use the same Postgres user.
+- Shared credentials: all OLI instances use the same Postgres user.
 
 ### Org Creation Flow (New)
 
 1. Create org record in Supabase with status `"provisioning"` (unchanged).
 2. Connect to shared Postgres, run `CREATE DATABASE org_<sanitized_org_id>`.
-3. Create Mattermost Railway service (unchanged).
-4. Configure Mattermost env vars with `MM_SQLSETTINGS_DATASOURCE` pointing to the shared Postgres host and the org-specific database name.
-5. Deploy Mattermost, health check, admin setup (unchanged).
+3. Create OLI Railway service (unchanged).
+4. Configure OLI env vars with `MM_SQLSETTINGS_DATASOURCE` pointing to the shared Postgres host and the org-specific database name.
+5. Deploy OLI, health check, admin setup (unchanged).
 
 ### What Gets Removed
 
@@ -34,7 +34,7 @@ Replace per-org Postgres provisioning with a single shared Postgres server on Ra
 
 ### What Stays
 
-- Mattermost service creation per org
+- OLI service creation per org
 - Domain assignment, env var config, deployment, health check, admin setup
 
 ## Provisioning API Changes
@@ -56,7 +56,7 @@ Replace per-org Postgres provisioning with a single shared Postgres server on Ra
 
 - Remove or stop calling `createPostgresService()` and `attachPostgresVolume()`.
 - Modify `provisionOrganization()` to call `createOrgDatabase()` instead of Postgres service creation.
-- Update Mattermost env var config to use a constructed connection string instead of Railway reference syntax (`${{postgres.VAR}}`).
+- Update OLI env var config to use a constructed connection string instead of Railway reference syntax (`${{postgres.VAR}}`).
 
 ## Connection String
 
@@ -72,9 +72,9 @@ postgres://mmuser:<shared_password>@<shared_postgres_host>:5432/org_<sanitized_o
 
 - Host, user, and password come from `SHARED_POSTGRES_URL` config.
 - Database name derived from org UUID (hyphens replaced with underscores): `org_550e8400_e29b_41d4_a716_446655440000`.
-- Mattermost's `MM_SQLSETTINGS_DATASOURCE` gets this string directly.
+- OLI's `MM_SQLSETTINGS_DATASOURCE` gets this string directly.
 
-**Networking:** The shared Postgres and per-org Mattermost services live in different Railway projects. The shared Postgres service must expose a public domain (via `serviceDomainCreate`) so that Mattermost instances in other Railway projects can reach it. The connection string uses this public domain.
+**Networking:** The shared Postgres and per-org OLI services live in different Railway projects. The shared Postgres service must expose a public domain (via `serviceDomainCreate`) so that OLI instances in other Railway projects can reach it. The connection string uses this public domain.
 
 ## Migration & Rollback
 

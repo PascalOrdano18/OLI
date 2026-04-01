@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import EventEmitter from 'events';
@@ -18,7 +18,7 @@ import {
 } from 'common/communication';
 import Config from 'common/config';
 import {Logger} from 'common/log';
-import {MattermostServer} from 'common/servers/MattermostServer';
+import {OLIServer} from 'common/servers/OLIServer';
 import {getFormattedPathName, isInternalURL, parseURL} from 'common/utils/url';
 
 import type {ConfigServer, Server} from 'types/config';
@@ -27,7 +27,7 @@ import type {RemoteInfo} from 'types/server';
 const log = new Logger('ServerManager');
 
 export class ServerManager extends EventEmitter {
-    private servers: Map<string, MattermostServer>;
+    private servers: Map<string, OLIServer>;
     private remoteInfo: Map<string, RemoteInfo>;
     private serverOrder: string[];
     private currentServerId?: string;
@@ -110,14 +110,14 @@ export class ServerManager extends EventEmitter {
     };
 
     private createServer = (server: Server, isPredefined: boolean, initialLoadURL?: URL) => {
-        let newServer = new MattermostServer(server, isPredefined, initialLoadURL);
+        let newServer = new OLIServer(server, isPredefined, initialLoadURL);
         while (this.servers.has(newServer.id)) {
-            newServer = new MattermostServer(server, isPredefined, initialLoadURL);
+            newServer = new OLIServer(server, isPredefined, initialLoadURL);
         }
         return newServer;
     };
 
-    private addServerToMap = (newServer: MattermostServer, setAsCurrentServer: boolean, persist: boolean = true) => {
+    private addServerToMap = (newServer: OLIServer, setAsCurrentServer: boolean, persist: boolean = true) => {
         // This is the only place where we log the server name
         log.debug('addServerToMap', newServer.id, newServer.name);
 
@@ -297,7 +297,7 @@ export class ServerManager extends EventEmitter {
         this.currentServerId = undefined;
 
         // Add the servers from the config
-        let initialServers: MattermostServer[] = [];
+        let initialServers: OLIServer[] = [];
 
         // Add the unordered predefined servers first
         const unorderedPredefinedServers = Config.predefinedServers.filter((server) =>
@@ -347,8 +347,8 @@ export class ServerManager extends EventEmitter {
         this.persistServers();
     };
 
-    private filterOutDuplicateServers = (servers: MattermostServer[]) => {
-        const uniqueServers = new Map<string, MattermostServer>();
+    private filterOutDuplicateServers = (servers: OLIServer[]) => {
+        const uniqueServers = new Map<string, OLIServer>();
         servers.forEach((server) => {
             if (!uniqueServers.has(`${server.url.toString()}`) || server.isPredefined) {
                 uniqueServers.set(`${server.url.toString()}`, server);

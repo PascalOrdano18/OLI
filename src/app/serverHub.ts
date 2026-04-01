@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {IpcMainEvent, IpcMainInvokeEvent} from 'electron';
@@ -26,7 +26,7 @@ import {
 } from 'common/communication';
 import {ModalConstants} from 'common/constants';
 import {Logger} from 'common/log';
-import {MattermostServer} from 'common/servers/MattermostServer';
+import {OLIServer} from 'common/servers/OLIServer';
 import ServerManager from 'common/servers/serverManager';
 import {URLValidationStatus} from 'common/utils/constants';
 import {isMagicLinkUrl, isValidURI, isValidURL, parseURL} from 'common/utils/url';
@@ -361,14 +361,14 @@ export class ServerHub {
                 );
             }
 
-            log.debug('handleServerURLValidation: Remote info is missing, returning NotMattermost');
+            log.debug('handleServerURLValidation: Remote info is missing, returning NotOLI');
             return {
-                status: URLValidationStatus.NotMattermost,
+                status: URLValidationStatus.NotOLI,
                 validatedURL: (originalURL ?? parsedURL.toString()).replace(/\/$/, ''),
             };
         }
 
-        const remoteServerName = remoteInfo.siteName === 'Mattermost' ? remoteURL.host.split('.')[0] : remoteInfo.siteName;
+        const remoteServerName = remoteInfo.siteName === 'OLI' ? remoteURL.host.split('.')[0] : remoteInfo.siteName;
 
         // If we were only able to connect via HTTP, warn the user that the connection is not secure
         if (remoteURL.protocol === 'http:') {
@@ -441,7 +441,7 @@ export class ServerHub {
      */
 
     private testRemoteServer = async (parsedURL: URL): Promise<ServerTestResult> => {
-        const server = new MattermostServer({name: 'temp', url: parsedURL.toString()}, false, undefined);
+        const server = new OLIServer({name: 'temp', url: parsedURL.toString()}, false, undefined);
         const serverInfo = new ServerInfo(server);
         try {
             // Ping server first for pre-auth - config endpoint might be whitelisted
@@ -494,7 +494,7 @@ export class ServerHub {
         ServerManager.removeServer(serverId);
     };
 
-    private handleServerCleanup = (server: MattermostServer) => {
+    private handleServerCleanup = (server: OLIServer) => {
         log.debug('handleServerCleanup', {serverId: server.id});
 
         session.defaultSession.clearData({

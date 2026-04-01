@@ -29,7 +29,7 @@ function parsePostgresUrl(url) {
 
 /**
  * Create a new logical database for an organization on the shared Postgres server.
- * Returns the connection string that Mattermost should use.
+ * Returns the connection string that OLI should use.
  */
 export async function createOrgDatabase(orgId) {
     const sharedUrl = config.sharedPostgresUrl();
@@ -63,7 +63,7 @@ export async function createOrgDatabase(orgId) {
         await client.end();
     }
 
-    // Build the connection string for Mattermost
+    // Build the connection string for OLI
     return `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${dbName}?sslmode=disable`;
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {BrowserWindow, Rectangle} from 'electron';
@@ -12,7 +12,7 @@ import {MAIN_WINDOW_CREATED} from 'common/communication';
 import Config from 'common/config';
 import {MATTERMOST_PROTOCOL} from 'common/constants';
 import {Logger} from 'common/log';
-import {MattermostServer} from 'common/servers/MattermostServer';
+import {OLIServer} from 'common/servers/OLIServer';
 import ServerManager from 'common/servers/serverManager';
 import {isValidURI} from 'common/utils/url';
 import {localizeMessage} from 'main/i18nManager';
@@ -157,7 +157,7 @@ export function flushCookiesStore() {
     });
 }
 
-export async function updateServerInfos(servers: MattermostServer[]) {
+export async function updateServerInfos(servers: OLIServer[]) {
     await Promise.all(servers.map(async (srv) => {
         const serverInfo = new ServerInfo(srv);
         let data: RemoteInfo;
@@ -181,7 +181,7 @@ export async function updateServerInfos(servers: MattermostServer[]) {
             }
 
             // We need to validate the site URL is reachable by pinging the server
-            const tempServer = new MattermostServer({name: 'temp', url: data.siteURL}, false);
+            const tempServer = new OLIServer({name: 'temp', url: data.siteURL}, false);
             const tempServerInfo = new ServerInfo(tempServer);
             try {
                 const tempRemoteInfo = await tempServerInfo.fetchConfigData();
@@ -203,7 +203,7 @@ export async function updateServerInfos(servers: MattermostServer[]) {
     MenuManager.refreshMenu();
 }
 
-export async function clearDataForServer(server: MattermostServer) {
+export async function clearDataForServer(server: OLIServer) {
     const mainWindow = MainWindow.get();
     if (!mainWindow) {
         return;

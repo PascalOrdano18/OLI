@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import EventEmitter from 'events';
@@ -17,14 +17,14 @@ import {
 } from 'common/communication';
 import Config from 'common/config';
 import {Logger} from 'common/log';
-import type {MattermostServer} from 'common/servers/MattermostServer';
+import type {OLIServer} from 'common/servers/OLIServer';
 import ServerManager from 'common/servers/serverManager';
-import {MattermostView, ViewType} from 'common/views/MattermostView';
+import {OLIView, ViewType} from 'common/views/OLIView';
 
 const log = new Logger('ViewManager');
 
 export class ViewManager extends EventEmitter {
-    private views: Map<string, MattermostView>;
+    private views: Map<string, OLIView>;
     private serverPrimaryViews: Map<string, string>;
 
     constructor() {
@@ -97,7 +97,7 @@ export class ViewManager extends EventEmitter {
         return Boolean(Config.viewLimit && this.views.size >= Config.viewLimit);
     };
 
-    createView = (server: MattermostServer, type: ViewType, initialPath?: string, parentViewId?: string, props?: PopoutViewProps) => {
+    createView = (server: OLIServer, type: ViewType, initialPath?: string, parentViewId?: string, props?: PopoutViewProps) => {
         log.debug('createView', {serverId: server.id, parentViewId, type});
 
         if (this.isViewLimitReached()) {
@@ -105,7 +105,7 @@ export class ViewManager extends EventEmitter {
             return undefined;
         }
 
-        const newView = new MattermostView(server, type, initialPath, parentViewId, props);
+        const newView = new OLIView(server, type, initialPath, parentViewId, props);
         this.views.set(newView.id, newView);
 
         if (type === ViewType.TAB && !this.serverPrimaryViews.has(server.id)) {
@@ -190,7 +190,7 @@ export class ViewManager extends EventEmitter {
         this.emit(VIEW_REMOVED, viewId, view.serverId);
     };
 
-    private setNewPrimaryViewIfNeeded = (view: MattermostView) => {
+    private setNewPrimaryViewIfNeeded = (view: OLIView) => {
         if (this.serverPrimaryViews.get(view.serverId) === view.id) {
             const newPrimaryView = Array.from(this.views.values()).find((v) => view.serverId === v.serverId && v.id !== view.id && v.type === ViewType.TAB);
             if (newPrimaryView) {
@@ -211,7 +211,7 @@ export class ViewManager extends EventEmitter {
         return new Logger(...additionalPrefixes, server.id, viewId);
     };
 
-    private handleServerWasRemoved = (server: MattermostServer) => {
+    private handleServerWasRemoved = (server: OLIServer) => {
         log.debug('handleServerWasRemoved', {serverId: server.id});
 
         this.views.forEach((view) => {

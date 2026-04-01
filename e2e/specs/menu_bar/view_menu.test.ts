@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs/promises';
@@ -7,9 +7,9 @@ import * as path from 'path';
 
 import {test, expect} from '../../fixtures/index';
 import {waitForAppReady} from '../../helpers/appReadiness';
-import {appDir, demoMattermostConfig, electronBinaryPath, writeConfigFile} from '../../helpers/config';
+import {appDir, demoOLIConfig, electronBinaryPath, writeConfigFile} from '../../helpers/config';
 import {waitForWindow, closeElectronApp} from '../../helpers/electronApp';
-import {loginToMattermost} from '../../helpers/login';
+import {loginToOLI} from '../../helpers/login';
 import {clickApplicationMenuItem} from '../../helpers/menu';
 import {buildServerMap} from '../../helpers/serverMap';
 
@@ -99,7 +99,7 @@ async function waitForServerReload(
 async function getServerContext() {
     const browserWindow = await electronApp.browserWindow(mainWindow);
     const serverMap = await buildServerMap(electronApp);
-    const serverEntry = serverMap[demoMattermostConfig.servers[0].name][0];
+    const serverEntry = serverMap[demoOLIConfig.servers[0].name][0];
     const firstServer = serverEntry.win;
     const firstServerId = serverEntry.webContentsId;
 
@@ -117,7 +117,7 @@ test.describe('menu/view', () => {
 
     test.beforeAll(async () => {
         userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mm-view-menu-e2e-'));
-        writeConfigFile(userDataDir, demoMattermostConfig);
+        writeConfigFile(userDataDir, demoOLIConfig);
 
         const {_electron: electron} = await import('playwright');
         electronApp = await electron.launch({
@@ -152,8 +152,8 @@ test.describe('menu/view', () => {
         await waitForAppReady(electronApp);
         mainWindow = await waitForWindow(electronApp, 'index');
         const serverMap = await buildServerMap(electronApp);
-        const firstServer = serverMap[demoMattermostConfig.servers[0].name][0].win;
-        await loginToMattermost(firstServer);
+        const firstServer = serverMap[demoOLIConfig.servers[0].name][0].win;
+        await loginToOLI(firstServer);
         await mainWindow.waitForSelector('.ServerDropdownButton', {timeout: 30_000});
     });
 
@@ -166,7 +166,7 @@ test.describe('menu/view', () => {
         await closeElectronApp(electronApp, userDataDir);
     });
 
-    test('MM-T813 Control+F should focus the search bar in Mattermost', {tag: ['@P2', '@all']}, async () => {
+    test('MM-T813 Control+F should focus the search bar in OLI', {tag: ['@P2', '@all']}, async () => {
         const {firstServer, firstServerId} = await getServerContext();
 
         // On macOS, Cmd+F sent directly to the web content focuses the search bar.

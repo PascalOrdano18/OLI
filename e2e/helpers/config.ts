@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs';
@@ -72,7 +72,7 @@ const baseConfig: AppConfig = {
     viewLimit: 15,
 };
 
-// Two demo servers (no live Mattermost needed): example.com + github.com
+// Two demo servers (no live OLI needed): example.com + github.com
 export const demoConfig: AppConfig = {
     ...baseConfig,
     servers: [
@@ -81,8 +81,8 @@ export const demoConfig: AppConfig = {
     ],
 };
 
-// Single Mattermost server (requires MM_TEST_SERVER_URL)
-export const demoMattermostConfig: AppConfig = {
+// Single OLI server (requires MM_TEST_SERVER_URL)
+export const demoOLIConfig: AppConfig = {
     ...baseConfig,
     servers: [
         {name: 'example', url: mattermostURL, order: 0},

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 'use strict';
 
@@ -17,7 +17,7 @@ jest.mock('path', () => ({
 
 jest.mock('electron', () => ({
     app: {
-        name: 'Mattermost',
+        name: 'OLI',
         getVersion: () => '5.0.0',
         getPath: (folder) => `/${folder}`,
         relaunch: jest.fn(),

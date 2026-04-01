@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import React from 'react';
@@ -205,12 +205,12 @@ class NewServerModal extends React.PureComponent<Props, State> {
                     defaultMessage: 'Your server URL is potentially insecure. For best results, use a URL with the HTTPS protocol.',
                 }),
             };
-        case URLValidationStatus.NotMattermost:
+        case URLValidationStatus.NotOLI:
             return {
                 type: STATUS.WARNING,
                 value: this.props.intl.formatMessage({
-                    id: 'renderer.components.newServerModal.warning.notMattermost',
-                    defaultMessage: 'The server URL provided does not appear to point to a valid Mattermost server. Please verify the URL and check your connection.',
+                    id: 'renderer.components.newServerModal.warning.notOLI',
+                    defaultMessage: 'The server URL provided does not appear to point to a valid OLI server. Please verify the URL and check your connection.',
                 }),
             };
         case URLValidationStatus.URLNotMatched:
@@ -218,7 +218,7 @@ class NewServerModal extends React.PureComponent<Props, State> {
                 type: STATUS.WARNING,
                 value: this.props.intl.formatMessage({
                     id: 'renderer.components.newServerModal.warning.urlNotMatched',
-                    defaultMessage: 'The server URL does not match the configured Site URL on your Mattermost server. Server version: {serverVersion}',
+                    defaultMessage: 'The server URL does not match the configured Site URL on your OLI server. Server version: {serverVersion}',
                 }, {
                     serverVersion: this.state.validationResult.serverVersion,
                 }),
@@ -228,7 +228,7 @@ class NewServerModal extends React.PureComponent<Props, State> {
                 type: STATUS.INFO,
                 value: this.props.intl.formatMessage({
                     id: 'renderer.components.newServerModal.warning.urlUpdated',
-                    defaultMessage: 'The server URL provided has been updated to match the configured Site URL on your Mattermost server. Server version: {serverVersion}',
+                    defaultMessage: 'The server URL provided has been updated to match the configured Site URL on your OLI server. Server version: {serverVersion}',
                 }, {
                     serverVersion: this.state.validationResult.serverVersion,
                 }),
@@ -408,7 +408,7 @@ class NewServerModal extends React.PureComponent<Props, State> {
                                     type: STATUS.INFO,
                                     value: this.props.intl.formatMessage({
                                         id: 'renderer.components.newServerModal.serverURL.description',
-                                        defaultMessage: 'The URL of your Mattermost server. Must start with http:// or https://.',
+                                        defaultMessage: 'The URL of your OLI server. Must start with http:// or https://.',
                                     }),
                                 })}
                                 placeholder={this.props.intl.formatMessage({
@@ -508,7 +508,7 @@ class NewServerModal extends React.PureComponent<Props, State> {
                                         <small className='NewServerModal__toggle__description'>
                                             <FormattedMessage
                                                 id='renderer.components.newServerModal.permissions.notifications.mac'
-                                                defaultMessage='You may also need to enable notifications in macOS for Mattermost. Click <link>here</link> to open the System Preferences.'
+                                                defaultMessage='You may also need to enable notifications in macOS for OLI. Click <link>here</link> to open the System Preferences.'
                                                 values={notificationValues}
                                             />
                                         </small>
@@ -517,7 +517,7 @@ class NewServerModal extends React.PureComponent<Props, State> {
                                         <small className='NewServerModal__toggle__description'>
                                             <FormattedMessage
                                                 id='renderer.components.newServerModal.permissions.notifications.windows'
-                                                defaultMessage='You may also need to enable notifications in Windows for Mattermost. Click <link>here</link> to open the Notification Settings.'
+                                                defaultMessage='You may also need to enable notifications in Windows for OLI. Click <link>here</link> to open the Notification Settings.'
                                                 values={notificationValues}
                                             />
                                         </small>

@@ -1,5 +1,5 @@
 // OLI Provisioning API
-// Creates Mattermost organizations on Railway and registers them in Supabase
+// Creates OLI organizations on Railway and registers them in Supabase
 
 import cors from 'cors';
 import express from 'express';
@@ -52,7 +52,7 @@ app.get('/organizations/:id', async (req, res) => {
 //
 // This endpoint:
 // 1. Creates a Supabase record with status "provisioning"
-// 2. Provisions Mattermost + Postgres on Railway
+// 2. Provisions OLI + Postgres on Railway
 // 3. Updates the record with the server URL and status "ready"
 app.post('/organizations', async (req, res) => {
     const {name, created_by, is_private, password} = req.body;

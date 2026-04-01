@@ -1,4 +1,4 @@
-# Copyright 2022 Mattermost, Inc.
+# Copyright 2022 OLI, Inc.
 name: "patch-version"
 description: This action is used to patch package.json version with the nightly build
 

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "API to provision Mattermost organizations on Railway and register them in Supabase",
+  "description": "API to provision OLI organizations on Railway and register them in Supabase",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

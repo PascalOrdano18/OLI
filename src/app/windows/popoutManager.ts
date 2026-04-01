@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {IpcMainEvent, IpcMainInvokeEvent, WebContentsView} from 'electron';
@@ -10,7 +10,7 @@ import CallsWidgetWindow from 'app/callsWidgetWindow';
 import MainWindow from 'app/mainWindow/mainWindow';
 import MenuManager from 'app/menus';
 import {createSetNativeTitleBar} from 'app/popoutMenu';
-import type {MattermostWebContentsView} from 'app/views/MattermostWebContentsView';
+import type {OLIWebContentsView} from 'app/views/OLIWebContentsView';
 import WebContentsManager from 'app/views/webContentsManager';
 import BaseWindow from 'app/windows/baseWindow';
 import {
@@ -43,8 +43,8 @@ import {POPOUT_RATE_LIMIT} from 'common/constants';
 import {Logger} from 'common/log';
 import ServerManager from 'common/servers/serverManager';
 import {DEFAULT_RHS_WINDOW_WIDTH, TAB_BAR_HEIGHT} from 'common/utils/constants';
-import type {MattermostView} from 'common/views/MattermostView';
-import {ViewType} from 'common/views/MattermostView';
+import type {OLIView} from 'common/views/OLIView';
+import {ViewType} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
 import performanceMonitor from 'main/performanceMonitor';
 import ThemeManager from 'main/themeManager';
@@ -111,7 +111,7 @@ export class PopoutManager {
         }
     };
 
-    private createPopoutWindow = (view: MattermostView) => {
+    private createPopoutWindow = (view: OLIView) => {
         let options = {} as Electron.BrowserWindowConstructorOptions;
         const mainWindow = MainWindow.get();
         if (mainWindow) {
@@ -148,7 +148,7 @@ export class PopoutManager {
             });
     };
 
-    private setupView = (viewId: string, window: BaseWindow, mattermostWebContentsView: MattermostWebContentsView) => {
+    private setupView = (viewId: string, window: BaseWindow, mattermostWebContentsView: OLIWebContentsView) => {
         const webContentsView = mattermostWebContentsView.getWebContentsView();
 
         const loadScreenEnd = () => window.fadeLoadingScreen();

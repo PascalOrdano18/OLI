@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 'use strict';
@@ -12,7 +12,7 @@ import {
     SERVER_REMOVED,
 } from 'common/communication';
 import ServerManager from 'common/servers/serverManager';
-import {ViewType} from 'common/views/MattermostView';
+import {ViewType} from 'common/views/OLIView';
 
 import {ViewManager} from './viewManager';
 

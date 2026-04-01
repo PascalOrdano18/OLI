@@ -1,8 +1,8 @@
-# Issue Tagging in Mattermost Chat
+# Issue Tagging in OLI Chat
 
 ## Summary
 
-Enable users to reference issues from the issue tracker directly in Mattermost chat messages using `#` autocomplete. Referenced issues render as rich cards (identical to Oli's existing issue cards) in both user and agent messages. Clicking a card navigates the Electron app to Issues > that issue > Docs tab.
+Enable users to reference issues from the issue tracker directly in OLI chat messages using `#` autocomplete. Referenced issues render as rich cards (identical to Oli's existing issue cards) in both user and agent messages. Clicking a card navigates the Electron app to Issues > that issue > Docs tab.
 
 ## Goals
 
@@ -19,17 +19,17 @@ Enable users to reference issues from the issue tracker directly in Mattermost c
 
 ## Architecture
 
-Four components, all in the Mattermost plugin webapp except for a small IPC addition in the Electron app.
+Four components, all in the OLI plugin webapp except for a small IPC addition in the Electron app.
 
 ### 1. IssueAutocomplete
 
 **Location:** `mattermost-plugin-issues/webapp/src/components/issue_autocomplete/`
 **Registration:** `registerRootComponent` in plugin `index.tsx`
 
-A floating dropdown that appears when the user types `#` in the Mattermost message textarea.
+A floating dropdown that appears when the user types `#` in the OLI message textarea.
 
 **Behavior:**
-- Attaches a `keyup`/`input` listener to the Mattermost chat textarea (found via DOM query: `#post_textbox` or equivalent).
+- Attaches a `keyup`/`input` listener to the OLI chat textarea (found via DOM query: `#post_textbox` or equivalent).
 - Detects `#` preceded by a space or at the start of input.
 - Extracts the query text after `#` (e.g., `#fix` -> query is `fix`).
 - Searches across all projects, matching against both issue identifier and title (case-insensitive).
@@ -51,7 +51,7 @@ A floating dropdown that appears when the user types `#` in the Mattermost messa
 A MutationObserver-based component that scans rendered message DOM for `{{issue:IDENTIFIER}}` patterns and replaces them with rich cards.
 
 **Behavior:**
-- On mount, creates a `MutationObserver` watching the Mattermost post list container for new/changed child nodes.
+- On mount, creates a `MutationObserver` watching the OLI post list container for new/changed child nodes.
 - When a post element is added or updated, scans its text content for the regex: `\{\{issue:([A-Z]+-\d+)\}\}`.
 - For each match:
   - In the message text span, replaces `{{issue:BCK-3}}` with a styled inline identifier (bold, colored by status).
@@ -76,7 +76,7 @@ The `OliResponsePost` component passes `onClick` to each `IssueRefCard` it rende
 
 ### 4. IPC: navigateToIssue
 
-A new IPC channel enabling the Mattermost WebView (external view) to tell the Electron app to navigate to a specific issue's Docs tab.
+A new IPC channel enabling the OLI WebView (external view) to tell the Electron app to navigate to a specific issue's Docs tab.
 
 **Files changed:**
 

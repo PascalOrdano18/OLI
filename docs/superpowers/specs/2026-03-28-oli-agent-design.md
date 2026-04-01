@@ -1,11 +1,11 @@
-# Oli Agent — Reactive Mattermost Team Member
+# Oli Agent — Reactive OLI Team Member
 
 **Date:** 2026-03-28
 **Status:** Approved design
 
 ## Overview
 
-Oli is a separate Mattermost bot that responds when `@oli`'d or DM'd. It answers questions about the codebase, company, and issues in a concise, direct style. It runs inside the existing `ai-service/` as a new endpoint alongside Fiona's `/analyze`.
+Oli is a separate OLI bot that responds when `@oli`'d or DM'd. It answers questions about the codebase, company, and issues in a concise, direct style. It runs inside the existing `ai-service/` as a new endpoint alongside Fiona's `/analyze`.
 
 ## Decisions
 
@@ -84,7 +84,7 @@ New module alongside `agent.ts`. Uses `generateText()` from Vercel `ai` SDK with
 
 **System prompt:**
 ```
-You are Oli, a team member in this Mattermost workspace. You answer questions
+You are Oli, a team member in this OLI workspace. You answer questions
 about the codebase, company, and issues.
 
 Be concise and direct — like a senior dev responding to a quick ping. Short
@@ -201,14 +201,14 @@ registry.registerPostTypeComponent('custom_oli_response', OliResponsePost);
 ```
 
 **`OliResponsePost` component** renders:
-1. The markdown text (using Mattermost's built-in markdown renderer)
+1. The markdown text (using OLI's built-in markdown renderer)
 2. Embedded code snippet cards
 3. Embedded issue mention cards
 
 **Code snippet card:**
-- Dark background container (matching Mattermost's code block theme)
+- Dark background container (matching OLI's code block theme)
 - Header bar with file path as monospace pill, language tag, line range
-- Syntax-highlighted code body (Mattermost's built-in highlight.js)
+- Syntax-highlighted code body (OLI's built-in highlight.js)
 - Rounded corners, subtle border
 
 **Issue mention card:**

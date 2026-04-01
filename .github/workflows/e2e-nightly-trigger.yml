@@ -1,7 +1,7 @@
 name: E2E Nightly Trigger
 
 # This is a lightweight trigger workflow.
-# Matterwick receives the workflow_run:requested event, provisions 3 Mattermost cloud
+# Matterwick receives the workflow_run:requested event, provisions 3 OLI cloud
 # instances (linux/macos/windows), and dispatches e2e-functional.yml with instance details.
 # When e2e-functional.yml completes, Matterwick destroys the provisioned instances.
 on:

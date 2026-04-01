@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs/promises';
@@ -7,13 +7,13 @@ import * as path from 'path';
 
 import {test, expect} from '../../fixtures/index';
 import {waitForAppReady} from '../../helpers/appReadiness';
-import {electronBinaryPath, appDir, demoMattermostConfig, writeConfigFile} from '../../helpers/config';
+import {electronBinaryPath, appDir, demoOLIConfig, writeConfigFile} from '../../helpers/config';
 import {waitForLockFileRelease} from '../../helpers/cleanup';
-import {loginToMattermost} from '../../helpers/login';
+import {loginToOLI} from '../../helpers/login';
 import {buildServerMap} from '../../helpers/serverMap';
 
 const config = {
-    ...demoMattermostConfig,
+    ...demoOLIConfig,
     alwaysMinimize: false,
     minimizeToTray: false,
 };
@@ -75,7 +75,7 @@ async function closeElectronApp(app: ElectronApplication, dataDir: string) {
     await waitForLockFileRelease(dataDir).catch(() => {});
 }
 
-async function getMattermostServer() {
+async function getOLIServer() {
     const serverMap = await buildServerMap(electronApp);
     const mmServer = serverMap[config.servers[0].name]?.[0]?.win;
     expect(mmServer).toBeDefined();
@@ -161,14 +161,14 @@ test.describe('server_management/popout_windows', () => {
         });
         await waitForAppReady(electronApp);
         mainWindow = await waitForWindow(electronApp, 'index');
-        const mmServer = await getMattermostServer();
-        await loginToMattermost(mmServer);
+        const mmServer = await getOLIServer();
+        await loginToOLI(mmServer);
         await mainWindow.waitForSelector('#newTabButton', {timeout: 30_000});
     });
 
     test.beforeEach(async () => {
         await closeAllPopouts();
-        const mmServer = await getMattermostServer();
+        const mmServer = await getOLIServer();
         await mmServer.waitForSelector('#sidebarItem_town-square', {timeout: 15_000});
         await mmServer.click('#sidebarItem_town-square').catch(() => {});
         await mainWindow.bringToFront().catch(() => {});
@@ -291,12 +291,12 @@ test.describe('server_management/popout_windows', () => {
             const mainWindowTitle = await mainWindow.title();
             const popoutWindowTitle = await popoutWindow.title();
 
-            expect(mainWindowTitle).toContain('Mattermost');
-            expect(popoutWindowTitle).toContain('Mattermost');
+            expect(mainWindowTitle).toContain('OLI');
+            expect(popoutWindowTitle).toContain('OLI');
         });
 
         test('MM-T4411_2 should maintain separate navigation state in popout window', {tag: ['@P2', '@all']}, async () => {
-            const mainView = await getMattermostServer();
+            const mainView = await getOLIServer();
             await mainView.waitForSelector('#sidebarItem_off-topic');
             await mainView.click('#sidebarItem_off-topic');
 

@@ -1,9 +1,9 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {test, expect} from '../../fixtures/index';
-import {demoMattermostConfig} from '../../helpers/config';
-import {loginToMattermost} from '../../helpers/login';
+import {demoOLIConfig} from '../../helpers/config';
+import {loginToOLI} from '../../helpers/login';
 import {buildServerMap} from '../../helpers/serverMap';
 
 test.describe('menu/view', () => {
@@ -18,14 +18,14 @@ test.describe('menu/view', () => {
         }
 
         const serverMap = await buildServerMap(electronApp);
-        const serverName = demoMattermostConfig.servers[0].name;
+        const serverName = demoOLIConfig.servers[0].name;
         const serverEntry = serverMap[serverName]?.[0];
         if (!serverEntry) {
             test.skip(true, `Server "${serverName}" not found in serverMap`);
             return;
         }
         const firstServer = serverEntry.win;
-        await loginToMattermost(firstServer);
+        await loginToOLI(firstServer);
         await firstServer.waitForSelector('#post_textbox');
         const currentWidth = await firstServer.evaluate(() => window.outerWidth);
         const currentHeight = await firstServer.evaluate(() => window.outerHeight);

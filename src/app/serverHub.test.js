@@ -1,9 +1,9 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import MainWindow from 'app/mainWindow/mainWindow';
 import ModalManager from 'app/mainWindow/modals/modalManager';
-import {MattermostServer} from 'common/servers/MattermostServer';
+import {OLIServer} from 'common/servers/OLIServer';
 import ServerManager from 'common/servers/serverManager';
 import {URLValidationStatus} from 'common/utils/constants';
 import PermissionsManager from 'main/security/permissionsManager';
@@ -39,8 +39,8 @@ jest.mock('common/servers/serverManager', () => ({
     on: jest.fn(),
     emit: jest.fn(),
 }));
-jest.mock('common/servers/MattermostServer', () => ({
-    MattermostServer: jest.fn(),
+jest.mock('common/servers/OLIServer', () => ({
+    OLIServer: jest.fn(),
 }));
 jest.mock('main/server/serverInfo', () => ({
     ServerInfo: jest.fn(),
@@ -277,14 +277,14 @@ describe('app/serverViewState', () => {
         const serverViewState = new ServerHub();
 
         beforeEach(() => {
-            MattermostServer.mockImplementation(({url}) => ({url}));
+            OLIServer.mockImplementation(({url}) => ({url}));
             ServerInfo.mockImplementation(({url}) => ({
                 pingServer: jest.fn().mockImplementation(() => ({
                     status: 'OK',
                 })),
                 fetchConfigData: jest.fn().mockImplementation(() => ({
                     serverVersion: '7.8.0',
-                    siteName: 'Mattermost',
+                    siteName: 'OLI',
                     siteURL: url,
                 })),
             }));
@@ -388,7 +388,7 @@ describe('app/serverViewState', () => {
 
                     return {
                         serverVersion: '7.8.0',
-                        siteName: 'Mattermost',
+                        siteName: 'OLI',
                         siteURL: url,
                     };
                 }),
@@ -411,7 +411,7 @@ describe('app/serverViewState', () => {
 
                     return {
                         serverVersion: '7.8.0',
-                        siteName: 'Mattermost',
+                        siteName: 'OLI',
                         siteURL: url,
                     };
                 }),
@@ -430,7 +430,7 @@ describe('app/serverViewState', () => {
             }));
 
             const result = await serverViewState.handleServerURLValidation({}, 'https://not-server.com');
-            expect(result.status).toBe(URLValidationStatus.NotMattermost);
+            expect(result.status).toBe(URLValidationStatus.NotOLI);
             expect(result.validatedURL).toBe('https://not-server.com');
         });
 
@@ -442,7 +442,7 @@ describe('app/serverViewState', () => {
                 fetchConfigData: jest.fn().mockImplementation(() => {
                     return {
                         serverVersion: '7.8.0',
-                        siteName: 'Mattermost',
+                        siteName: 'OLI',
                         siteURL: 'https://mainserver.com/',
                     };
                 }),
@@ -461,7 +461,7 @@ describe('app/serverViewState', () => {
                 fetchConfigData: jest.fn().mockImplementation(() => {
                     return {
                         serverVersion: '7.8.0',
-                        siteName: 'Mattermost',
+                        siteName: 'OLI',
                         siteURL: '',
                     };
                 }),
@@ -483,7 +483,7 @@ describe('app/serverViewState', () => {
                     }
                     return {
                         serverVersion: '7.8.0',
-                        siteName: 'Mattermost',
+                        siteName: 'OLI',
                         siteURL: 'https://mainserver.com/',
                     };
                 }),
@@ -502,7 +502,7 @@ describe('app/serverViewState', () => {
             }));
 
             const result = await serverViewState.handleServerURLValidation({}, 'https://not-server.com/some/deep/path');
-            expect(result.status).toBe(URLValidationStatus.NotMattermost);
+            expect(result.status).toBe(URLValidationStatus.NotOLI);
             expect(result.validatedURL).toBe('https://not-server.com/some/deep/path');
         });
 
@@ -514,7 +514,7 @@ describe('app/serverViewState', () => {
             }));
 
             const result = await serverViewState.handleServerURLValidation({}, 'not-server.com/some/path');
-            expect(result.status).toBe(URLValidationStatus.NotMattermost);
+            expect(result.status).toBe(URLValidationStatus.NotOLI);
             expect(result.validatedURL).toBe('https://not-server.com/some/path');
         });
 
@@ -532,7 +532,7 @@ describe('app/serverViewState', () => {
                     }
                     return {
                         serverVersion: '7.8.0',
-                        siteName: 'Mattermost',
+                        siteName: 'OLI',
                         siteURL: 'https://server.com/',
                     };
                 }),
@@ -552,7 +552,7 @@ describe('app/serverViewState', () => {
                 fetchConfigData: jest.fn().mockImplementation(() => {
                     return {
                         serverVersion: '7.8.0',
-                        siteName: 'Mattermost',
+                        siteName: 'OLI',
                         siteURL: 'https://mainserver.com',
                     };
                 }),

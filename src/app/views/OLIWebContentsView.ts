@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {type BrowserWindow, WebContentsView, app, ipcMain} from 'electron';
@@ -29,7 +29,7 @@ import type {Logger} from 'common/log';
 import ServerManager from 'common/servers/serverManager';
 import {RELOAD_INTERVAL, MAX_SERVER_RETRIES, SECOND, MAX_LOADING_SCREEN_SECONDS} from 'common/utils/constants';
 import {isInternalURL, parseURL} from 'common/utils/url';
-import {type MattermostView} from 'common/views/MattermostView';
+import {type OLIView} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
 import {updateServerInfos} from 'main/app/utils';
 import DeveloperMode from 'main/developerMode';
@@ -311,11 +311,13 @@ const buildDesktopSidebarThemeOverrideScript = () => {
         }
     \`;
 
-    const hideMattermostBranding = () => {
+    const hideOLIBranding = () => {
+        // Inject OLI logo into the header, replacing Mattermost branding
         const headerRoots = Array.from(document.querySelectorAll('header, .global-header, [class*="global-header"], .top-bar, [class*="top-bar"]'));
-        const brandedLabels = new Set(['mattermost', 'team edition']);
+        const brandedLabels = new Set(['mattermost', 'team edition', 'free edition', 'mattermost free edition']);
 
         for (const root of headerRoots) {
+            // Find and replace the product switcher / logo area
             for (const element of root.querySelectorAll('a, button, div, span')) {
                 const label = element.textContent?.trim().toLowerCase();
                 if (!label || !brandedLabels.has(label)) {
@@ -327,11 +329,63 @@ const buildDesktopSidebarThemeOverrideScript = () => {
                     hideTarget.style.setProperty('display', 'none', 'important');
                 }
             }
+
+            // Hide the compass SVG logo and inject OLI logo
+            if (!root.querySelector('#oli-header-logo')) {
+                const logoSvgs = root.querySelectorAll('svg');
+                for (const svg of logoSvgs) {
+                    const parent = svg.parentElement;
+                    if (!parent) continue;
+                    const parentText = parent.textContent?.trim().toLowerCase() || '';
+                    // Target the product logo SVG (usually the first SVG in header, near "Mattermost" text)
+                    if (parentText === '' || parentText.includes('mattermost') || parentText.includes('free edition')) {
+                        parent.style.setProperty('display', 'none', 'important');
+                    }
+                }
+
+                // Insert OLI branding as the first child of the header
+                const oliBrand = document.createElement('div');
+                oliBrand.id = 'oli-header-logo';
+                oliBrand.style.cssText = 'display:flex;align-items:center;gap:8px;padding:0 12px;height:100%;flex-shrink:0;';
+                oliBrand.innerHTML = '<svg width="24" height="24" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect width="64" height="64" rx="12" fill="#000"/><circle cx="32" cy="32" r="20" fill="#fff"/></svg><span style="font-weight:700;font-size:15px;color:#000;letter-spacing:-0.3px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">OLI</span>';
+                root.prepend(oliBrand);
+            }
         }
 
         for (const element of document.querySelectorAll('[aria-label*="Mattermost"], [title*="Mattermost"]')) {
-            if (element instanceof HTMLElement) {
-                element.style.setProperty('display', 'none', 'important');
+            if (element instanceof HTMLElement && element.id !== 'oli-header-logo') {
+                if (element.getAttribute('aria-label')) {
+                    element.setAttribute('aria-label', element.getAttribute('aria-label').replace(/Mattermost/g, 'OLI'));
+                }
+                if (element.getAttribute('title')) {
+                    element.setAttribute('title', element.getAttribute('title').replace(/Mattermost/g, 'OLI'));
+                }
+            }
+        }
+
+        // Replace "Mattermost" text with "OLI" in remaining visible elements
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.nodeValue && node.nodeValue.includes('Mattermost')) {
+                node.nodeValue = node.nodeValue.replace(/Mattermost/g, 'OLI');
+            }
+        }
+
+        // Replace System user profile pictures (Mattermost compass icon) with OLI logo
+        const oliLogoDataUri = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><rect width="64" height="64" rx="12" fill="#000"/><circle cx="32" cy="32" r="20" fill="#fff"/></svg>');
+        const avatarImages = document.querySelectorAll('img.Avatar, img[class*="Avatar"], img[class*="avatar"], img[class*="profile"]');
+        for (const img of avatarImages) {
+            if (img instanceof HTMLImageElement && img.src && img.src.includes('/api/v4/users/') && img.src.includes('/image')) {
+                // Check if this is the system bot avatar by looking at nearby username text
+                const post = img.closest('[class*="post"], [class*="Post"], [class*="message"]');
+                if (post) {
+                    const username = post.querySelector('[class*="username"], [class*="user-popover"], [class*="UserProfile"]');
+                    const nameText = username?.textContent?.trim().toLowerCase() || '';
+                    if (nameText === 'system') {
+                        img.src = oliLogoDataUri;
+                    }
+                }
             }
         }
     };
@@ -367,7 +421,7 @@ const buildDesktopSidebarThemeOverrideScript = () => {
             }
         }
 
-        hideMattermostBranding();
+        hideOLIBranding();
     };
 
     applyTheme();
@@ -375,12 +429,19 @@ const buildDesktopSidebarThemeOverrideScript = () => {
     setTimeout(applyTheme, 50);
     setTimeout(applyTheme, 250);
     setTimeout(applyTheme, 1000);
+    setTimeout(applyTheme, 3000);
+    setTimeout(applyTheme, 5000);
 
     if (!window.__desktopSidebarThemeObserver) {
-        const observer = new MutationObserver(() => applyTheme());
-        observer.observe(document.documentElement, {attributes: true, attributeFilter: ['style', 'class']});
+        let debounceTimer;
+        const debouncedApply = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(applyTheme, 100);
+        };
+        const observer = new MutationObserver(() => debouncedApply());
+        observer.observe(document.documentElement, {attributes: true, attributeFilter: ['style', 'class'], childList: true, subtree: true});
         if (document.body) {
-            observer.observe(document.body, {attributes: true, attributeFilter: ['style', 'class']});
+            observer.observe(document.body, {attributes: true, attributeFilter: ['style', 'class'], childList: true, subtree: true});
         }
         window.__desktopSidebarThemeObserver = observer;
     }
@@ -388,8 +449,8 @@ const buildDesktopSidebarThemeOverrideScript = () => {
 `;
 };
 
-export class MattermostWebContentsView extends EventEmitter {
-    private view: MattermostView;
+export class OLIWebContentsView extends EventEmitter {
+    private view: OLIView;
     private parentWindow: BrowserWindow;
 
     private log: Logger;
@@ -404,7 +465,7 @@ export class MattermostWebContentsView extends EventEmitter {
     private altPressStatus: boolean;
     private lastPath?: string;
 
-    constructor(view: MattermostView, options: WebContentsViewConstructorOptions, parentWindow: BrowserWindow) {
+    constructor(view: OLIView, options: WebContentsViewConstructorOptions, parentWindow: BrowserWindow) {
         super();
         this.view = view;
         this.parentWindow = parentWindow;
@@ -423,7 +484,7 @@ export class MattermostWebContentsView extends EventEmitter {
         this.webContentsView = new WebContentsView(this.options);
         this.resetLoadingStatus();
 
-        this.log = ViewManager.getViewLog(this.id, 'MattermostWebContentsView');
+        this.log = ViewManager.getViewLog(this.id, 'OLIWebContentsView');
         this.log.verbose('View created', this.id, this.view.title);
 
         this.webContentsView.webContents.on('update-target-url', this.handleUpdateTarget);

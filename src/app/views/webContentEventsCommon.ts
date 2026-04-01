@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 import path from 'path';
 
@@ -42,6 +42,6 @@ export function isCustomProtocol(url: URL) {
     return url.protocol !== 'http:' && url.protocol !== 'https:' && url.protocol !== `${MATTERMOST_PROTOCOL}:`;
 }
 
-export function isMattermostProtocol(url: URL) {
+export function isOLIProtocol(url: URL) {
     return url.protocol === `${MATTERMOST_PROTOCOL}:`;
 }

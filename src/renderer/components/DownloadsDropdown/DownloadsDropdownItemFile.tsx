@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import classNames from 'classnames';
@@ -29,7 +29,7 @@ const DownloadsDropdownItemFile = ({item, activeItem, appName}: OwnProps) => {
     };
 
     const itemFilename = item.type === 'update' ?
-        translate.formatMessage({id: 'renderer.downloadsDropdown.Update.MattermostVersionX', defaultMessage: `{appName} version ${item.filename}`}, {version: item.filename, appName}) :
+        translate.formatMessage({id: 'renderer.downloadsDropdown.Update.OLIVersionX', defaultMessage: `{appName} version ${item.filename}`}, {version: item.filename, appName}) :
         item.filename;
 
     return (

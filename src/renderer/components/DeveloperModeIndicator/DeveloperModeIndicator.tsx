@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import React from 'react';
@@ -18,7 +18,7 @@ export default function DeveloperModeIndicator({developerMode}: {developerMode: 
             title={
                 <FormattedMessage
                     id='renderer.components.developerModeIndicator.tooltip'
-                    defaultMessage='Developer mode is enabled. You should only have this enabled if a Mattermost developer has instructed you to.'
+                    defaultMessage='Developer mode is enabled. You should only have this enabled if a OLI developer has instructed you to.'
                 />
             }
             isVertical={false}
