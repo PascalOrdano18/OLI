@@ -3,7 +3,7 @@
 
 import {createHash} from 'crypto';
 import {execFile, spawn, ChildProcess} from 'child_process';
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync, rmSync} from 'fs';
 import {join, resolve} from 'path';
 import {promisify} from 'util';
 import {createInterface} from 'readline';
@@ -36,6 +36,7 @@ interface SessionEntry {
     history: AgentEvent[];
     webContentsId: number;
     repoPath: string;
+    worktreePath: string | null;
 }
 
 interface ProjectPaths {
@@ -226,19 +227,113 @@ export class AoManager {
     }
 
     private async detectDefaultBranch(repoPath: string): Promise<string> {
+        // Try origin/HEAD symbolic ref (most reliable)
         try {
             const {stdout} = await execFileAsync('git', [
                 '-C', repoPath, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD',
             ]);
             return stdout.trim().replace(/^origin\//, '');
-        } catch {
+        } catch { /* origin/HEAD not set */ }
+
+        // Try common default branch names by checking if they exist as remote refs
+        for (const candidate of ['main', 'master']) {
             try {
-                const {stdout} = await execFileAsync('git', [
-                    '-C', repoPath, 'rev-parse', '--abbrev-ref', 'HEAD',
+                await execFileAsync('git', [
+                    '-C', repoPath, 'rev-parse', '--verify', `refs/remotes/origin/${candidate}`,
                 ]);
-                return stdout.trim() || 'main';
+                return candidate;
+            } catch { /* branch doesn't exist */ }
+        }
+
+        return 'main';
+    }
+
+    // ─── Worktree lifecycle ─────────────────────────────────────────
+
+    private sanitizeForBranch(identifier: string): string {
+        return identifier.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    }
+
+    /**
+     * Create an isolated git worktree for an issue.
+     * Path: ~/.worktrees/{projectId}/{sanitized-identifier}/
+     * Branch: oli/{sanitized-identifier} based on origin/{defaultBranch}
+     */
+    private async createWorktree(projectId: string, issueIdentifier: string, repoPath: string): Promise<string> {
+        const homedir = require('os').homedir();
+        const sanitizedId = this.sanitizeForBranch(issueIdentifier);
+        const projectWorktreeDir = join(homedir, '.worktrees', projectId);
+        const worktreePath = join(projectWorktreeDir, sanitizedId);
+
+        // Reuse existing valid worktree
+        if (existsSync(worktreePath)) {
+            try {
+                await execFileAsync('git', ['-C', worktreePath, 'rev-parse', '--is-inside-work-tree']);
+                log.info('Reusing existing worktree', {worktreePath});
+                return worktreePath;
             } catch {
-                return 'main';
+                // Directory exists but isn't a valid worktree — prune and recreate
+                rmSync(worktreePath, {recursive: true, force: true});
+                try {
+                    await execFileAsync('git', ['-C', repoPath, 'worktree', 'prune']);
+                } catch { /* best effort */ }
+            }
+        }
+
+        mkdirSync(projectWorktreeDir, {recursive: true});
+
+        // Fetch latest from remote (non-fatal if offline)
+        try {
+            await execFileAsync('git', ['-C', repoPath, 'fetch', 'origin', '--quiet']);
+        } catch { /* offline is fine */ }
+
+        const defaultBranch = await this.detectDefaultBranch(repoPath);
+        const branch = `oli/${sanitizedId}`;
+        const baseRef = `origin/${defaultBranch}`;
+
+        try {
+            // Create worktree with a new branch based on the default branch
+            await execFileAsync('git', [
+                '-C', repoPath, 'worktree', 'add', '-b', branch, worktreePath, baseRef,
+            ]);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (!msg.includes('already exists')) {
+                throw new Error(`Failed to create worktree for "${issueIdentifier}": ${msg}`);
+            }
+
+            // Branch already exists — create worktree on base ref, then checkout the branch
+            await execFileAsync('git', ['-C', repoPath, 'worktree', 'add', worktreePath, baseRef]);
+            try {
+                await execFileAsync('git', ['-C', worktreePath, 'checkout', branch]);
+            } catch (checkoutErr: unknown) {
+                // Clean up orphaned worktree before rethrowing
+                try {
+                    await execFileAsync('git', ['-C', repoPath, 'worktree', 'remove', '--force', worktreePath]);
+                } catch { /* best effort */ }
+                const checkoutMsg = checkoutErr instanceof Error ? checkoutErr.message : String(checkoutErr);
+                throw new Error(`Failed to checkout branch "${branch}": ${checkoutMsg}`);
+            }
+        }
+
+        log.info('Created worktree', {projectId, branch, worktreePath});
+        return worktreePath;
+    }
+
+    /**
+     * Remove a git worktree. Does NOT delete the branch (can be cleaned up separately).
+     */
+    private async destroyWorktree(worktreePath: string): Promise<void> {
+        try {
+            const {stdout} = await execFileAsync('git', [
+                '-C', worktreePath, 'rev-parse', '--path-format=absolute', '--git-common-dir',
+            ]);
+            const repoRoot = resolve(stdout.trim(), '..');
+            await execFileAsync('git', ['-C', repoRoot, 'worktree', 'remove', '--force', worktreePath]);
+        } catch {
+            // If git commands fail, fall back to rm
+            if (existsSync(worktreePath)) {
+                rmSync(worktreePath, {recursive: true, force: true});
             }
         }
     }
@@ -281,6 +376,9 @@ export class AoManager {
             throw new Error('No repo linked. Use the folder picker to link a local git repo first.');
         }
 
+        // Create an isolated worktree for this issue
+        const worktreePath = await this.createWorktree(projectId, issue.identifier, repoPath);
+
         const sessionId = `${projectId}-${Date.now()}`;
 
         const prompt = [
@@ -300,7 +398,8 @@ export class AoManager {
             status: 'spawning',
             history: [],
             webContentsId: webContents.id,
-            repoPath,
+            repoPath: worktreePath,
+            worktreePath,
         };
 
         this.sessions.set(projectId, entry);
@@ -309,7 +408,7 @@ export class AoManager {
         this.broadcastEvent(entry, createAgentEvent(sessionId, 'user_message', {text: prompt}));
         this.broadcastEvent(entry, createAgentEvent(sessionId, 'status', {status: 'spawning' as AgentStatus}));
 
-        // Spawn Claude CLI — events stream back via processSDKEvent
+        // Spawn Claude CLI in the worktree
         this.runClaude(entry, prompt);
 
         return sessionId;
@@ -377,42 +476,43 @@ export class AoManager {
 
     async getDiff(projectId: string): Promise<string> {
         const wtPath = this.getWorktreePath(projectId);
-        if (!wtPath) {
+        const repoPath = this.getRepoPath(projectId);
+
+        // Use worktree if available, otherwise fall back to the linked repo path
+        const gitPath = wtPath ?? repoPath;
+        if (!gitPath) {
             return '';
         }
 
         try {
-            const repoPath = this.getRepoPath(projectId);
             const defaultBranch = repoPath ? await this.detectDefaultBranch(repoPath) : 'main';
 
-            // Compare the default branch directly against the worktree's current state
-            // (committed + uncommitted changes). This is a straight diff of master..HEAD
-            // plus any working tree changes.
+            // Use `git diff <ref>` (without ..HEAD) to compare against the working tree,
+            // which captures committed branch changes AND uncommitted modifications.
             try {
-                // First: committed changes vs default branch
-                const {stdout: committedDiff} = await execFileAsync('git', [
-                    '-C', wtPath, 'diff', defaultBranch + '..HEAD',
+                const {stdout} = await execFileAsync('git', [
+                    '-C', gitPath, 'diff', defaultBranch,
                 ], {maxBuffer: 10 * 1024 * 1024});
-                if (committedDiff.trim()) {
-                    return committedDiff;
+                if (stdout.trim()) {
+                    return stdout;
                 }
             } catch { /* default branch ref may not exist in worktree */ }
 
             // Try origin/defaultBranch as fallback
             try {
                 const {stdout} = await execFileAsync('git', [
-                    '-C', wtPath, 'diff', `origin/${defaultBranch}..HEAD`,
+                    '-C', gitPath, 'diff', `origin/${defaultBranch}`,
                 ], {maxBuffer: 10 * 1024 * 1024});
                 if (stdout.trim()) {
                     return stdout;
                 }
             } catch { /* fall through */ }
 
-            // Last resort: show all changes in the worktree (uncommitted)
-            const {stdout} = await execFileAsync('git', ['-C', wtPath, 'diff', 'HEAD'], {maxBuffer: 10 * 1024 * 1024});
+            // Last resort: show uncommitted changes vs HEAD
+            const {stdout} = await execFileAsync('git', ['-C', gitPath, 'diff', 'HEAD'], {maxBuffer: 10 * 1024 * 1024});
             return stdout;
         } catch (err) {
-            log.warn('Failed to get diff', {err, wtPath});
+            log.warn('Failed to get diff', {err, gitPath});
             return '';
         }
     }
@@ -460,11 +560,11 @@ export class AoManager {
             const repoPath = this.getRepoPath(projectId);
             const defaultBranch = repoPath ? await this.detectDefaultBranch(repoPath) : 'main';
 
-            // Try to get numstat from default branch
+            // Use `git diff <ref>` (without ..HEAD) to capture committed + uncommitted changes
             let diffOutput = '';
             try {
                 const {stdout} = await execFileAsync('git', [
-                    '-C', wtPath, 'diff', '--numstat', `${defaultBranch}..HEAD`,
+                    '-C', wtPath, 'diff', '--numstat', defaultBranch,
                 ], {maxBuffer: 10 * 1024 * 1024});
                 diffOutput = stdout;
             } catch { /* ignore */ }
@@ -472,7 +572,7 @@ export class AoManager {
             if (!diffOutput.trim()) {
                 try {
                     const {stdout} = await execFileAsync('git', [
-                        '-C', wtPath, 'diff', '--numstat', `origin/${defaultBranch}..HEAD`,
+                        '-C', wtPath, 'diff', '--numstat', `origin/${defaultBranch}`,
                     ], {maxBuffer: 10 * 1024 * 1024});
                     diffOutput = stdout;
                 } catch { /* ignore */ }
@@ -489,7 +589,7 @@ export class AoManager {
             let statusOutput = '';
             try {
                 const {stdout} = await execFileAsync('git', [
-                    '-C', wtPath, 'diff', '--name-status', `${defaultBranch}..HEAD`,
+                    '-C', wtPath, 'diff', '--name-status', defaultBranch,
                 ], {maxBuffer: 10 * 1024 * 1024});
                 statusOutput = stdout;
             } catch { /* ignore */ }
@@ -497,7 +597,7 @@ export class AoManager {
             if (!statusOutput.trim()) {
                 try {
                     const {stdout} = await execFileAsync('git', [
-                        '-C', wtPath, 'diff', '--name-status', `origin/${defaultBranch}..HEAD`,
+                        '-C', wtPath, 'diff', '--name-status', `origin/${defaultBranch}`,
                     ], {maxBuffer: 10 * 1024 * 1024});
                     statusOutput = stdout;
                 } catch { /* ignore */ }
