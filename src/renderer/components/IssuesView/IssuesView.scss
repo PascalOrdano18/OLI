@@ -213,7 +213,7 @@
     overflow: hidden;
 }
 
-// ── Work area (center — terminal or spawn panel) ────────────────────────────
+// ── Work area (center — agent chat or spawn panel) ──────────────────────────
 
 .IV__workArea {
     flex: 1;
@@ -301,9 +301,9 @@
     font-size: 12px;
 }
 
-// ── Terminal ───────────────────────────────────────────────────────────────
+// ── Agent Chat ─────────────────────────────────────────────────────────────
 
-.IV__terminalHeader {
+.IV__chatHeader {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -315,14 +315,14 @@
     color: var(--center-channel-color);
 }
 
-.IV__terminalSessionId {
+.IV__chatSessionId {
     font-family: 'Menlo', 'Monaco', monospace;
     font-size: 11px;
     font-weight: 600;
     color: rgba(0, 0, 0, 0.68);
 }
 
-.IV__terminalPulse {
+.IV__chatPulse {
     font-size: 11px;
     font-weight: 600;
     color: #3dc779;
@@ -334,40 +334,149 @@
     50% { opacity: 0.4; }
 }
 
-.IV__terminalTimer {
+.IV__chatTimer {
     font-family: 'Menlo', 'Monaco', monospace;
     font-size: 11px;
     opacity: 0.45;
     margin-left: auto;
 }
 
-.IV__terminalBody {
+.IV__agentChat {
     flex: 1;
     min-height: 0;
-    padding: 12px;
-    background: var(--center-channel-bg);
-    overflow: hidden;
     display: flex;
     flex-direction: column;
+    background: var(--center-channel-bg);
 }
 
-.IV__terminal {
+.IV__chatMessages {
     flex: 1;
     min-height: 0;
-    background: #f5f5f7;
-    border-radius: 6px;
-    border: 1px solid #d1d5db;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.IV__chatMsg {
+    max-width: 85%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.IV__chatMsg--user {
+    align-self: flex-end;
+    background: #0d6efd;
+    color: #fff;
+}
+
+.IV__chatMsg--assistant {
+    align-self: flex-start;
+    background: #f0f2f5;
+    color: #1f2328;
+}
+
+.IV__chatMsg--thinking {
+    align-self: flex-start;
+    background: #f8f4ff;
+    color: #6b5eaf;
+    font-style: italic;
+}
+
+.IV__chatMsg--error {
+    align-self: flex-start;
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.IV__chatMsgLabel {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 2px;
+    opacity: 0.7;
+}
+
+.IV__chatMsgText {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    font-family: inherit;
+}
+
+pre.IV__chatMsgText {
+    font-family: 'Menlo', 'Monaco', monospace;
+    font-size: 12px;
+}
+
+.IV__chatMsgText--dim {
+    opacity: 0.7;
+}
+
+.IV__chatToolUse {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: #6b7280;
+    border-left: 2px solid #d1d5db;
+}
+
+.IV__chatToolName {
+    font-family: 'Menlo', 'Monaco', monospace;
+    font-weight: 600;
+    font-size: 11px;
+    color: #4b5563;
+}
+
+.IV__chatToolSummary {
+    font-family: 'Menlo', 'Monaco', monospace;
+    font-size: 11px;
+    opacity: 0.7;
+    white-space: nowrap;
     overflow: hidden;
-    position: relative;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    text-overflow: ellipsis;
+}
 
-    .xterm {
-        position: absolute;
-        inset: 0;
-        padding: 8px;
+.IV__chatStatus {
+    text-align: center;
+    font-size: 12px;
+    color: #9ca3af;
+    padding: 4px 0;
+}
+
+.IV__chatInputArea {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid rgba(var(--center-channel-color-rgb), 0.1);
+    background: var(--center-channel-bg);
+}
+
+.IV__chatInput {
+    flex: 1;
+    resize: none;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    line-height: 1.4;
+    outline: none;
+
+    &:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
     }
+}
 
-    .xterm-viewport { overflow-y: auto; }
+.IV__chatSendBtn {
+    flex-shrink: 0;
+    height: 36px;
 }
 
 // ── Git actions panel (right, agents tab only) ───────────────────────────
