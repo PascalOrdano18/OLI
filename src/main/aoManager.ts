@@ -119,7 +119,6 @@ export class AoManager {
             '--output-format', 'stream-json',
             '--verbose',
             '--dangerously-skip-permissions',
-            '--bare',
         ];
 
         if (resumeSessionId) {
