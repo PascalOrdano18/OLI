@@ -22,184 +22,100 @@ type OrganizationListProps = {
     onConnect: (data: UniqueServer) => void;
 };
 
-function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps) {
-    const [orgs, setOrgs] = useState<Organization[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+type Step = 'org' | 'username' | 'settingUp';
 
-    // Create form state
+const HARDCODED_PASSWORD = 'OliUser123!';
+
+function sanitizeTeamName(orgName: string): string {
+    return orgName
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 59) + '-team';
+}
+
+function validateUsername(value: string): string[] {
+    const errors: string[] = [];
+    if (value.length < 3) {
+        errors.push('Username must be at least 3 characters');
+    }
+    if (value.length > 22) {
+        errors.push('Username must be at most 22 characters');
+    }
+    if (value.length > 0 && !/^[a-z0-9._-]+$/.test(value)) {
+        errors.push('Only lowercase letters, numbers, dots, dashes, and underscores allowed');
+    }
+    return errors;
+}
+
+function StepIndicator({step}: {step: Step}) {
+    return (
+        <div className='OrganizationList__step-indicator'>
+            <div className={`OrganizationList__step-indicator-dot ${step === 'org' ? 'OrganizationList__step-indicator-dot--active' : 'OrganizationList__step-indicator-dot--done'}`}/>
+            <div className={`OrganizationList__step-indicator-dot ${step === 'username' ? 'OrganizationList__step-indicator-dot--active' : ''}`}/>
+        </div>
+    );
+}
+
+function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps) {
+    const [step, setStep] = useState<Step>('org');
+
+    // Org step state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResult, setSearchResult] = useState<Organization | null>(null);
+    const [searchDone, setSearchDone] = useState(false);
+    const [searching, setSearching] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
     const [newName, setNewName] = useState('');
-    const [newPassword, setNewPassword] = useState('');
     const [creating, setCreating] = useState(false);
-
-    // Password prompt state for private orgs
-    const [passwordOrg, setPasswordOrg] = useState<Organization | null>(null);
-    const [password, setPassword] = useState('');
-    const [passwordError, setPasswordError] = useState('');
-
-    // Provisioning poll state
     const [provisioningOrgId, setProvisioningOrgId] = useState<string | null>(null);
+    const [error, setError] = useState('');
 
-    const fetchOrgs = useCallback(async () => {
-        const url = `${provisioningApiUrl}/organizations`;
-        console.log(`[ProvisioningAPI] GET ${url}`);
+    // Resolved org (ready to use)
+    const [resolvedOrg, setResolvedOrg] = useState<Organization | null>(null);
+
+    // Username step state
+    const [username, setUsername] = useState('');
+    const [usernameErrors, setUsernameErrors] = useState<string[]>([]);
+    const [setupError, setSetupError] = useState('');
+
+    const handleSearch = useCallback(async () => {
+        if (!searchQuery.trim()) {
+            return;
+        }
+
+        setSearching(true);
+        setSearchResult(null);
+        setSearchDone(false);
+        setError('');
 
         try {
-            const res = await fetch(url);
-            const bodyText = await res.text();
-
+            const res = await fetch(`${provisioningApiUrl}/organizations`);
             if (!res.ok) {
-                console.error(
-                    `[ProvisioningAPI] GET /organizations HTTP error ${JSON.stringify({
-                        url,
-                        status: res.status,
-                        statusText: res.statusText,
-                        bodyPreview: bodyText.slice(0, 800),
-                    })}`,
-                );
                 throw new Error(`HTTP ${res.status} ${res.statusText}`);
             }
 
-            let data: Organization[];
-            try {
-                data = JSON.parse(bodyText) as Organization[];
-            } catch (parseErr) {
-                console.error(
-                    `[ProvisioningAPI] GET /organizations not JSON ${JSON.stringify({
-                        url,
-                        parseError: parseErr instanceof Error ? parseErr.message : String(parseErr),
-                        bodyPreview: bodyText.slice(0, 600),
-                    })}`,
-                );
-                throw parseErr;
-            }
+            const orgs: Organization[] = await res.json();
+            const match = orgs.find((org) => org.name.toLowerCase() === searchQuery.trim().toLowerCase());
 
-            setOrgs(data);
-            setError('');
-            console.log(`[ProvisioningAPI] GET /organizations ok count=${Array.isArray(data) ? data.length : 'n/a'}`);
-        } catch (err) {
-            console.error(
-                `[ProvisioningAPI] GET /organizations failed ${JSON.stringify({
-                    url,
-                    provisioningApiUrl,
-                    error: err instanceof Error ? err.message : String(err),
-                    errorName: err instanceof Error ? err.name : undefined,
-                })}`,
-            );
-            if (err instanceof Error && err.stack) {
-                console.error(`[ProvisioningAPI] stack ${err.stack}`);
+            if (match) {
+                setSearchResult(match);
             }
+            setSearchDone(true);
+        } catch {
             setError('Could not connect to provisioning API');
         } finally {
-            setLoading(false);
+            setSearching(false);
         }
-    }, [provisioningApiUrl]);
-
-    useEffect(() => {
-        fetchOrgs();
-    }, [fetchOrgs]);
-
-    // Poll for provisioning status
-    useEffect(() => {
-        if (!provisioningOrgId) {
-            return;
-        }
-
-        const pollUrl = `${provisioningApiUrl}/organizations/${provisioningOrgId}`;
-        console.log(`[Provisioning] started polling ${pollUrl}`);
-
-        let intervalId: ReturnType<typeof setInterval>;
-
-        const pollOnce = async () => {
-            try {
-                const res = await fetch(pollUrl);
-                const bodyText = await res.text();
-                if (!res.ok) {
-                    console.error(`[Provisioning] poll HTTP ${res.status} ${res.statusText} body=${bodyText.slice(0, 600)}`);
-                    return;
-                }
-
-                let org: Organization;
-                try {
-                    org = JSON.parse(bodyText) as Organization;
-                } catch (parseErr) {
-                    console.error(`[Provisioning] poll response not JSON: ${parseErr instanceof Error ? parseErr.message : String(parseErr)} body=${bodyText.slice(0, 400)}`);
-                    return;
-                }
-
-                console.log(`[Provisioning] poll result ${JSON.stringify({
-                    id: org.id,
-                    name: org.name,
-                    status: org.status,
-                    server_url: org.server_url,
-                    is_private: org.is_private,
-                    provision_error: org.provision_error,
-                })}`);
-
-                if (org.status === 'ready' && org.server_url) {
-                    clearInterval(intervalId);
-                    setProvisioningOrgId(null);
-                    console.log(`[Provisioning] ready, connecting to ${org.server_url}`);
-                    onConnect({url: org.server_url, name: org.name});
-                } else if (org.status === 'failed') {
-                    clearInterval(intervalId);
-                    setProvisioningOrgId(null);
-                    const reason = org.provision_error?.trim();
-                    console.error(`[Provisioning] FAILED reason=${reason || '(none)'} fullOrg=${bodyText}`);
-                    setError(
-                        reason
-                            ? `Provisioning failed: ${reason.slice(0, 400)}${reason.length > 400 ? '…' : ''}`
-                            : 'Provisioning failed. Please try again.',
-                    );
-                }
-            } catch (err) {
-                console.error(`[Provisioning] poll threw (will retry): ${err instanceof Error ? err.message : String(err)}`);
-            }
-        };
-
-        intervalId = setInterval(pollOnce, 5000);
-        void pollOnce();
-
-        return () => clearInterval(intervalId);
-    }, [provisioningOrgId, provisioningApiUrl, onConnect]);
+    }, [provisioningApiUrl, searchQuery]);
 
     const handleOrgClick = (org: Organization) => {
-        if (org.status !== 'ready' || !org.server_url) {
-            return;
-        }
-
-        if (org.is_private) {
-            setPasswordOrg(org);
-            setPassword('');
-            setPasswordError('');
-            return;
-        }
-
-        onConnect({url: org.server_url, name: org.name});
-    };
-
-    const handleJoin = async () => {
-        if (!passwordOrg) {
-            return;
-        }
-
-        try {
-            const res = await fetch(`${provisioningApiUrl}/organizations/${passwordOrg.id}/join`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({password}),
-            });
-
-            if (!res.ok) {
-                setPasswordError('Incorrect password');
-                return;
-            }
-
-            const org = await res.json();
-            onConnect({url: org.server_url, name: org.name});
-        } catch {
-            setPasswordError('Connection error');
+        if (org.status === 'ready' && org.server_url) {
+            setResolvedOrg(org);
+            setStep('username');
+        } else if (org.status !== 'failed') {
+            setProvisioningOrgId(org.id);
         }
     };
 
@@ -209,6 +125,8 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
         }
 
         setCreating(true);
+        setError('');
+
         try {
             const res = await fetch(`${provisioningApiUrl}/organizations`, {
                 method: 'POST',
@@ -216,7 +134,6 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
                 body: JSON.stringify({
                     name: newName.trim(),
                     created_by: 'desktop-user',
-                    password: newPassword || undefined,
                 }),
             });
 
@@ -227,9 +144,7 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
             const org = await res.json();
             setShowCreate(false);
             setNewName('');
-            setNewPassword('');
             setProvisioningOrgId(org.id);
-            fetchOrgs();
         } catch {
             setError('Failed to create organization');
         } finally {
@@ -237,115 +152,307 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
         }
     };
 
+    // Poll for provisioning status
+    useEffect(() => {
+        if (!provisioningOrgId) {
+            return;
+        }
+
+        const pollUrl = `${provisioningApiUrl}/organizations/${provisioningOrgId}`;
+        let intervalId: ReturnType<typeof setInterval>;
+
+        const pollOnce = async () => {
+            try {
+                const res = await fetch(pollUrl);
+                if (!res.ok) {
+                    return;
+                }
+
+                const org: Organization = await res.json();
+
+                if (org.status === 'ready' && org.server_url) {
+                    clearInterval(intervalId);
+                    setProvisioningOrgId(null);
+                    setResolvedOrg(org);
+                    setStep('username');
+                } else if (org.status === 'failed') {
+                    clearInterval(intervalId);
+                    setProvisioningOrgId(null);
+                    const reason = org.provision_error?.trim();
+                    setError(
+                        reason
+                            ? `Provisioning failed: ${reason.slice(0, 400)}${reason.length > 400 ? '…' : ''}`
+                            : 'Provisioning failed. Please try again.',
+                    );
+                }
+            } catch {
+                // will retry on next interval
+            }
+        };
+
+        intervalId = setInterval(pollOnce, 5000);
+        void pollOnce();
+
+        return () => clearInterval(intervalId);
+    }, [provisioningOrgId, provisioningApiUrl]);
+
+    const handleUsernameChange = (value: string) => {
+        const lowered = value.toLowerCase();
+        setUsername(lowered);
+        if (lowered.length > 0) {
+            setUsernameErrors(validateUsername(lowered));
+        } else {
+            setUsernameErrors([]);
+        }
+        setSetupError('');
+    };
+
+    const isUsernameValid = username.length >= 3 && username.length <= 22 && /^[a-z0-9._-]+$/.test(username);
+
+    const handleContinue = async () => {
+        if (!resolvedOrg?.server_url || !isUsernameValid) {
+            return;
+        }
+
+        setStep('settingUp');
+        setSetupError('');
+
+        const serverUrl = resolvedOrg.server_url.replace(/\/+$/, '');
+        const email = `${username}@oli.local`;
+
+        // Use IPC proxy to avoid CORS issues with Mattermost API
+        const proxyFetch = async (url: string, options: {method?: string; headers?: Record<string, string>; body?: string}) => {
+            return window.desktop.proxyFetch(url, options) as Promise<{ok: boolean; status: number; headers: Record<string, string>; body: string}>;
+        };
+
+        try {
+            // 1. Create user
+            const createUserRes = await proxyFetch(`${serverUrl}/api/v4/users`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username,
+                    email,
+                    password: HARDCODED_PASSWORD,
+                }),
+            });
+
+            if (!createUserRes.ok) {
+                if (createUserRes.status === 409) {
+                    // Username taken — that's fine, try to log in
+                } else {
+                    let message = 'Failed to create user';
+                    try {
+                        const err = JSON.parse(createUserRes.body);
+                        if (err.message) {
+                            message = err.message;
+                        }
+                    } catch {
+                        // use default message
+                    }
+                    throw new Error(message);
+                }
+            }
+
+            // 2. Login
+            const loginRes = await proxyFetch(`${serverUrl}/api/v4/users/login`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    login_id: email,
+                    password: HARDCODED_PASSWORD,
+                }),
+            });
+
+            if (!loginRes.ok) {
+                throw new Error('Failed to log in. Username may already be taken by another account.');
+            }
+
+            const token = loginRes.headers.token || loginRes.headers.Token;
+            let user: {id: string};
+            try {
+                user = JSON.parse(loginRes.body);
+            } catch {
+                throw new Error('Invalid login response');
+            }
+
+            if (!token) {
+                throw new Error('Login succeeded but no auth token received');
+            }
+
+            // 3. Create team (or get existing)
+            const teamName = sanitizeTeamName(resolvedOrg.name);
+            let teamId: string;
+
+            const createTeamRes = await proxyFetch(`${serverUrl}/api/v4/teams`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    name: teamName,
+                    display_name: resolvedOrg.name,
+                    type: 'O',
+                }),
+            });
+
+            if (createTeamRes.ok) {
+                const team = JSON.parse(createTeamRes.body);
+                teamId = team.id;
+            } else if (createTeamRes.status === 409) {
+                // Team exists, get it
+                const getTeamRes = await proxyFetch(`${serverUrl}/api/v4/teams/name/${teamName}`, {
+                    headers: {'Authorization': `Bearer ${token}`},
+                });
+                if (!getTeamRes.ok) {
+                    throw new Error('Failed to find existing team');
+                }
+                const team = JSON.parse(getTeamRes.body);
+                teamId = team.id;
+            } else {
+                throw new Error('Failed to create team');
+            }
+
+            // 4. Join team
+            await proxyFetch(`${serverUrl}/api/v4/teams/${teamId}/members`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    team_id: teamId,
+                    user_id: user.id,
+                }),
+            });
+
+            // 5. Set auth cookie so the Mattermost web app loads already logged in
+            await window.desktop.setServerAuthCookie(serverUrl, token, user.id);
+
+            // 6. Done
+            onConnect({url: serverUrl, name: resolvedOrg.name});
+        } catch (err) {
+            setSetupError(err instanceof Error ? err.message : 'Something went wrong');
+            setStep('username');
+        }
+    };
+
+    // Provisioning spinner
     if (provisioningOrgId) {
         return (
             <div className='OrganizationList'>
                 <div className='OrganizationList__provisioning-status'>
-                    <h1 className='OrganizationList__title'>Setting up your organization...</h1>
-                    <p>{'This may take a couple of minutes. Provisioning server and database...'}</p>
+                    <div className='OrganizationList__spinner'/>
+                    <h1 className='OrganizationList__title'>{'Setting up your organization...'}</h1>
+                    <p className='OrganizationList__subtitle'>{'This may take a couple of minutes.'}</p>
                 </div>
             </div>
         );
     }
 
-    if (passwordOrg) {
+    // Setting up account spinner
+    if (step === 'settingUp') {
         return (
             <div className='OrganizationList'>
-                <h1 className='OrganizationList__title'>{`Join ${passwordOrg.name}`}</h1>
-                <p className='OrganizationList__subtitle'>{'This organization requires a password'}</p>
-                <div className='OrganizationList__password-prompt'>
-                    <input
-                        className='OrganizationList__password-input'
-                        type='password'
-                        placeholder='Enter password'
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-                        autoFocus={true}
-                    />
-                    {passwordError && <span className='OrganizationList__password-error'>{passwordError}</span>}
-                    <div className='OrganizationList__password-buttons'>
-                        <button
-                            className='secondary-button secondary-medium-button'
-                            onClick={() => setPasswordOrg(null)}
-                        >
-                            {'Back'}
-                        </button>
-                        <button
-                            className='primary-button primary-medium-button'
-                            onClick={handleJoin}
-                        >
-                            {'Join'}
-                        </button>
-                    </div>
+                <div className='OrganizationList__provisioning-status'>
+                    <div className='OrganizationList__spinner'/>
+                    <h1 className='OrganizationList__title'>{'Setting up your account...'}</h1>
+                    <p className='OrganizationList__subtitle'>{'Almost there, hang tight.'}</p>
                 </div>
             </div>
         );
     }
 
+    // Page 2: Username
+    if (step === 'username') {
+        return (
+            <div className='OrganizationList'>
+                <div className='OrganizationList__logo'>
+                    <span className='OrganizationList__logo-text'>{'O'}</span>
+                </div>
+                <StepIndicator step='username'/>
+                <h1 className='OrganizationList__title'>{'Choose your username'}</h1>
+                <p className='OrganizationList__subtitle'>
+                    {'This is how others will see you in '}
+                    <span className='OrganizationList__org-highlight'>{resolvedOrg?.name}</span>
+                </p>
+
+                {setupError && <span className='OrganizationList__error'>{setupError}</span>}
+
+                <div className='OrganizationList__card'>
+                    <input
+                        className={`OrganizationList__input ${usernameErrors.length > 0 ? 'OrganizationList__input--error' : ''}`}
+                        type='text'
+                        placeholder='Enter username'
+                        value={username}
+                        onChange={(e) => handleUsernameChange(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && isUsernameValid && handleContinue()}
+                        autoFocus={true}
+                    />
+
+                    {usernameErrors.length > 0 ? (
+                        <div className='OrganizationList__validation-errors'>
+                            {usernameErrors.map((err) => (
+                                <p
+                                    key={err}
+                                    className='OrganizationList__validation-error'
+                                >{err}</p>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className='OrganizationList__hint'>
+                            {'3-22 characters. Lowercase letters, numbers, dots, dashes, underscores.'}
+                        </p>
+                    )}
+
+                    <button
+                        className='OrganizationList__continue-button'
+                        onClick={handleContinue}
+                        disabled={!isUsernameValid}
+                    >
+                        {'Continue'}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // Page 1: Organization
     return (
         <div className='OrganizationList'>
-            <h1 className='OrganizationList__title'>{'Choose an Organization'}</h1>
-            <p className='OrganizationList__subtitle'>{'Join an existing organization or create a new one'}</p>
+            <div className='OrganizationList__logo'>
+                <span className='OrganizationList__logo-text'>{'O'}</span>
+            </div>
+            <StepIndicator step='org'/>
+            <h1 className='OrganizationList__title'>{'Welcome to OLI'}</h1>
+            <p className='OrganizationList__subtitle'>{'Find your organization or create a new one'}</p>
 
             {error && <span className='OrganizationList__error'>{error}</span>}
 
-            {loading ? (
-                <span className='OrganizationList__loading'>{'Loading organizations...'}</span>
-            ) : (
-                <div className='OrganizationList__list'>
-                    {orgs.length === 0 && (
-                        <div className='OrganizationList__empty'>
-                            {'No organizations yet. Create one to get started.'}
-                        </div>
-                    )}
-                    {orgs.map((org) => (
-                        <div
-                            key={org.id}
-                            className={`OrganizationList__item ${org.is_private ? 'OrganizationList__item--private' : ''} ${org.status !== 'ready' ? 'OrganizationList__item--provisioning' : ''}`}
-                            onClick={() => handleOrgClick(org)}
-                        >
-                            <span className='OrganizationList__item-name'>
-                                {org.is_private ? '\uD83D\uDD12 ' : ''}{org.name}
-                            </span>
-                            {org.status !== 'ready' && (
-                                <span className='OrganizationList__item-badge'>{org.status}</span>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
-
             {showCreate ? (
-                <div className='OrganizationList__create'>
+                <div className='OrganizationList__card'>
                     <input
-                        className='OrganizationList__create-input'
+                        className='OrganizationList__input'
                         type='text'
                         placeholder='Organization name'
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && newName.trim() && handleCreate()}
                         autoFocus={true}
                     />
-                    <input
-                        className='OrganizationList__create-input'
-                        type='password'
-                        placeholder='Password (optional, for private orgs)'
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                    />
-                    <div className='OrganizationList__create-buttons'>
+                    <div className='OrganizationList__button-row'>
                         <button
-                            className='secondary-button secondary-medium-button'
+                            className='OrganizationList__cancel-button'
                             onClick={() => {
                                 setShowCreate(false);
                                 setNewName('');
-                                setNewPassword('');
                             }}
                         >
                             {'Cancel'}
                         </button>
                         <button
-                            className='primary-button primary-medium-button'
+                            className='OrganizationList__create-button'
                             onClick={handleCreate}
                             disabled={creating || !newName.trim()}
                         >
@@ -354,12 +461,64 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
                     </div>
                 </div>
             ) : (
-                <button
-                    className='primary-button primary-medium-button'
-                    onClick={() => setShowCreate(true)}
-                >
-                    {'Create Organization'}
-                </button>
+                <div className='OrganizationList__card'>
+                    <div className='OrganizationList__search-row'>
+                        <input
+                            className='OrganizationList__input'
+                            type='text'
+                            placeholder='Search organization by name...'
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setSearchResult(null);
+                                setSearchDone(false);
+                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            autoFocus={true}
+                        />
+                        <button
+                            className='OrganizationList__search-button'
+                            onClick={handleSearch}
+                            disabled={searching || !searchQuery.trim()}
+                        >
+                            {searching ? 'Searching...' : 'Search'}
+                        </button>
+                    </div>
+
+                    {searchResult && (
+                        <div
+                            className='OrganizationList__result'
+                            onClick={() => handleOrgClick(searchResult)}
+                        >
+                            <span className='OrganizationList__result-name'>{searchResult.name}</span>
+                            {searchResult.status === 'ready' ? (
+                                <span className='OrganizationList__result-badge OrganizationList__result-badge--ready'>{'ready'}</span>
+                            ) : (
+                                <span className='OrganizationList__result-badge'>{searchResult.status}</span>
+                            )}
+                        </div>
+                    )}
+
+                    {searchDone && !searchResult && (
+                        <p className='OrganizationList__no-result'>{'No organization found with that name'}</p>
+                    )}
+
+                    {!searchDone && !searching && (
+                        <p className='OrganizationList__hint'>{'Enter the exact organization name to find it'}</p>
+                    )}
+
+                    <div className='OrganizationList__divider'/>
+
+                    <div className='OrganizationList__create-section'>
+                        <p className='OrganizationList__hint'>{"Don't have an organization?"}</p>
+                        <button
+                            className='OrganizationList__create-button'
+                            onClick={() => setShowCreate(true)}
+                        >
+                            {'Create Organization'}
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );
