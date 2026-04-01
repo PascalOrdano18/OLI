@@ -12,6 +12,10 @@ import (
 
 func (p *Plugin) handleListCycles(w http.ResponseWriter, r *http.Request) {
 	projectID := mux.Vars(r)["id"]
+	if _, err := p.getProjectForRequest(r, projectID); err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
 	cycles, err := p.store.ListCycles(projectID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
@@ -22,6 +26,10 @@ func (p *Plugin) handleListCycles(w http.ResponseWriter, r *http.Request) {
 
 func (p *Plugin) handleCreateCycle(w http.ResponseWriter, r *http.Request) {
 	projectID := mux.Vars(r)["id"]
+	if _, err := p.getProjectForRequest(r, projectID); err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
 
 	var req CreateCycleRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -29,15 +37,7 @@ func (p *Plugin) handleCreateCycle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cycle := &Cycle{
-		ID:        uuid.New().String(),
-		ProjectID: projectID,
-		Name:      req.Name,
-		StartDate: req.StartDate,
-		EndDate:   req.EndDate,
-		IsActive:  false,
-	}
-
+	cycle := &Cycle{ID: uuid.New().String(), ProjectID: projectID, Name: req.Name, StartDate: req.StartDate, EndDate: req.EndDate, IsActive: false}
 	if err := cycle.IsValid(); err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
@@ -55,7 +55,7 @@ func (p *Plugin) handleCreateCycle(w http.ResponseWriter, r *http.Request) {
 func (p *Plugin) handleUpdateCycle(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	cycle, err := p.store.GetCycle(id)
+	cycle, err := p.getCycleForRequest(r, id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
@@ -96,8 +96,7 @@ func (p *Plugin) handleUpdateCycle(w http.ResponseWriter, r *http.Request) {
 
 func (p *Plugin) handleDeleteCycle(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-
-	if _, err := p.store.GetCycle(id); err != nil {
+	if _, err := p.getCycleForRequest(r, id); err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
 	}

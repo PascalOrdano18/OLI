@@ -66,6 +66,7 @@ type Project struct {
 	ID              string `json:"id"`
 	Name            string `json:"name"`
 	Prefix          string `json:"prefix"`
+	Scope           string `json:"scope,omitempty"`
 	NextIssueNumber int    `json:"next_issue_number"`
 	CreatedBy       string `json:"created_by"`
 	CreatedAt       int64  `json:"created_at"`

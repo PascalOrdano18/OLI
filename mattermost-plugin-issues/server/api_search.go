@@ -17,6 +17,10 @@ func (p *Plugin) handleGetIssueByIdentifier(w http.ResponseWriter, r *http.Reque
 		respondError(w, http.StatusNotFound, err.Error())
 		return
 	}
+	if _, err := p.getProjectForRequest(r, issue.ProjectID); err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
 	respondJSON(w, http.StatusOK, issue)
 }
 
@@ -38,5 +42,12 @@ func (p *Plugin) handleSearchAllIssues(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	respondJSON(w, http.StatusOK, issues)
+
+	filtered := make([]*Issue, 0, len(issues))
+	for _, issue := range issues {
+		if _, err := p.getProjectForRequest(r, issue.ProjectID); err == nil {
+			filtered = append(filtered, issue)
+		}
+	}
+	respondJSON(w, http.StatusOK, filtered)
 }
