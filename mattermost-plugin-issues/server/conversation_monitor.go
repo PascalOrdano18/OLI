@@ -13,7 +13,7 @@ import (
 	"github.com/mattermost/mattermost/server/public/plugin"
 )
 
-const conversationTimeout = 2 * time.Minute
+const conversationTimeout = 30 * time.Second
 
 // conversationMessage is a single message captured during a conversation.
 type conversationMessage struct {

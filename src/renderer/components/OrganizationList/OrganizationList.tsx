@@ -300,8 +300,8 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
             if (createTeamRes.ok) {
                 const team = JSON.parse(createTeamRes.body);
                 teamId = team.id;
-            } else if (createTeamRes.status === 409) {
-                // Team exists, get it
+            } else {
+                // Team may already exist (409) or user lacks permission to create (403) — try to join existing
                 const getTeamRes = await proxyFetch(`${serverUrl}/api/v4/teams/name/${teamName}`, {
                     headers: {'Authorization': `Bearer ${token}`},
                 });
@@ -310,8 +310,6 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
                 }
                 const team = JSON.parse(getTeamRes.body);
                 teamId = team.id;
-            } else {
-                throw new Error('Failed to create team');
             }
 
             // 4. Join team
