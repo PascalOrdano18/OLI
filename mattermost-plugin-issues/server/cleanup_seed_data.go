@@ -98,7 +98,7 @@ func isLegacySeedProject(project *Project) bool {
 		return false
 	}
 
-	return project.Prefix == prefix && project.CreatedBy == "system"
+	return project.Prefix == prefix
 }
 
 func (p *Plugin) clearLegacySeedCompanyInfo() error {
