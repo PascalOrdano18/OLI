@@ -5,10 +5,8 @@ import type {MenuItemConstructorOptions, BaseWindow, MenuItem} from 'electron';
 import {app, BrowserWindow} from 'electron';
 
 import MainWindow from 'app/mainWindow/mainWindow';
-import ServerHub from 'app/serverHub';
 import TabManager from 'app/tabs/tabManager';
 import PopoutManager from 'app/windows/popoutManager';
-import Config from 'common/config';
 import ServerManager from 'common/servers/serverManager';
 import {ViewType} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
@@ -143,15 +141,6 @@ function getSettingsAndSignInToAnotherServerMenu(): MenuItemConstructorOptions[]
             handleShowSettingsModal();
         },
     }];
-
-    if (Config.enableServerManagement === true && ServerManager.hasServers()) {
-        platformAppMenu.push({
-            label: localizeMessage('main.menus.app.file.signInToAnotherServer', 'Sign in to Another Server'),
-            click() {
-                ServerHub.showNewServerModal();
-            },
-        });
-    }
 
     return platformAppMenu;
 }
