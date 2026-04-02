@@ -510,8 +510,8 @@ class MainPage extends React.PureComponent<Props, State> {
                 errorState={errorState}
                 errorMessage={tabStatus?.extra?.error}
                 errorUrl={tabStatus?.extra?.url}
-                activeMode={this.state.activeMode}
-                onModeChange={this.handleModeChange}
+                activeMode={activeServer ? this.state.activeMode : undefined}
+                onModeChange={activeServer ? this.handleModeChange : undefined}
                 issuesContent={<IssuesView/>}
             >
                 {activeServer && (
