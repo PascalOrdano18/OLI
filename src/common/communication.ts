@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 export const GET_APP_INFO = 'get-app-info';
@@ -101,6 +101,8 @@ export const SET_VIEW_MODE = 'set-view-mode';
 export const GET_AUTH_TOKEN = 'get-auth-token';
 export const ISSUES_API_REQUEST = 'issues-api-request';
 export const NAVIGATE_TO_ISSUE = 'navigate-to-issue';
+export const PROXY_FETCH = 'proxy-fetch';
+export const SET_SERVER_AUTH_COOKIE = 'set-server-auth-cookie';
 
 export const UPDATE_PATHS = 'update-paths';
 

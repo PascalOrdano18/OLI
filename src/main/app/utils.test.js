@@ -1,10 +1,10 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {screen} from 'electron';
 
 import MainWindow from 'app/mainWindow/mainWindow';
-import {MattermostServer} from 'common/servers/MattermostServer';
+import {OLIServer} from 'common/servers/OLIServer';
 import ServerManager from 'common/servers/serverManager';
 import {ServerInfo} from 'main/server/serverInfo';
 
@@ -73,8 +73,8 @@ jest.mock('./initialize', () => ({
     mainProtocol: 'mattermost',
 }));
 
-jest.mock('common/servers/MattermostServer', () => ({
-    MattermostServer: jest.fn().mockImplementation((config) => ({
+jest.mock('common/servers/OLIServer', () => ({
+    OLIServer: jest.fn().mockImplementation((config) => ({
         id: config.id || 'server-1',
         name: config.name || 'Test Server',
         url: config.url || 'http://localhost:8065',
@@ -217,7 +217,7 @@ describe('main/app/utils', () => {
         });
 
         it('should catch error when ServerInfo.fetchRemoteInfo throws', async () => {
-            const mockServer = new MattermostServer({id: 'server-1', name: 'Test Server', url: 'http://localhost:8065'});
+            const mockServer = new OLIServer({id: 'server-1', name: 'Test Server', url: 'http://localhost:8065'});
             const mockError = new Error('Network error');
             const mockServerInfoInstance = {
                 fetchRemoteInfo: jest.fn().mockRejectedValue(mockError),

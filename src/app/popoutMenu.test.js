@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 'use strict';
@@ -6,7 +6,7 @@
 import {clipboard, Menu} from 'electron';
 
 import WebContentsManager from 'app/views/webContentsManager';
-import {ViewType} from 'common/views/MattermostView';
+import {ViewType} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
 import {localizeMessage} from 'main/i18nManager';
 
@@ -26,7 +26,7 @@ jest.mock('app/views/webContentsManager', () => ({
     getView: jest.fn(),
 }));
 
-jest.mock('common/views/MattermostView', () => ({
+jest.mock('common/views/OLIView', () => ({
     ViewType: {
         TAB: 'TAB',
         WINDOW: 'WINDOW',

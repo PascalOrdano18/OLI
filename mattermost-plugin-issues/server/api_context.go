@@ -31,25 +31,20 @@ type IssueContext struct {
 	CycleName    string        `json:"cycle_name,omitempty"`
 }
 
-// GET /api/v1/context/general
-func (p *Plugin) handleGetGeneralContext(w http.ResponseWriter, _ *http.Request) {
+func (p *Plugin) handleGetGeneralContext(w http.ResponseWriter, r *http.Request) {
 	companyInfo, err := p.store.GetCompanyInfo()
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	projects, err := p.store.ListProjects()
+	projects, err := p.listProjectsForRequest(r)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	result := GeneralContext{
-		Company:  companyInfo,
-		Projects: make([]ProjectContext, 0, len(projects)),
-	}
-
+	result := GeneralContext{Company: companyInfo, Projects: make([]ProjectContext, 0, len(projects))}
 	totalIssues := 0
 	openIssues := 0
 
@@ -77,15 +72,9 @@ func (p *Plugin) handleGetGeneralContext(w http.ResponseWriter, _ *http.Request)
 			}
 		}
 
-		result.Projects = append(result.Projects, ProjectContext{
-			Project: project,
-			Issues:  issues,
-			Labels:  labels,
-			Cycles:  cycles,
-		})
+		result.Projects = append(result.Projects, ProjectContext{Project: project, Issues: issues, Labels: labels, Cycles: cycles})
 	}
 
-	// Fill in live stats if company info exists.
 	if result.Company != nil {
 		result.Company.State.ActiveProjects = len(projects)
 		result.Company.State.TotalIssues = totalIssues
@@ -95,11 +84,10 @@ func (p *Plugin) handleGetGeneralContext(w http.ResponseWriter, _ *http.Request)
 	respondJSON(w, http.StatusOK, result)
 }
 
-// GET /api/v1/projects/{id}/context
 func (p *Plugin) handleGetProjectContext(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	project, err := p.store.GetProject(id)
+	project, err := p.getProjectForRequest(r, id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
@@ -121,25 +109,18 @@ func (p *Plugin) handleGetProjectContext(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, ProjectContext{
-		Project: project,
-		Issues:  issues,
-		Labels:  labels,
-		Cycles:  cycles,
-	})
+	respondJSON(w, http.StatusOK, ProjectContext{Project: project, Issues: issues, Labels: labels, Cycles: cycles})
 }
 
-// GET /api/v1/issues/{id}/context
 func (p *Plugin) handleGetIssueContext(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	issue, err := p.store.GetIssue(id)
+	issue, err := p.getIssueForRequest(r, id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
-	// Resolve labels
 	labels := make([]*IssueLabel, 0, len(issue.LabelIDs))
 	for _, labelID := range issue.LabelIDs {
 		if label, err := p.store.GetLabel(labelID); err == nil {
@@ -147,7 +128,6 @@ func (p *Plugin) handleGetIssueContext(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Resolve assignee name
 	var assigneeName string
 	if issue.AssigneeID != "" {
 		if user, appErr := p.API.GetUser(issue.AssigneeID); appErr == nil {
@@ -155,7 +135,6 @@ func (p *Plugin) handleGetIssueContext(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Resolve cycle name
 	var cycleName string
 	if issue.CycleID != "" {
 		if cycle, err := p.store.GetCycle(issue.CycleID); err == nil {
@@ -163,10 +142,5 @@ func (p *Plugin) handleGetIssueContext(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respondJSON(w, http.StatusOK, IssueContext{
-		Issue:        issue,
-		Labels:       labels,
-		AssigneeName: assigneeName,
-		CycleName:    cycleName,
-	})
+	respondJSON(w, http.StatusOK, IssueContext{Issue: issue, Labels: labels, AssigneeName: assigneeName, CycleName: cycleName})
 }

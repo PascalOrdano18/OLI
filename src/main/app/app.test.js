@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {app, dialog} from 'electron';
@@ -177,7 +177,7 @@ describe('main/app/app', () => {
             expect(CertificateStore.save).toHaveBeenCalled();
         });
 
-        it('should load URL using MattermostWebContentsView when trusting certificate', async () => {
+        it('should load URL using OLIWebContentsView when trusting certificate', async () => {
             dialog.showMessageBox.mockResolvedValue({response: 0});
             await handleAppCertificateError(event, webContents, testURL, 'error-1', certificate, callback);
             expect(callback).toHaveBeenCalledWith(true);

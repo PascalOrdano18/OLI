@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 /* eslint-disable quote-props */
 
@@ -50,7 +50,7 @@ export const URLValidationStatus = {
     Invalid: 'INVALID',
     Insecure: 'INSECURE',
     URLExists: 'URL_EXISTS',
-    NotMattermost: 'NOT_MATTERMOST',
+    NotOLI: 'NOT_MATTERMOST',
     URLNotMatched: 'URL_NOT_MATCHED',
     URLUpdated: 'URL_UPDATED',
     PreAuthRequired: 'PREAUTH_REQUIRED',

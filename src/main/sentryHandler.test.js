@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as Sentry from '@sentry/electron/main';
@@ -17,7 +17,7 @@ jest.mock('@sentry/electron/main', () => ({
 
 jest.mock('electron', () => ({
     app: {
-        getName: jest.fn(() => 'Mattermost'),
+        getName: jest.fn(() => 'OLI'),
         getVersion: jest.fn(() => '6.0.0'),
     },
 }));
@@ -105,7 +105,7 @@ describe('main/sentryHandler', () => {
             expect(Sentry.setContext).toHaveBeenCalledWith(
                 'App-Build Information',
                 expect.objectContaining({
-                    appName: 'Mattermost',
+                    appName: 'OLI',
                     appVersion: '6.0.0',
                     electronVersion: '20.0.0',
                 }),

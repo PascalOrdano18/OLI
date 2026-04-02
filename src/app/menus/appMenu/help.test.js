@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {shell, clipboard} from 'electron';
@@ -206,24 +206,24 @@ describe('app/menus/appMenu/help', () => {
         it('should show academy link when available', () => {
             localizeMessage.mockImplementation((id) => {
                 if (id === 'main.menus.app.help.academy') {
-                    return 'Mattermost Academy';
+                    return 'OLI Academy';
                 }
                 return id;
             });
             const menu = createHelpMenu();
-            const academyItem = menu.submenu.find((item) => item.label === 'Mattermost Academy');
+            const academyItem = menu.submenu.find((item) => item.label === 'OLI Academy');
             expect(academyItem).not.toBe(undefined);
         });
 
         it('should call shell.openExternal with academy link when academy is clicked', () => {
             localizeMessage.mockImplementation((id) => {
                 if (id === 'main.menus.app.help.academy') {
-                    return 'Mattermost Academy';
+                    return 'OLI Academy';
                 }
                 return id;
             });
             const menu = createHelpMenu();
-            const academyItem = menu.submenu.find((item) => item.label === 'Mattermost Academy');
+            const academyItem = menu.submenu.find((item) => item.label === 'OLI Academy');
             academyItem.click();
             expect(shell.openExternal).toHaveBeenCalledWith('http://academy.site.com');
         });

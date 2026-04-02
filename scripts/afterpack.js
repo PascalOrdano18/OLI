@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 const {spawnSync} = require('child_process');
@@ -24,10 +24,10 @@ function fixSetuid(context) {
 function getAppFileName(context) {
     switch (context.electronPlatformName) {
     case 'win32':
-        return 'Mattermost.exe';
+        return 'OLI.exe';
     case 'darwin':
     case 'mas':
-        return 'Mattermost.app';
+        return 'OLI.app';
     case 'linux':
         return context.packager.executableName;
     default:

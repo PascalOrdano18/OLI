@@ -1,6 +1,6 @@
 # E2E Agent Guide
 
-This directory contains the Mattermost Desktop E2E test suite.
+This directory contains the OLI Desktop E2E test suite.
 
 Follow these instructions when writing, fixing, optimizing, or running tests in this folder.
 
@@ -22,7 +22,7 @@ The app has two distinct window types and they are accessed differently:
 
 **1. The main internal window** — the Electron `BrowserWindow` that hosts the app chrome (tab bar, server switcher, settings). Accessible as a Playwright `Page` via the `mainWindow` fixture or by finding the window whose URL contains `index`.
 
-**2. Server views** — each Mattermost server renders in its own `WebContentsView`, which is NOT a `BrowserWindow` and does NOT appear in `app.windows()`. They are discovered via main-process registries exposed on `global.__e2eTestRefs`.
+**2. Server views** — each OLI server renders in its own `WebContentsView`, which is NOT a `BrowserWindow` and does NOT appear in `app.windows()`. They are discovered via main-process registries exposed on `global.__e2eTestRefs`.
 
 ```typescript
 // ❌ WRONG — app.windows() only returns BrowserWindows, not WebContentsViews
@@ -140,7 +140,7 @@ Do not remove skips or platform guards unless the test can actually run in the c
 
 Examples:
 - Tests tagged for Windows or Linux are not truthfully verified on macOS.
-- Tests requiring a live Mattermost server should not be treated as fixed unless those env vars are set and the spec was rerun.
+- Tests requiring a live OLI server should not be treated as fixed unless those env vars are set and the spec was rerun.
 
 ## Test Design Rules
 
@@ -186,13 +186,13 @@ await electronApp.evaluate(() => {
 ```typescript
 // ❌ WRONG — logs in before every test in a 10-test suite (10× expensive)
 test.beforeEach(async ({serverMap}) => {
-    await loginToMattermost(serverMap['example'][0].win);
+    await loginToOLI(serverMap['example'][0].win);
 });
 
 // ✅ CORRECT — login once, reset cheap state between tests
 test.describe.configure({mode: 'serial'});
 test.beforeAll(async ({serverMap}) => {
-    await loginToMattermost(serverMap['example'][0].win);
+    await loginToOLI(serverMap['example'][0].win);
 });
 test.beforeEach(async () => {
     await resetState(); // cheap — just switches back to the right server/tab
@@ -234,9 +234,9 @@ Use it for:
 
 ```typescript
 import {test, expect} from '../../fixtures/index';
-import {demoMattermostConfig} from '../../helpers/config';
+import {demoOLIConfig} from '../../helpers/config';
 
-test.use({appConfig: demoMattermostConfig});
+test.use({appConfig: demoOLIConfig});
 
 test.describe('my suite', () => {
     test('loads the server', async ({mainWindow, serverMap}) => {

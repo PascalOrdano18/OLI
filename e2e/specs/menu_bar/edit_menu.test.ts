@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs/promises';
@@ -7,9 +7,9 @@ import * as path from 'path';
 
 import {test, expect} from '../../fixtures/index';
 import {waitForAppReady} from '../../helpers/appReadiness';
-import {appDir, demoMattermostConfig, electronBinaryPath, writeConfigFile} from '../../helpers/config';
+import {appDir, demoOLIConfig, electronBinaryPath, writeConfigFile} from '../../helpers/config';
 import {waitForWindow, closeElectronApp} from '../../helpers/electronApp';
-import {loginToMattermost} from '../../helpers/login';
+import {loginToOLI} from '../../helpers/login';
 import {buildServerMap} from '../../helpers/serverMap';
 import type {ServerView} from '../../helpers/serverView';
 
@@ -86,7 +86,7 @@ test.describe('edit_menu', () => {
 
     test.beforeAll(async () => {
         userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mm-edit-menu-e2e-'));
-        writeConfigFile(userDataDir, demoMattermostConfig);
+        writeConfigFile(userDataDir, demoOLIConfig);
 
         const {_electron: electron} = await import('playwright');
         electronApp = await electron.launch({
@@ -121,9 +121,9 @@ test.describe('edit_menu', () => {
         await waitForAppReady(electronApp);
         mainWindow = await waitForWindow(electronApp, 'index');
         const serverMap = await buildServerMap(electronApp);
-        firstServer = serverMap[demoMattermostConfig.servers[0].name][0].win;
-        firstServerId = serverMap[demoMattermostConfig.servers[0].name][0].webContentsId;
-        await loginToMattermost(firstServer);
+        firstServer = serverMap[demoOLIConfig.servers[0].name][0].win;
+        firstServerId = serverMap[demoOLIConfig.servers[0].name][0].webContentsId;
+        await loginToOLI(firstServer);
         await mainWindow.waitForSelector('.ServerDropdownButton', {timeout: 30_000});
     });
 
@@ -138,24 +138,24 @@ test.describe('edit_menu', () => {
     });
 
     test('MM-T807 Undo in the post textbox', {tag: ['@P2', '@all']}, async () => {
-        await typeInPostTextbox(firstServer, 'Mattermost');
+        await typeInPostTextbox(firstServer, 'OLI');
         await clickEditMenuItem('undo');
         const content = await firstServer.inputValue('#post_textbox');
         expect(content).toBe('Mattermos');
     });
 
     test('MM-T808 Redo in the post textbox', {tag: ['@P2', '@all']}, async () => {
-        await typeInPostTextbox(firstServer, 'Mattermost');
+        await typeInPostTextbox(firstServer, 'OLI');
         await clickEditMenuItem('undo');
         const textAfterUndo = await firstServer.inputValue('#post_textbox');
         expect(textAfterUndo).toBe('Mattermos');
         await clickEditMenuItem('redo');
         const content = await firstServer.inputValue('#post_textbox');
-        expect(content).toBe('Mattermost');
+        expect(content).toBe('OLI');
     });
 
     test('MM-T809 Cut in the post textbox', {tag: ['@P2', '@all']}, async () => {
-        await typeInPostTextbox(firstServer, 'Mattermost');
+        await typeInPostTextbox(firstServer, 'OLI');
         await clickEditMenuItem('selectAll');
         await clickEditMenuItem('cut');
         const content = await firstServer.inputValue('#post_textbox');
@@ -163,29 +163,29 @@ test.describe('edit_menu', () => {
     });
 
     test('MM-T810 Copy in the post textbox', {tag: ['@P2', '@all']}, async () => {
-        await typeInPostTextbox(firstServer, 'Mattermost');
+        await typeInPostTextbox(firstServer, 'OLI');
         await clickEditMenuItem('selectAll');
         await clickEditMenuItem('copy');
         await movePostTextboxCursorToEnd(firstServer);
         await clickEditMenuItem('paste');
         const content = await firstServer.inputValue('#post_textbox');
-        expect(content).toBe('MattermostMattermost');
+        expect(content).toBe('OLIOLI');
     });
 
     test('MM-T811 Paste in the post textbox', {tag: ['@P2', '@all']}, async () => {
-        await typeInPostTextbox(firstServer, 'Mattermost');
+        await typeInPostTextbox(firstServer, 'OLI');
         await clickEditMenuItem('selectAll');
         await clickEditMenuItem('copy');
         await clickEditMenuItem('selectAll');
         await clickEditMenuItem('paste');
         const content = await firstServer.inputValue('#post_textbox');
-        expect(content).toBe('Mattermost');
+        expect(content).toBe('OLI');
     });
 
     test('MM-T812 Select All in the post textbox', {tag: ['@P2', '@all']}, async () => {
-        await firstServer.fill('#post_textbox', 'Mattermost');
+        await firstServer.fill('#post_textbox', 'OLI');
         await clickEditMenuItem('selectAll');
         const channelHeaderText = await getSelectedText(firstServer);
-        expect(channelHeaderText).toBe('Mattermost');
+        expect(channelHeaderText).toBe('OLI');
     });
 });

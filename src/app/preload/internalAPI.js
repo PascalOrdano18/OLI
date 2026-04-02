@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 // Copyright (c) 2015-2016 Yuya Ochiai
 
@@ -131,6 +131,8 @@ import {
     SET_VIEW_MODE,
     GET_AUTH_TOKEN,
     ISSUES_API_REQUEST,
+    PROXY_FETCH,
+    SET_SERVER_AUTH_COOKIE,
     AO_PICK_REPO_PATH,
     AO_SPAWN_SESSION,
     AO_SEND_MESSAGE,
@@ -174,6 +176,8 @@ contextBridge.exposeInMainWorld('desktop', {
     },
     getAuthToken: () => ipcRenderer.invoke(GET_AUTH_TOKEN),
     issuesApiRequest: (method, path, body) => ipcRenderer.invoke(ISSUES_API_REQUEST, method, path, body),
+    proxyFetch: (url, options) => ipcRenderer.invoke(PROXY_FETCH, url, options),
+    setServerAuthCookie: (serverUrl, token, userId) => ipcRenderer.invoke(SET_SERVER_AUTH_COOKIE, serverUrl, token, userId),
     closeTab: (viewId) => ipcRenderer.send(CLOSE_TAB, viewId),
     exitFullScreen: () => ipcRenderer.send(EXIT_FULLSCREEN),
     doubleClickOnWindow: () => ipcRenderer.send(DOUBLE_CLICK_ON_WINDOW),

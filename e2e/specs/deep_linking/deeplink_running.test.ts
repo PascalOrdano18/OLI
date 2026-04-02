@@ -1,14 +1,14 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {execSync} from 'child_process';
 
 import {test, expect} from '../../fixtures/index';
-import {mattermostURL, demoMattermostConfig} from '../../helpers/config';
-import {loginToMattermost} from '../../helpers/login';
+import {mattermostURL, demoOLIConfig} from '../../helpers/config';
+import {loginToOLI} from '../../helpers/login';
 
-// Use a real Mattermost server config so serverMap.example points to localhost:8065
-test.use({appConfig: demoMattermostConfig});
+// Use a real OLI server config so serverMap.example points to localhost:8065
+test.use({appConfig: demoOLIConfig});
 
 test(
     'deep link navigates to correct server while app is running',
@@ -30,7 +30,7 @@ test(
             return;
         }
 
-        await loginToMattermost(serverWin);
+        await loginToOLI(serverWin);
         await serverWin.waitForSelector('#sidebarItem_town-square', {timeout: 30_000});
 
         // Trigger deep link from the OS

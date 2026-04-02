@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {readFile, writeFile, access, mkdir} from 'fs/promises';
@@ -175,7 +175,7 @@ export class SecureStorage {
             }
 
             // Use protocol + hostname + port + path for server identity
-            // This preserves subpaths to support multiple Mattermost instances on the same domain
+            // This preserves subpaths to support multiple OLI instances on the same domain
             // e.g., https://company.com/mattermost-dev vs https://company.com/mattermost-prod
             const normalizedPath = getFormattedPathName(parsed.pathname);
             return `${parsed.origin}${normalizedPath}`;

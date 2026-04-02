@@ -1,5 +1,5 @@
 name: Bug report
-description: Create a report about an issue you found in the Mattermost Desktop App
+description: Create a report about an issue you found in the OLI Desktop App
 title: "[Bug]: "
 labels: "Type/Bug"
 body:
@@ -7,15 +7,15 @@ body:
   attributes:
     value: |
       ## STOP! Before you file a bug report
-      Check that the issue is truly a Desktop App issue and not an issue with our Web App. The Desktop App makes use of the Mattermost Web App to render Mattermost. This repository is for issues with the Desktop App wrapper.
+      Check that the issue is truly a Desktop App issue and not an issue with our Web App. The Desktop App makes use of the OLI Web App to render OLI. This repository is for issues with the Desktop App wrapper.
       You can do this by going to your web browser (preferably Chrome) and attempting to reproduce the issue there.
-      If it does, the issue should be reported to the [main Mattermost repository](https://github.com/mattermost/mattermost/issues).
+      If it does, the issue should be reported to the [main OLI repository](https://github.com/mattermost/mattermost/issues).
 - type: checkboxes
   attributes:
     label: Checks before filing an issue
     description: Please ensure you can confirm the following
     options:
-      - label: This issue doesn't reproduce on web browsers (such as in Chrome). If it does, [issue reports go to the Mattermost Server repository](https://github.com/mattermost/mattermost-server/issues).
+      - label: This issue doesn't reproduce on web browsers (such as in Chrome). If it does, [issue reports go to the OLI Server repository](https://github.com/mattermost/mattermost-server/issues).
         required: true
       - label: I have checked the [issue tracker](https://github.com/mattermost/desktop/issues) and have not found an issue that matches the one I'm filing. This should include closed issues.
         required: true
@@ -23,13 +23,13 @@ body:
         required: true
       - label: "This issue is not a feature request. You can request features and make product suggestions here: https://mattermost.com/suggestions/."
         required: true
-      - label: This issue reproduces on the most recent [stable version](https://github.com/mattermost/desktop/releases/latest), or the most recent [prerelease version](https://github.com/mattermost/desktop/releases) of the Mattermost Desktop App.
+      - label: This issue reproduces on the most recent [stable version](https://github.com/mattermost/desktop/releases/latest), or the most recent [prerelease version](https://github.com/mattermost/desktop/releases) of the OLI Desktop App.
         required: true
       - label: I have read the [contribution guidelines](https://github.com/mattermost/desktop/blob/master/CONTRIBUTING.md).
         required: true
 - type: input
   attributes:
-    label: Mattermost Desktop Version 
+    label: OLI Desktop Version 
     description: |
       What version of the Desktop App are you using? You can find it by going to [Help] > [Version Number].
   validations:
@@ -48,10 +48,10 @@ body:
     required: true
 - type: input
   attributes:
-    label: Mattermost Server Version
+    label: OLI Server Version
     description: |
-      Which version of the Mattermost Server did this occur on?
-      You can find your Mattermost Server version by [Mattermost Menu] > [About Mattermost], where [Mattermost Menu] can be accessed by clicking on the grid in the top-left corner.
+      Which version of the OLI Server did this occur on?
+      You can find your OLI Server version by [OLI Menu] > [About OLI], where [OLI Menu] can be accessed by clicking on the grid in the top-left corner.
 - type: textarea
   attributes:
     label: Steps to reproduce

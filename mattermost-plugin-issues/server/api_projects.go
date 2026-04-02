@@ -10,8 +10,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func (p *Plugin) handleListProjects(w http.ResponseWriter, _ *http.Request) {
-	projects, err := p.store.ListProjects()
+func (p *Plugin) handleListProjects(w http.ResponseWriter, r *http.Request) {
+	projects, err := p.listProjectsForRequest(r)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -30,6 +30,7 @@ func (p *Plugin) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		ID:              uuid.New().String(),
 		Name:            req.Name,
 		Prefix:          normalizePrefix(req.Prefix),
+		Scope:           projectScopeFromRequest(r),
 		NextIssueNumber: 0,
 		CreatedBy:       getUserID(r),
 		CreatedAt:       nowMillis(),
@@ -50,7 +51,7 @@ func (p *Plugin) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 
 func (p *Plugin) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	project, err := p.store.GetProject(id)
+	project, err := p.getProjectForRequest(r, id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
@@ -61,7 +62,7 @@ func (p *Plugin) handleGetProject(w http.ResponseWriter, r *http.Request) {
 func (p *Plugin) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	project, err := p.store.GetProject(id)
+	project, err := p.getProjectForRequest(r, id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
@@ -96,7 +97,7 @@ func (p *Plugin) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
 func (p *Plugin) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	if _, err := p.store.GetProject(id); err != nil {
+	if _, err := p.getProjectForRequest(r, id); err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
 	}

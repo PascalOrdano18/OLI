@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs';
@@ -8,9 +8,9 @@ import * as path from 'path';
 
 import {test, expect} from '../../fixtures/index';
 import {waitForAppReady} from '../../helpers/appReadiness';
-import {electronBinaryPath, appDir, demoMattermostConfig, writeConfigFile} from '../../helpers/config';
+import {electronBinaryPath, appDir, demoOLIConfig, writeConfigFile} from '../../helpers/config';
 import {waitForLockFileRelease} from '../../helpers/cleanup';
-import {loginToMattermost} from '../../helpers/login';
+import {loginToOLI} from '../../helpers/login';
 import {buildServerMap} from '../../helpers/serverMap';
 
 if (!process.env.MM_TEST_SERVER_URL) {
@@ -18,9 +18,9 @@ if (!process.env.MM_TEST_SERVER_URL) {
 }
 
 const config = {
-    ...demoMattermostConfig,
+    ...demoOLIConfig,
     servers: [
-        ...demoMattermostConfig.servers,
+        ...demoOLIConfig.servers,
         {
             name: 'google',
             url: 'https://google.com/',
@@ -87,7 +87,7 @@ async function closeElectronApp(app: ElectronApplication, dataDir: string) {
     await waitForLockFileRelease(dataDir).catch(() => {});
 }
 
-async function getMattermostServer() {
+async function getOLIServer() {
     const serverMap = await buildServerMap(electronApp);
     const mmServer = serverMap[config.servers[0].name]?.[0]?.win;
     expect(mmServer).toBeDefined();
@@ -130,7 +130,7 @@ async function resetState() {
     mainWindow = await waitForWindow(electronApp, 'index');
     await mainWindow.bringToFront().catch(() => {});
     await mainWindow.keyboard.press('Escape').catch(() => {});
-    const mmServer = await getMattermostServer();
+    const mmServer = await getOLIServer();
     await mmServer.waitForSelector('#sidebarItem_town-square', {timeout: 15_000});
     await mmServer.click('#sidebarItem_town-square').catch(() => {});
 }
@@ -196,8 +196,8 @@ test.describe('server_management/drag_and_drop', () => {
         });
         await waitForAppReady(electronApp);
         mainWindow = await waitForWindow(electronApp, 'index');
-        const mmServer = await getMattermostServer();
-        await loginToMattermost(mmServer);
+        const mmServer = await getOLIServer();
+        await loginToOLI(mmServer);
         await mainWindow.waitForSelector('#newTabButton', {timeout: 30_000});
     });
 

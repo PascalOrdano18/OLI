@@ -2,7 +2,7 @@
 
 ## Descripcion General
 
-OLI es un sistema de gestion de issues integrado con Mattermost. El usuario solo necesita correr la **app de escritorio** localmente.
+OLI es un sistema de gestion de issues integrado con OLI. El usuario solo necesita correr la **app de escritorio** localmente.
 
 ---
 
@@ -48,7 +48,7 @@ npm start
 
 Al abrir la app por primera vez, se mostrara la pantalla de onboarding.
 
-1. **Agregar servidor**: Ingresar la URL del servidor de Mattermost si es requerida, de lo contrario proseguir:
+1. **Agregar servidor**: Ingresar la URL del servidor de OLI si es requerida, de lo contrario proseguir:
    - **URL**: `https://oli-mattermost-production.up.railway.app`
 
 2. **Iniciar sesion**: Usar una de las cuentas de invitado:

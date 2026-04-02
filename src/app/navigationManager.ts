@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {IpcMainEvent, IpcMainInvokeEvent} from 'electron';
@@ -11,12 +11,12 @@ import TabManager from 'app/tabs/tabManager';
 import WebContentsManager from 'app/views/webContentsManager';
 import {BROWSER_HISTORY_PUSH, HISTORY, LOAD_FAILED, LOAD_SUCCESS, REQUEST_BROWSER_HISTORY_STATUS} from 'common/communication';
 import {Logger} from 'common/log';
-import type {MattermostServer} from 'common/servers/MattermostServer';
+import type {OLIServer} from 'common/servers/OLIServer';
 import ServerManager from 'common/servers/serverManager';
 import {getFormattedPathName, isMagicLinkUrl, parseURL} from 'common/utils/url';
 import Utils from 'common/utils/util';
-import type {MattermostView} from 'common/views/MattermostView';
-import {ViewType} from 'common/views/MattermostView';
+import type {OLIView} from 'common/views/OLIView';
+import {ViewType} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
 import {handleWelcomeScreenModal} from 'main/app/intercom';
 import {localizeMessage} from 'main/i18nManager';
@@ -38,7 +38,7 @@ export class NavigationManager {
         ipcMain.on(BROWSER_HISTORY_PUSH, this.handleBrowserHistoryPush);
     }
 
-    private openLinkInTab = (url: string | URL, getView: (server: MattermostServer) => MattermostView | undefined) => {
+    private openLinkInTab = (url: string | URL, getView: (server: OLIServer) => OLIView | undefined) => {
         if (!url) {
             return;
         }
@@ -109,7 +109,7 @@ export class NavigationManager {
             return;
         }
 
-        this.openLinkInTab(url, (server: MattermostServer) => {
+        this.openLinkInTab(url, (server: OLIServer) => {
             let view = ViewManager.getPrimaryView(server.id);
 
             // We should only open in the primary tab for logging in, and if the app is just starting up
@@ -126,7 +126,7 @@ export class NavigationManager {
     };
 
     openLinkInNewTab = (url: string | URL) => {
-        this.openLinkInTab(url, (server: MattermostServer) => {
+        this.openLinkInTab(url, (server: OLIServer) => {
             const view = ViewManager.createView(server, ViewType.TAB);
             if (!view) {
                 this.showViewLimitReachedError();
@@ -138,7 +138,7 @@ export class NavigationManager {
     };
 
     openLinkInNewWindow = (url: string | URL) => {
-        this.openLinkInTab(url, (server: MattermostServer) => {
+        this.openLinkInTab(url, (server: OLIServer) => {
             return ViewManager.createView(server, ViewType.WINDOW);
         });
     };

@@ -1,19 +1,19 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {test, expect} from '../../fixtures/index';
-import {demoMattermostConfig} from '../../helpers/config';
-import {loginToMattermost} from '../../helpers/login';
+import {demoOLIConfig} from '../../helpers/config';
+import {loginToOLI} from '../../helpers/login';
 import {buildServerMap} from '../../helpers/serverMap';
 
 test.describe('history_menu', () => {
-    test.use({appConfig: demoMattermostConfig});
+    test.use({appConfig: demoOLIConfig});
     test.skip(!process.env.MM_TEST_SERVER_URL, 'MM_TEST_SERVER_URL required');
 
     test('Click back and forward from history', {tag: ['@P2', '@all']}, async ({electronApp}) => {
         const serverMap = await buildServerMap(electronApp);
-        const firstServer = serverMap[demoMattermostConfig.servers[0].name][0].win;
-        await loginToMattermost(firstServer);
+        const firstServer = serverMap[demoOLIConfig.servers[0].name][0].win;
+        await loginToOLI(firstServer);
         await firstServer.waitForSelector('#sidebarItem_off-topic');
 
         // Click on Off-Topic channel

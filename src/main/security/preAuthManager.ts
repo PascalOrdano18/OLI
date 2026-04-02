@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {type Certificate, type WebContents, type Event, app, type AuthenticationResponseDetails, type AuthInfo} from 'electron';
@@ -9,7 +9,7 @@ import {SERVER_REMOVED} from 'common/communication';
 import {ModalConstants} from 'common/constants';
 import {SECURE_STORAGE_KEYS} from 'common/constants/secureStorage';
 import {Logger} from 'common/log';
-import type {MattermostServer} from 'common/servers/MattermostServer';
+import type {OLIServer} from 'common/servers/OLIServer';
 import ServerManager from 'common/servers/serverManager';
 import {isTrustedURL as isTrustedURLHelper, parseURL} from 'common/utils/url';
 import secureStorage from 'main/secureStorage';
@@ -107,7 +107,7 @@ export class PreAuthManager {
         }
     };
 
-    private handleServerRemoved = (server: MattermostServer) => {
+    private handleServerRemoved = (server: OLIServer) => {
         log.debug('handleServerRemoved', {serverId: server.id});
 
         // Clean up associated secret

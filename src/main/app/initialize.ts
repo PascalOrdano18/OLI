@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import path from 'path';
@@ -40,6 +40,8 @@ import {
     GET_AUTH_TOKEN,
     ISSUES_API_REQUEST,
     NAVIGATE_TO_ISSUE,
+    PROXY_FETCH,
+    SET_SERVER_AUTH_COOKIE,
     SET_VIEW_MODE,
     AO_PICK_REPO_PATH,
     AO_SPAWN_SESSION,
@@ -52,7 +54,6 @@ import {
     AO_GIT_ACTION,
     AO_GET_GIT_STATUS,
 } from 'common/communication';
-import aoManager from 'main/aoManager';
 import Config from 'common/config';
 import buildConfig from 'common/config/buildConfig';
 import {MATTERMOST_PROTOCOL} from 'common/constants';
@@ -61,6 +62,7 @@ import ServerManager from 'common/servers/serverManager';
 import {parseURL} from 'common/utils/url';
 import {setTestField} from 'common/utils/util';
 import ViewManager from 'common/views/viewManager';
+import aoManager from 'main/aoManager';
 import AppVersionManager from 'main/AppVersionManager';
 import AutoLauncher from 'main/AutoLauncher';
 import {configPath, updatePaths} from 'main/constants';
@@ -120,6 +122,23 @@ import {
     handleDoubleClick,
     handleGetDarkMode,
 } from './windows';
+
+const getIssuesRequestTeamScope = () => {
+    const currentView = TabManager.getCurrentActiveTabView();
+    const pathname = currentView?.currentURL?.pathname || '';
+    const pathParts = pathname.split('/').filter(Boolean);
+    if (pathParts.length > 0) {
+        return pathParts[0].trim().toLowerCase();
+    }
+
+    const currentTab = TabManager.getCurrentActiveTab();
+    const teamName = currentTab?.title.teamName?.trim().toLowerCase();
+    if (!teamName) {
+        return '';
+    }
+
+    return teamName.replace(/\s+/g, '-');
+};
 
 const log = new Logger('App.Initialize');
 
@@ -316,7 +335,8 @@ function initializeInterCommunicationEventListeners() {
 
     ipcMain.handle(ISSUES_API_REQUEST, async (_event, method: string, path: string, body?: unknown) => {
         const currentServerId = ServerManager.getCurrentServerId();
-        console.log('[issues-api-request] incoming', {method, path, hasBody: body !== undefined, currentServerId});
+        const teamScope = getIssuesRequestTeamScope();
+        console.log('[issues-api-request] incoming', {method, path, hasBody: body !== undefined, currentServerId, teamScope});
 
         const currentServer = currentServerId ? ServerManager.getServer(currentServerId) : null;
         if (!currentServer?.url) {
@@ -336,7 +356,10 @@ function initializeInterCommunicationEventListeners() {
             'X-Requested-With': 'XMLHttpRequest',
         };
         if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+            headers.Authorization = `Bearer ${token}`;
+        }
+        if (teamScope) {
+            headers['X-Oli-Team-Scope'] = teamScope;
         }
 
         const response = await net.fetch(fullUrl, {
@@ -368,6 +391,48 @@ function initializeInterCommunicationEventListeners() {
             return null;
         }
         return response.json();
+    });
+
+    ipcMain.handle(PROXY_FETCH, async (_event, url: string, options: {method?: string; headers?: Record<string, string>; body?: string}) => {
+        const response = await net.fetch(url, {
+            method: options.method || 'GET',
+            headers: options.headers,
+            ...(options.body ? {body: options.body} : {}),
+        });
+
+        const responseHeaders: Record<string, string> = {};
+        response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+        });
+
+        const text = await response.text();
+        return {
+            ok: response.ok,
+            status: response.status,
+            headers: responseHeaders,
+            body: text,
+        };
+    });
+
+    ipcMain.handle(SET_SERVER_AUTH_COOKIE, async (_event, serverUrl: string, token: string, userId: string) => {
+        const url = new URL(serverUrl);
+        await session.defaultSession.cookies.set({
+            url: serverUrl,
+            name: 'MMAUTHTOKEN',
+            value: token,
+            domain: url.hostname,
+            path: '/',
+            httpOnly: true,
+            secure: url.protocol === 'https:',
+        });
+        await session.defaultSession.cookies.set({
+            url: serverUrl,
+            name: 'MMUSERID',
+            value: userId,
+            domain: url.hostname,
+            path: '/',
+            secure: url.protocol === 'https:',
+        });
     });
 
     ipcMain.on(NAVIGATE_TO_ISSUE, (_event, issueId: string) => {
@@ -476,7 +541,7 @@ async function initializeAfterAppReady() {
     ServerManager.init();
     ServerManager.off(SERVER_ADDED, PreAuthManager.loadPreAuthSecretForServer);
 
-    app.setAppUserModelId('Mattermost.Desktop'); // Use explicit AppUserModelID
+    app.setAppUserModelId('OLI.Desktop'); // Use explicit AppUserModelID
     const defaultSession = session.defaultSession;
     defaultSession.webRequest.onHeadersReceived((details, callback) => {
         const url = parseURL(details.url);
@@ -504,7 +569,7 @@ async function initializeAfterAppReady() {
         downloadsManager.webRequestOnHeadersReceivedHandler(details, callback);
     });
 
-    // Inject X-Mattermost-Preauth-Secret header for all server requests
+    // Inject X-OLI-Preauth-Secret header for all server requests
     defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
         try {
             const server = ServerManager.lookupServerByURL(details.url);
@@ -512,10 +577,10 @@ async function initializeAfterAppReady() {
             if (server && server.preAuthSecret) {
                 const secret = server.preAuthSecret;
 
-                if (!('X-Mattermost-Preauth-Secret' in details.requestHeaders)) {
+                if (!('X-OLI-Preauth-Secret' in details.requestHeaders)) {
                     const requestHeaders = {
                         ...details.requestHeaders,
-                        'X-Mattermost-Preauth-Secret': secret,
+                        'X-OLI-Preauth-Secret': secret,
                     };
 
                     callback({requestHeaders});

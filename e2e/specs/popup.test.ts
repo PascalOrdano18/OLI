@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs/promises';
@@ -6,11 +6,11 @@ import * as os from 'os';
 import * as path from 'path';
 
 import {test, expect} from '../fixtures/index';
-import {cmdOrCtrl, demoMattermostConfig} from '../helpers/config';
+import {cmdOrCtrl, demoOLIConfig} from '../helpers/config';
 import {waitForAppReady} from '../helpers/appReadiness';
 import {appDir, electronBinaryPath, writeConfigFile} from '../helpers/config';
 import {waitForWindow, closeElectronApp} from '../helpers/electronApp';
-import {loginToMattermost} from '../helpers/login';
+import {loginToOLI} from '../helpers/login';
 import {buildServerMap} from '../helpers/serverMap';
 import type {ServerView} from '../helpers/serverView';
 
@@ -69,7 +69,7 @@ test.describe('popup', () => {
         }
 
         userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mm-popup-e2e-'));
-        writeConfigFile(userDataDir, demoMattermostConfig);
+        writeConfigFile(userDataDir, demoOLIConfig);
 
         const {_electron: electron} = await import('playwright');
         electronApp = await electron.launch({
@@ -104,12 +104,12 @@ test.describe('popup', () => {
         await waitForAppReady(electronApp);
         mainWindow = await waitForWindow(electronApp, 'index');
         const serverMap = await buildServerMap(electronApp);
-        firstServer = serverMap[demoMattermostConfig.servers[0].name]?.[0]?.win;
+        firstServer = serverMap[demoOLIConfig.servers[0].name]?.[0]?.win;
         if (!firstServer) {
             throw new Error('No server view available for popup tests');
         }
 
-        await loginToMattermost(firstServer);
+        await loginToOLI(firstServer);
         await mainWindow.waitForSelector('.ServerDropdownButton', {timeout: 30_000});
     });
 
@@ -136,7 +136,7 @@ test.describe('popup', () => {
 
         const loginField = await popupWindow.waitForSelector('#login_field');
         await loginField.focus();
-        await popupWindow.keyboard.type('Mattermost');
+        await popupWindow.keyboard.type('OLI');
 
         const selectAllKey = cmdOrCtrl === 'command' ? 'Meta+a' : 'Control+a';
         await popupWindow.keyboard.press(selectAllKey);
@@ -145,7 +145,7 @@ test.describe('popup', () => {
             const box = document.querySelectorAll('#login_field')[0] as HTMLInputElement;
             return box.value.substring(box.selectionStart!, box.selectionEnd!);
         });
-        expect(selectedText).toBe('Mattermost');
+        expect(selectedText).toBe('OLI');
     });
 
     test('MM-T2827_2 should be able to cut and paste in popup windows', {tag: ['@P2', '@all']}, async () => {
@@ -153,7 +153,7 @@ test.describe('popup', () => {
 
         const loginField = await popupWindow.waitForSelector('#login_field');
         await loginField.focus();
-        await popupWindow.keyboard.type('Mattermost');
+        await popupWindow.keyboard.type('OLI');
 
         const textbox = await popupWindow.waitForSelector('#login_field');
         await textbox.selectText({force: true});
@@ -166,7 +166,7 @@ test.describe('popup', () => {
         const pasteKey = cmdOrCtrl === 'command' ? 'Meta+v' : 'Control+v';
         await popupWindow.keyboard.press(pasteKey);
         textValue = await textbox.inputValue();
-        expect(textValue).toBe('Mattermost');
+        expect(textValue).toBe('OLI');
     });
 
     test('MM-T2827_3 should be able to copy and paste in popup windows', {tag: ['@P2', '@all']}, async () => {
@@ -174,7 +174,7 @@ test.describe('popup', () => {
 
         const loginField = await popupWindow.waitForSelector('#login_field');
         await loginField.focus();
-        await popupWindow.keyboard.type('Mattermost');
+        await popupWindow.keyboard.type('OLI');
 
         const textbox = await popupWindow.waitForSelector('#login_field');
         await textbox.selectText({force: true});
@@ -185,7 +185,7 @@ test.describe('popup', () => {
         const pasteKey = cmdOrCtrl === 'command' ? 'Meta+v' : 'Control+v';
         await popupWindow.keyboard.press(pasteKey);
         const textValue = await textbox.inputValue();
-        expect(textValue).toBe('other-textMattermost');
+        expect(textValue).toBe('other-textOLI');
     });
 
     test('MM-T1659 should not be able to go Back or Forward in the popup window', {tag: ['@P2', '@all']}, async () => {

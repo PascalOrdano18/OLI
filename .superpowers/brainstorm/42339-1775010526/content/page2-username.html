@@ -1,0 +1,63 @@
+<h2>Page 2 — Username</h2>
+<p class="subtitle">Appears after org is ready. User just enters a username, then everything else happens automatically behind the scenes.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Username Entry</div>
+    <div class="mockup-body" style="padding: 40px; text-align: center; font-family: -apple-system, sans-serif; background: #1e1e2e; color: #cdd6f4;">
+      <h2 style="font-size: 24px; font-weight: 600; margin-bottom: 4px; color: #cdd6f4;">Choose your username</h2>
+      <p style="font-size: 14px; color: #a6adc8; margin-bottom: 32px;">This is how others will see you in <span style="color: #89b4fa;">Acme Corp</span></p>
+
+      <div style="max-width: 400px; margin: 0 auto;">
+        <input type="text" value="rocco.dev"
+               style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid #89b4fa; background: #313244; color: #cdd6f4; font-size: 14px; box-sizing: border-box; outline: none; margin-bottom: 8px;" disabled>
+
+        <p style="font-size: 12px; color: #a6adc8; text-align: left; margin-bottom: 20px;">3-22 characters. Lowercase letters, numbers, dots, dashes, underscores.</p>
+
+        <button style="width: 100%; padding: 12px 24px; border-radius: 8px; background: #89b4fa; color: #1e1e2e; border: none; font-size: 14px; font-weight: 500; cursor: pointer;">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Validation Error</div>
+    <div class="mockup-body" style="padding: 40px; text-align: center; font-family: -apple-system, sans-serif; background: #1e1e2e; color: #cdd6f4;">
+      <h2 style="font-size: 24px; font-weight: 600; margin-bottom: 4px; color: #cdd6f4;">Choose your username</h2>
+      <p style="font-size: 14px; color: #a6adc8; margin-bottom: 32px;">This is how others will see you in <span style="color: #89b4fa;">Acme Corp</span></p>
+
+      <div style="max-width: 400px; margin: 0 auto;">
+        <input type="text" value="R!"
+               style="width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid #f38ba8; background: #313244; color: #cdd6f4; font-size: 14px; box-sizing: border-box; outline: none; margin-bottom: 4px;" disabled>
+
+        <p style="font-size: 12px; color: #f38ba8; text-align: left; margin-bottom: 4px;">Username must be at least 3 characters</p>
+        <p style="font-size: 12px; color: #f38ba8; text-align: left; margin-bottom: 20px;">Only lowercase letters, numbers, dots, dashes, and underscores allowed</p>
+
+        <button style="width: 100%; padding: 12px 24px; border-radius: 8px; background: #585b70; color: #a6adc8; border: none; font-size: 14px; font-weight: 500; cursor: not-allowed;" disabled>Continue</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 24px;">
+  <div class="mockup">
+    <div class="mockup-header">Setting Up (after clicking Continue)</div>
+    <div class="mockup-body" style="padding: 60px 40px; text-align: center; font-family: -apple-system, sans-serif; background: #1e1e2e; color: #cdd6f4;">
+      <div style="margin-bottom: 16px;">
+        <div style="width: 40px; height: 40px; border: 3px solid #45475a; border-top-color: #89b4fa; border-radius: 50%; margin: 0 auto; animation: none;"></div>
+      </div>
+      <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 8px; color: #cdd6f4;">Setting up your account...</h2>
+      <p style="font-size: 14px; color: #a6adc8;">Creating user, joining team, logging in</p>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 16px; padding: 16px; background: #2a2a3a; border-radius: 8px; border: 1px solid #444;">
+  <h3 style="margin: 0 0 8px; font-size: 14px;">What happens invisibly after "Continue":</h3>
+  <ol style="margin: 0; padding-left: 20px; font-size: 13px; color: #aaa; line-height: 1.8;">
+    <li><code>POST /api/v4/users</code> — create user with <code>{username, email: "{username}@oli.local", password: "OliUser123!"}</code></li>
+    <li><code>POST /api/v4/users/login</code> — login with email + hardcoded password → get auth token</li>
+    <li><code>POST /api/v4/teams</code> — create team <code>{name: "{orgName}-team", display_name: "{orgName}", type: "O"}</code></li>
+    <li><code>POST /api/v4/teams/{id}/members</code> — add user to team</li>
+    <li>Call <code>finishModal({url, name})</code> → app transitions to main view, already logged in</li>
+  </ol>
+</div>

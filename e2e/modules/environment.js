@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 'use strict';
 
@@ -70,7 +70,7 @@ const demoConfig = {
     viewLimit: 15,
 };
 
-const demoMattermostConfig = {
+const demoOLIConfig = {
     ...demoConfig,
     servers: [{
         ...exampleServer,
@@ -120,7 +120,7 @@ module.exports = {
     exampleURL,
     mattermostURL,
     demoConfig,
-    demoMattermostConfig,
+    demoOLIConfig,
     cmdOrCtrl,
 
     /**
@@ -632,7 +632,7 @@ module.exports = {
         return lastMap;
     },
 
-    async loginToMattermost(window) {
+    async loginToOLI(window) {
         // Windows needs more time for page navigation and rendering
         const initialDelay = process.platform === 'win32' ? 3000 : 1000;
         await asyncSleep(initialDelay);
@@ -654,7 +654,7 @@ module.exports = {
         } catch (error) {
             // Log detailed error for debugging
             // eslint-disable-next-line no-console
-            console.error('loginToMattermost failed:', error.message);
+            console.error('loginToOLI failed:', error.message);
             // eslint-disable-next-line no-console
             console.error('Window URL:', window.url());
             throw error;

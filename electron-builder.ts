@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 const semver = require('semver');
 
@@ -19,7 +19,7 @@ function getMacVersions() {
 }
 
 const config = {
-    appId: 'Mattermost.Desktop',
+    appId: 'OLI.Desktop',
     artifactName: '${version}/${name}-${version}-${os}-${arch}.${ext}',
     directories: {
         buildResources: 'src/assets',
@@ -56,7 +56,7 @@ const config = {
     ],
     protocols: [
         {
-            name: 'Mattermost',
+            name: 'OLI',
             schemes: [
                 'mattermost',
             ],
@@ -66,7 +66,7 @@ const config = {
     afterPack: 'scripts/afterpack.js',
     deb: {
         artifactName: '${version}/${name}_${version}-1_${arch}.${ext}',
-        synopsis: 'Mattermost Desktop App',
+        synopsis: 'OLI Desktop App',
         depends: [
             'libnotify4',
             'libxtst6',
@@ -89,7 +89,7 @@ const config = {
             'rpm',
             'flatpak',
         ],
-        appId: 'com.Mattermost.Desktop',
+        appId: 'com.OLI.Desktop',
         extraFiles: [
             {
                 filter: [
@@ -132,7 +132,7 @@ const config = {
         extendInfo: {
             NSMicrophoneUsageDescription: 'Microphone access is used to capture audio for voice communication and recordings.',
             NSCameraUsageDescription: 'Camera access is used to capture video for video conferencing and recordings.',
-            NSFocusStatusUsageDescription: 'Focus status is used by Mattermost to determine whether to send notifications or not.',
+            NSFocusStatusUsageDescription: 'Focus status is used by OLI to determine whether to send notifications or not.',
             LSFileQuarantineEnabled: true,
         },
         ...getMacVersions(),
@@ -193,7 +193,7 @@ const config = {
             certificateProfileName: 'mattermost-desktop-app',
             codeSigningAccountName: 'DesktopAppCodeSigning',
             endpoint: 'https://eus.codesigning.azure.net',
-            publisherName: 'CN="Mattermost, Inc.", O="Mattermost, Inc.", L=Palo Alto, S=California, C=US',
+            publisherName: 'CN="OLI, Inc.", O="OLI, Inc.", L=Palo Alto, S=California, C=US',
         } : null,
     },
     msi: {

@@ -1,11 +1,11 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {v4 as uuid} from 'uuid';
 
 import type {PopoutViewProps} from '@mattermost/desktop-api';
 
-import type {MattermostServer} from 'common/servers/MattermostServer';
+import type {OLIServer} from 'common/servers/OLIServer';
 import ServerManager from 'common/servers/serverManager';
 import {isInternalURL, parseURL} from 'common/utils/url';
 
@@ -16,7 +16,7 @@ export enum ViewType {
     WINDOW = 'window',
 }
 
-export class MattermostView {
+export class OLIView {
     id: string;
     serverId: string;
     type: ViewType;
@@ -28,7 +28,7 @@ export class MattermostView {
     props?: PopoutViewProps;
 
     constructor(
-        server: MattermostServer,
+        server: OLIServer,
         type: ViewType,
         initialPath?: string,
         parentViewId?: string,

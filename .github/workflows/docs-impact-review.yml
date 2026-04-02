@@ -58,7 +58,7 @@ jobs:
             PR NUMBER: ${{ github.event.pull_request.number }}
  
             ## Task
-            You are a documentation impact analyst for the Mattermost project. Your job is to determine whether a pull request to the **mattermost/desktop** repository requires updates to the public documentation hosted at https://docs.mattermost.com (source repo: mattermost/docs).
+            You are a documentation impact analyst for the OLI project. Your job is to determine whether a pull request to the **mattermost/desktop** repository requires updates to the public documentation hosted at https://docs.mattermost.com (source repo: mattermost/docs).
  
             ## Repository Layout
             The PR code is checked out at the workspace root. The documentation source is checked out at `./docs/source/` (RST files, Sphinx-based).
@@ -105,13 +105,13 @@ jobs:
  
             <personas>
             ### System Administrator
-            Deploys, configures, and manages the Mattermost Desktop App across an organization.
+            Deploys, configures, and manages the OLI Desktop App across an organization.
             - **Reads:** `administration-guide/`, `deployment-guide/`, `security-guide/`
             - **Cares about:** MSI/enterprise deployment, Group Policy / managed config, auto-update settings, certificate management, allowed origins, proxy configuration, push notification handling, silent install flags, system requirements (OS versions, Electron version)
             - **Impact signals:** changes to `src/main/autoupdate/`, `src/main/config/`, `src/main/certificateManager.ts`, `src/main/trustedOrigins.ts`, `src/common/config/`, `package.json` (Electron version bumps), new CLI flags or environment variables
  
             ### End User
-            Uses the Mattermost Desktop App daily for messaging and collaboration.
+            Uses the OLI Desktop App daily for messaging and collaboration.
             - **Reads:** `end-user-guide/`, `get-help/`
             - **Cares about:** UI changes, keyboard shortcuts, notification behavior, system tray features, multi-server/tab management, spell check, screen sharing, deep link handling, accessibility changes
             - **Impact signals:** changes to `src/renderer/components/`, `src/main/windows/`, `src/main/tray/`, `src/main/notifications/`, `src/common/tabs/`
@@ -123,7 +123,7 @@ jobs:
             - **Impact signals:** changes to `src/main/certificateManager.ts`, `src/main/certificateStore.ts`, `src/main/trustedOrigins.ts`, `src/main/allowedProtocols.ts`, `src/preload/`
  
             ### Developer / Integrator
-            Builds integrations with or extensions for the Mattermost Desktop App.
+            Builds integrations with or extensions for the OLI Desktop App.
             - **Reads:** `integrations-guide/`, developer docs
             - **Cares about:** IPC APIs exposed via preload, deep link protocol registration, custom URL schemes, desktop app JS bridge for plugins/integrations
             - **Impact signals:** changes to `src/preload/`, IPC channel definitions, custom protocol registration in `src/main/`

@@ -27,7 +27,7 @@
   "main.allowProtocolDialog.title": "http(s) хаттамасы емес",
   "main.app.app.handleAppCertificateError.certError.button.cancelConnection": "Байланысты болдырмау",
   "main.app.app.handleAppCertificateError.certError.button.moreDetails": "Көбірек мәлімет",
-  "main.app.app.handleAppCertificateError.certError.dialog.message": "Бұл Mattermost серверінде конфигурация ахуалы туындады, немесе біреу сіздің байланысыңызды қағып алғалы тұр. Сіз веб браузеріңізді қолдану үшін өзіңіз қосылған Wi-Fi желісіне кіруіңіз керек болуы мүмкін.",
+  "main.app.app.handleAppCertificateError.certError.dialog.message": "Бұл OLI серверінде конфигурация ахуалы туындады, немесе біреу сіздің байланысыңызды қағып алғалы тұр. Сіз веб браузеріңізді қолдану үшін өзіңіз қосылған Wi-Fi желісіне кіруіңіз керек болуы мүмкін.",
   "main.app.app.handleAppCertificateError.certError.dialog.title": "Сертификат қатесі",
   "main.app.app.handleAppCertificateError.certNotTrusted.button.cancelConnection": "Байланысты болдырмау",
   "main.app.app.handleAppCertificateError.certNotTrusted.button.trustInsecureCertificate": "Сенімсіз сертификатқа сенім арту",

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs/promises';
@@ -30,7 +30,7 @@ type Fixtures = {
      * A launched ElectronApplication with its own isolated userDataDir.
      * Guaranteed torn down (app.close() + lock file release) after each test.
      * Config defaults to demoConfig (example.com + github.com).
-     * Override config with test.use({ appConfig: demoMattermostConfig }).
+     * Override config with test.use({ appConfig: demoOLIConfig }).
      */
     electronApp: ElectronApplication;
 

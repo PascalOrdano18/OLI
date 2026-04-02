@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {v4 as uuid} from 'uuid';
@@ -9,7 +9,7 @@ import {parseURL} from 'common/utils/url';
 
 import type {UniqueServer, Server} from 'types/config';
 
-export class MattermostServer {
+export class OLIServer {
     id: string;
     name: string;
     url!: URL;

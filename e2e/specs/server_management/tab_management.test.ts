@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs/promises';
@@ -7,12 +7,12 @@ import * as path from 'path';
 
 import {test, expect} from '../../fixtures/index';
 import {waitForAppReady} from '../../helpers/appReadiness';
-import {electronBinaryPath, appDir, demoMattermostConfig, writeConfigFile} from '../../helpers/config';
+import {electronBinaryPath, appDir, demoOLIConfig, writeConfigFile} from '../../helpers/config';
 import {waitForWindow, closeElectronApp} from '../../helpers/electronApp';
-import {loginToMattermost} from '../../helpers/login';
+import {loginToOLI} from '../../helpers/login';
 import {buildServerMap} from '../../helpers/serverMap';
 
-const config = demoMattermostConfig;
+const config = demoOLIConfig;
 type ElectronApplication = Awaited<ReturnType<typeof import('playwright')['_electron']['launch']>>;
 type ElectronPage = import('playwright').Page;
 
@@ -25,7 +25,7 @@ async function getServerViews() {
     return serverMap[config.servers[0].name];
 }
 
-async function getMattermostServer() {
+async function getOLIServer() {
     const serverEntries = await getServerViews();
     const mmServer = serverEntries?.[0]?.win;
     expect(mmServer).toBeDefined();
@@ -77,8 +77,8 @@ test.describe('server_management/tab_management', () => {
         });
         await waitForAppReady(electronApp);
         mainWindow = await waitForWindow(electronApp, 'index');
-        const mmServer = await getMattermostServer();
-        await loginToMattermost(mmServer);
+        const mmServer = await getOLIServer();
+        await loginToOLI(mmServer);
         await mainWindow.waitForSelector('#newTabButton', {timeout: 30_000});
     });
 

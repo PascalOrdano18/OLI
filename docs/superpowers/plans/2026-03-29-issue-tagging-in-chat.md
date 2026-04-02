@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Enable `#` autocomplete for issue references in Mattermost chat, render them as rich cards, and make cards clickable to navigate to the issue's Docs tab.
+**Goal:** Enable `#` autocomplete for issue references in OLI chat, render them as rich cards, and make cards clickable to navigate to the issue's Docs tab.
 
 **Architecture:** Four components — (1) server-side search endpoint in Go plugin, (2) IssueAutocomplete dropdown in plugin webapp, (3) IssueRefRenderer for rendering `{{issue:ID}}` as rich cards, (4) IPC channel for click-to-navigate. The existing `IssueRefCard` component is enhanced with click handling.
 
-**Tech Stack:** Go (Mattermost plugin server), React/TypeScript (Mattermost plugin webapp), Electron IPC (desktop app)
+**Tech Stack:** Go (OLI plugin server), React/TypeScript (OLI plugin webapp), Electron IPC (desktop app)
 
 **Spec:** `docs/superpowers/specs/2026-03-29-issue-tagging-in-chat-design.md`
 
@@ -105,7 +105,7 @@ func (s *KVStore) SearchAllIssues(query string, limit int) ([]*Issue, error) {
 Create `mattermost-plugin-issues/server/api_search.go`:
 
 ```go
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 package main
@@ -222,7 +222,7 @@ git commit -m "feat: add client methods for issue search endpoints"
 Replace the full content of `mattermost-plugin-issues/webapp/src/components/oli/issue_ref_card.tsx`:
 
 ```tsx
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import React, {useCallback, useState} from 'react';
@@ -401,7 +401,7 @@ In `src/common/communication.ts`, add after line 102 (`ISSUES_API_REQUEST`):
 export const NAVIGATE_TO_ISSUE = 'navigate-to-issue';
 ```
 
-- [ ] **Step 2: Expose in external preload (for Mattermost WebView)**
+- [ ] **Step 2: Expose in external preload (for OLI WebView)**
 
 In `src/app/preload/externalAPI.ts`, add `NAVIGATE_TO_ISSUE` to the imports from `common/communication` (line 55 area). Add it after `WINDOW_CLOSE`:
 
@@ -495,7 +495,7 @@ git commit -m "feat: add NAVIGATE_TO_ISSUE IPC channel for click-to-navigate"
 Create `mattermost-plugin-issues/webapp/src/components/issue_autocomplete/issue_autocomplete.tsx`:
 
 ```tsx
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import React, {useEffect, useState, useRef, useCallback} from 'react';
@@ -817,7 +817,7 @@ git commit -m "feat: add IssueAutocomplete dropdown triggered by # in chat"
 Create `mattermost-plugin-issues/webapp/src/components/issue_ref_renderer/issue_ref_renderer.tsx`:
 
 ```tsx
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import React, {useEffect, useRef, useCallback} from 'react';
@@ -1035,7 +1035,7 @@ Expected: successful build of main, preload, and renderer bundles.
 - [ ] **Step 4: Manual smoke test checklist**
 
 1. Start the app with `npm start`.
-2. Open a Mattermost channel.
+2. Open a OLI channel.
 3. Type `#` followed by part of an issue identifier or title — verify the autocomplete dropdown appears.
 4. Use arrow keys to navigate the dropdown — verify highlighting moves.
 5. Press Enter to select — verify `{{issue:BCK-3}}` is inserted in the textbox.

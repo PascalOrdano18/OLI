@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {session} from 'electron';
@@ -41,8 +41,8 @@ jest.mock('app/serverHub', () => ({
     showNewServerModal: jest.fn(),
 }));
 
-jest.mock('common/servers/MattermostServer', () => ({
-    MattermostServer: jest.fn(),
+jest.mock('common/servers/OLIServer', () => ({
+    OLIServer: jest.fn(),
 }));
 
 jest.mock('common/utils/url', () => ({
@@ -139,8 +139,8 @@ jest.mock('common/servers/serverManager', () => {
     };
 });
 
-jest.mock('./MattermostWebContentsView', () => ({
-    MattermostWebContentsView: jest.fn(),
+jest.mock('./OLIWebContentsView', () => ({
+    OLIWebContentsView: jest.fn(),
 }));
 
 jest.mock('app/mainWindow/modals/modalManager', () => ({

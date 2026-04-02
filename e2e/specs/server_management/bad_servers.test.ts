@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fs from 'fs';
@@ -6,9 +6,9 @@ import * as path from 'path';
 
 import {test, expect} from '../../fixtures/index';
 import {waitForAppReady} from '../../helpers/appReadiness';
-import {electronBinaryPath, appDir, demoConfig, demoMattermostConfig} from '../../helpers/config';
+import {electronBinaryPath, appDir, demoConfig, demoOLIConfig} from '../../helpers/config';
 import {waitForLockFileRelease} from '../../helpers/cleanup';
-import {loginToMattermost} from '../../helpers/login';
+import {loginToOLI} from '../../helpers/login';
 import {buildServerMap} from '../../helpers/serverMap';
 
 const UNREACHABLE_SERVER_URL = 'https://jhsgefhjsaeiuofhseifuphoauifdhjauiowijdfcpohuawoiudfjpdhauwodjahwdpojaoiwdhawhdiuawd.com';
@@ -253,20 +253,20 @@ test.describe('Bad Server Configurations', () => {
             }
         });
 
-        test('should handle pre-configured unreachable server and still allow login to working Mattermost server', {tag: ['@P2', '@all']}, async ({}, testInfo) => {
+        test('should handle pre-configured unreachable server and still allow login to working OLI server', {tag: ['@P2', '@all']}, async ({}, testInfo) => {
             if (!process.env.MM_TEST_SERVER_URL) {
                 test.skip(true, 'MM_TEST_SERVER_URL required');
                 return;
             }
             const badConfig = {
-                ...demoMattermostConfig,
+                ...demoOLIConfig,
                 servers: [
                     {
                         name: 'Pre-configured Unreachable',
                         url: `${UNREACHABLE_SERVER_URL}/`,
                         order: 0,
                     },
-                    ...demoMattermostConfig.servers.map((s, i) => ({...s, order: i + 1})),
+                    ...demoOLIConfig.servers.map((s, i) => ({...s, order: i + 1})),
                 ],
                 lastActiveServer: 0,
             };
@@ -286,8 +286,8 @@ test.describe('Bad Server Configurations', () => {
                 await dropdownView!.click('.ServerDropdown .ServerDropdown__button:nth-child(2)');
 
                 const serverMap = await buildServerMap(app);
-                const mmServer = serverMap[demoMattermostConfig.servers[0].name][0].win;
-                await loginToMattermost(mmServer);
+                const mmServer = serverMap[demoOLIConfig.servers[0].name][0].win;
+                await loginToOLI(mmServer);
 
                 await mmServer.waitForSelector('#post_textbox');
                 const postTextbox = await mmServer.$('#post_textbox');

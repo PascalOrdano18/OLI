@@ -231,7 +231,7 @@
   "renderer.downloadsDropdown.Downloads": "بارگیری‌ها",
   "renderer.downloadsDropdown.Update.ANewVersionIsAvailableToInstall": "A new version of the {appName} Desktop App (version {version}) is available to install.",
   "renderer.downloadsDropdown.Update.DownloadUpdate": "بارگیری به‌روزرسانی",
-  "renderer.downloadsDropdown.Update.MattermostVersionX": "{appName} version {version}",
+  "renderer.downloadsDropdown.Update.OLIVersionX": "{appName} version {version}",
   "renderer.downloadsDropdown.Update.NewDesktopVersionAvailable": "نسخه جدیدی از برنامه میزکار موجود است",
   "renderer.downloadsDropdown.Update.RestartAndUpdate": "راه‌اندازی مجدد و به‌روزرسانی",
   "renderer.downloadsDropdown.remaining": "باقیمانده",

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as fsp from 'fs/promises';
@@ -7,18 +7,18 @@ import * as path from 'path';
 
 import {test, expect} from '../fixtures/index';
 import {waitForAppReady} from '../helpers/appReadiness';
-import {electronBinaryPath, appDir, demoMattermostConfig, writeConfigFile} from '../helpers/config';
+import {electronBinaryPath, appDir, demoOLIConfig, writeConfigFile} from '../helpers/config';
 import {waitForLockFileRelease} from '../helpers/cleanup';
-import {loginToMattermost} from '../helpers/login';
+import {loginToOLI} from '../helpers/login';
 import {buildServerMap, type ServerMap} from '../helpers/serverMap';
 
 const SHOW_SETTINGS_WINDOW = 'show-settings-window';
 const SHOW_NEW_SERVER_MODAL = 'show_new_server_modal';
 
 const config = {
-    ...demoMattermostConfig,
+    ...demoOLIConfig,
     servers: [
-        ...demoMattermostConfig.servers,
+        ...demoOLIConfig.servers,
         {
             name: 'community',
             url: process.env.MM_TEST_SERVER_URL ?? 'http://localhost:8065',
@@ -153,7 +153,7 @@ test.describe('focus', () => {
         firstServer = primaryServer;
         secondServer = communityServer;
 
-        await loginToMattermost(firstServer);
+        await loginToOLI(firstServer);
         await firstServer.waitForSelector('#post_textbox');
     });
 
@@ -187,7 +187,7 @@ test.describe('focus', () => {
 
     test.describe('Focus textbox tests', () => {
         // BrowserWindow.isFocused() returns false in headless CI environments (Linux Xvfb,
-        // GitHub Actions macOS runners), so MattermostWebContentsView.focus() silently
+        // GitHub Actions macOS runners), so OLIWebContentsView.focus() silently
         // skips webContents.focus(). These tests require a real interactive desktop session.
         test.skip(
             process.platform === 'linux' || Boolean(process.env.CI),
@@ -219,10 +219,10 @@ test.describe('focus', () => {
             await firstServer.fill('#post_textbox', '');
 
             // Make sure you can just start typing and it'll go in the post textbox
-            await firstServer.fill('#post_textbox', 'Mattermost');
+            await firstServer.fill('#post_textbox', 'OLI');
 
             const textboxString = await firstServer.inputValue('#post_textbox');
-            expect(textboxString).toBe('Mattermost');
+            expect(textboxString).toBe('OLI');
         });
 
         test('MM-T1316 should return focus to the message box when closing the Add Server modal', {tag: ['@P2', '@all']}, async () => {
@@ -239,10 +239,10 @@ test.describe('focus', () => {
             await firstServer.fill('#post_textbox', '');
 
             // Make sure you can just start typing and it'll go in the post textbox
-            await firstServer.fill('#post_textbox', 'Mattermost');
+            await firstServer.fill('#post_textbox', 'OLI');
 
             const textboxString = await firstServer.inputValue('#post_textbox');
-            expect(textboxString).toBe('Mattermost');
+            expect(textboxString).toBe('OLI');
         });
 
         test('MM-T1317 should return focus to the focused box when switching servers', {tag: ['@P2', '@all']}, async () => {
@@ -260,10 +260,10 @@ test.describe('focus', () => {
             await firstServer.fill('#post_textbox', '');
 
             // Make sure you can just start typing and it'll go in the post textbox
-            await firstServer.fill('#post_textbox', 'Mattermost');
+            await firstServer.fill('#post_textbox', 'OLI');
 
             const textboxString = await firstServer.inputValue('#post_textbox');
-            expect(textboxString).toBe('Mattermost');
+            expect(textboxString).toBe('OLI');
 
             await switchToServer(electronApp, 'community');
             const isLoginFocused = await secondServer.$eval('#input_loginId', (el) => el === document.activeElement);

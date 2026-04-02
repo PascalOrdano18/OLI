@@ -1,4 +1,4 @@
-// Railway GraphQL API client — provisions Mattermost + Postgres projects
+// Railway GraphQL API client — provisions OLI + Postgres projects
 
 import crypto from 'node:crypto';
 
@@ -6,21 +6,36 @@ import config from './config.js';
 
 const RAILWAY_API = 'https://backboard.railway.com/graphql/v2';
 
-async function railwayQuery(query, variables = {}) {
-    const res = await fetch(RAILWAY_API, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.railwayApiToken()}`,
-        },
-        body: JSON.stringify({query, variables}),
-    });
+async function railwayQuery(query, variables = {}, retries = 3) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        const res = await fetch(RAILWAY_API, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${config.railwayApiToken()}`,
+            },
+            body: JSON.stringify({query, variables}),
+        });
 
-    const json = await res.json();
-    if (json.errors) {
-        throw new Error(`Railway API error: ${JSON.stringify(json.errors)}`);
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await res.text();
+            console.error(`[railway] API returned non-JSON (status ${res.status}, attempt ${attempt}/${retries}): ${text.slice(0, 300)}`);
+            if (attempt < retries) {
+                const delay = attempt * 2000;
+                console.log(`[railway] Retrying in ${delay}ms...`);
+                await new Promise((r) => setTimeout(r, delay));
+                continue;
+            }
+            throw new Error(`Railway API returned non-JSON response (status ${res.status})`);
+        }
+
+        const json = await res.json();
+        if (json.errors) {
+            throw new Error(`Railway API error: ${JSON.stringify(json.errors)}`);
+        }
+        return json.data;
     }
-    return json.data;
 }
 
 // Step 1: Create a new Railway project for this organization
@@ -63,9 +78,9 @@ async function createPostgres(projectId) {
     return data.serviceCreate.id;
 }
 
-// Persistent volume for Mattermost + SQLite (single-service stack). Mount root may contain
+// Persistent volume for OLI + SQLite (single-service stack). Mount root may contain
 // lost+found; keep DB under mmdata/.
-async function attachMattermostVolume(projectId, environmentId, serviceId) {
+async function attachOLIVolume(projectId, environmentId, serviceId) {
     await railwayQuery(
         `mutation($input: VolumeCreateInput!) {
             volumeCreate(input: $input) {
@@ -134,10 +149,10 @@ async function configurePostgres(projectId, serviceId, environmentId) {
     );
 }
 
-// Step 4: Create the Mattermost service (Docker Hub: docker.io/owner/repo:tag; GHCR: ghcr.io/...)
-async function createMattermost(projectId) {
-    const image = config.oliMattermostImage();
-    console.log(`[railway] Mattermost image: ${image}`);
+// Step 4: Create the OLI service (Docker Hub: docker.io/owner/repo:tag; GHCR: ghcr.io/...)
+async function createOLI(projectId) {
+    const image = config.oliOLIImage();
+    console.log(`[railway] OLI image: ${image}`);
     const data = await railwayQuery(
         `mutation($input: ServiceCreateInput!) {
             serviceCreate(input: $input) { id name }
@@ -145,7 +160,7 @@ async function createMattermost(projectId) {
         {
             input: {
                 projectId,
-                name: 'Mattermost',
+                name: 'OLI',
                 source: {image},
             },
         },
@@ -154,7 +169,7 @@ async function createMattermost(projectId) {
     return data.serviceCreate.id;
 }
 
-// Shared Mattermost env vars for open signup and relaxed security
+// Shared OLI env vars for open signup and relaxed security
 const OPEN_ACCESS_VARS = {
     MM_TEAMSETTINGS_ENABLEOPENSERVER: 'true',
     MM_EMAILSETTINGS_ENABLESIGNUPWITHEMAIL: 'true',
@@ -167,8 +182,8 @@ const OPEN_ACCESS_VARS = {
     MM_TEAMSETTINGS_ENABLEUSERACCESS: 'true',
 };
 
-// Step 5: Configure Mattermost env vars and wire to Postgres
-async function configureMattermost(projectId, serviceId, environmentId, postgresServiceId, siteUrl) {
+// Step 5: Configure OLI env vars and wire to Postgres
+async function configureOLI(projectId, serviceId, environmentId, postgresServiceId, siteUrl) {
     // Railway reference variables use ${{service.VAR}} syntax
     const pgRef = (v) => `\${{${postgresServiceId}.${v}}}`;
 
@@ -198,8 +213,8 @@ async function configureMattermost(projectId, serviceId, environmentId, postgres
     );
 }
 
-// Mattermost with SQLite — one Railway service only (fits free-tier limits).
-async function configureMattermostSqlite(projectId, serviceId, environmentId, siteUrl) {
+// OLI with SQLite — one Railway service only (fits free-tier limits).
+async function configureOLISqlite(projectId, serviceId, environmentId, siteUrl) {
     await railwayQuery(
         `mutation($input: VariableCollectionUpsertInput!) {
             variableCollectionUpsert(input: $input)
@@ -227,7 +242,35 @@ async function configureMattermostSqlite(projectId, serviceId, environmentId, si
     );
 }
 
-// Step 6: Expose Mattermost publicly (targetPort matches Mattermost HTTP listener)
+// OLI with shared Postgres — connection string points to pre-existing shared server.
+async function configureOLISharedPostgres(projectId, serviceId, environmentId, siteUrl, datasource) {
+    await railwayQuery(
+        `mutation($input: VariableCollectionUpsertInput!) {
+            variableCollectionUpsert(input: $input)
+        }`,
+        {
+            input: {
+                projectId,
+                serviceId,
+                environmentId,
+                variables: {
+                    MM_SQLSETTINGS_DRIVERNAME: 'postgres',
+                    MM_SQLSETTINGS_DATASOURCE: datasource,
+                    MM_SERVICESETTINGS_SITEURL: siteUrl,
+                    MM_SERVICESETTINGS_LISTENADDRESS: ':8065',
+                    MM_SERVICESETTINGS_ENABLELOCALMODE: 'true',
+                    MM_PLUGINSETTINGS_ENABLEUPLOADS: 'true',
+                    MM_PLUGINSETTINGS_ENABLE: 'true',
+                    MM_BLEVESETTINGS_INDEXDIR: '/mattermost/bleve-indexes',
+                    PORT: '8065',
+                    ...OPEN_ACCESS_VARS,
+                },
+            },
+        },
+    );
+}
+
+// Step 6: Expose OLI publicly (targetPort matches OLI HTTP listener)
 async function exposeService(_projectId, serviceId, environmentId) {
     const data = await railwayQuery(
         `mutation($input: ServiceDomainCreateInput!) {
@@ -274,14 +317,14 @@ async function getPublicDomain(projectId, serviceId, environmentId) {
     return list?.[0]?.domain ?? null;
 }
 
-// Wait for the Mattermost server to be reachable, then complete initial setup
+// Wait for the OLI server to be reachable, then complete initial setup
 // (create admin user + default team) so the desktop app sees a login page, not the setup wizard.
-async function setupMattermost(serverUrl, orgName) {
-    console.log(`[setup] Waiting for Mattermost at ${serverUrl} to be reachable...`);
+async function setupOLI(serverUrl, orgName) {
+    console.log(`[setup] Waiting for OLI at ${serverUrl} to be reachable...`);
 
     // Require multiple consecutive successful pings before proceeding.
     // On first boot, Postgres may restart (volume checks, init) causing
-    // Mattermost to briefly respond then crash-loop. Requiring consecutive
+    // OLI to briefly respond then crash-loop. Requiring consecutive
     // successes ensures the server is truly stable.
     const maxAttempts = 90; // 7.5 minutes at 5s intervals
     const requiredConsecutive = 3;
@@ -292,25 +335,25 @@ async function setupMattermost(serverUrl, orgName) {
             const res = await fetch(`${serverUrl}/api/v4/system/ping`);
             if (res.ok) {
                 consecutiveOk++;
-                console.log(`[setup] Mattermost ping OK (${consecutiveOk}/${requiredConsecutive}, attempt ${i + 1})`);
+                console.log(`[setup] OLI ping OK (${consecutiveOk}/${requiredConsecutive}, attempt ${i + 1})`);
                 if (consecutiveOk >= requiredConsecutive) {
-                    console.log(`[setup] Mattermost is stable after ${i + 1} attempts`);
+                    console.log(`[setup] OLI is stable after ${i + 1} attempts`);
                     break;
                 }
             } else {
                 if (consecutiveOk > 0) {
-                    console.log(`[setup] Mattermost ping failed (resetting consecutive count, attempt ${i + 1})`);
+                    console.log(`[setup] OLI ping failed (resetting consecutive count, attempt ${i + 1})`);
                 }
                 consecutiveOk = 0;
             }
         } catch {
             if (consecutiveOk > 0) {
-                console.log(`[setup] Mattermost unreachable (resetting consecutive count, attempt ${i + 1})`);
+                console.log(`[setup] OLI unreachable (resetting consecutive count, attempt ${i + 1})`);
             }
             consecutiveOk = 0;
         }
         if (i === maxAttempts - 1) {
-            console.error('[setup] Mattermost never became stable, skipping setup');
+            console.error('[setup] OLI never became stable, skipping setup');
             return;
         }
         await new Promise((r) => setTimeout(r, 5000));
@@ -386,9 +429,9 @@ async function setupMattermost(serverUrl, orgName) {
         // Configure the issues plugin with the shared AI service
         await configurePlugin(serverUrl, token);
 
-        console.log(`[setup] Mattermost setup complete. Users can now sign up with email/password.`);
+        console.log(`[setup] OLI setup complete. Users can now sign up with email/password.`);
     } catch (err) {
-        console.error(`[setup] Error during Mattermost setup:`, err);
+        console.error(`[setup] Error during OLI setup:`, err);
     }
 }
 
@@ -462,8 +505,8 @@ async function configurePlugin(serverUrl, token) {
     console.log(`[setup] Plugin configured with shared AI service`);
 }
 
-/** Postgres + Mattermost (two services). Requires Railway plan that allows both. */
-async function provisionPostgresAndMattermost(orgName) {
+/** Postgres + OLI (two services). Requires Railway plan that allows both. */
+async function provisionPostgresAndOLI(orgName) {
     console.log(`[railway] Creating project for org: ${orgName}`);
     const {projectId, environmentId} = await createProject(orgName);
 
@@ -473,23 +516,23 @@ async function provisionPostgresAndMattermost(orgName) {
     await attachPostgresVolume(projectId, environmentId, postgresId);
     await configurePostgres(projectId, postgresId, environmentId);
 
-    console.log(`[railway] Creating Mattermost service...`);
-    const mattermostId = await createMattermost(projectId);
+    console.log(`[railway] Creating OLI service...`);
+    const mattermostId = await createOLI(projectId);
 
     // Get domain BEFORE configuring so SITEURL is correct on first boot
     const domain = await exposeService(projectId, mattermostId, environmentId);
     const serverUrl = domain ? `https://${domain}` : null;
     console.log(`[railway] Assigned domain: ${domain}`);
 
-    await configureMattermost(projectId, mattermostId, environmentId, postgresId, serverUrl);
+    await configureOLI(projectId, mattermostId, environmentId, postgresId, serverUrl);
 
     console.log(`[railway] Deploying services...`);
     await deployService(postgresId, environmentId);
     await deployService(mattermostId, environmentId);
 
-    // Wait for Mattermost to boot and complete initial setup
+    // Wait for OLI to boot and complete initial setup
     if (serverUrl) {
-        await setupMattermost(serverUrl, orgName);
+        await setupOLI(serverUrl, orgName);
     }
 
     console.log(`[railway] Provisioned: ${serverUrl}`);
@@ -503,24 +546,24 @@ async function provisionPostgresAndMattermost(orgName) {
     };
 }
 
-/** One Mattermost service + SQLite + volume — fits Railway free-tier service limits. */
-async function provisionMattermostSqliteOnly(orgName) {
+/** One OLI service + SQLite + volume — fits Railway free-tier service limits. */
+async function provisionOLISqliteOnly(orgName) {
     console.log(`[railway] Creating project for org: ${orgName}`);
     const {projectId, environmentId} = await createProject(orgName);
 
-    console.log(`[railway] Creating Mattermost service (SQLite, single service)...`);
-    const mattermostId = await createMattermost(projectId);
-    console.log(`[railway] Attaching Mattermost data volume at /var/lib/mattermost...`);
-    await attachMattermostVolume(projectId, environmentId, mattermostId);
+    console.log(`[railway] Creating OLI service (SQLite, single service)...`);
+    const mattermostId = await createOLI(projectId);
+    console.log(`[railway] Attaching OLI data volume at /var/lib/mattermost...`);
+    await attachOLIVolume(projectId, environmentId, mattermostId);
 
     // Get domain BEFORE configuring so SITEURL is correct on first boot
     const domain = await exposeService(projectId, mattermostId, environmentId);
     const serverUrl = domain ? `https://${domain}` : null;
     console.log(`[railway] Assigned domain: ${domain}`);
 
-    await configureMattermostSqlite(projectId, mattermostId, environmentId, serverUrl);
+    await configureOLISqlite(projectId, mattermostId, environmentId, serverUrl);
 
-    console.log(`[railway] Deploying Mattermost...`);
+    console.log(`[railway] Deploying OLI...`);
     await deployService(mattermostId, environmentId);
 
     console.log(`[railway] Provisioned (lite): ${serverUrl}`);
@@ -534,17 +577,58 @@ async function provisionMattermostSqliteOnly(orgName) {
     };
 }
 
-export async function provisionOrganization(orgName) {
+/** OLI service only — connects to shared Postgres (fast provisioning). */
+async function provisionOLISharedPostgres(orgName, datasource) {
+    console.log(`[railway] Creating project for org: ${orgName}`);
+    const {projectId, environmentId} = await createProject(orgName);
+
+    console.log(`[railway] Creating OLI service (shared Postgres)...`);
+    const mattermostId = await createOLI(projectId);
+
+    // Get domain BEFORE configuring so SITEURL is correct on first boot
+    const domain = await exposeService(projectId, mattermostId, environmentId);
+    const serverUrl = domain ? `https://${domain}` : null;
+    console.log(`[railway] Assigned domain: ${domain}`);
+
+    await configureOLISharedPostgres(projectId, mattermostId, environmentId, serverUrl, datasource);
+
+    console.log(`[railway] Deploying OLI...`);
+    await deployService(mattermostId, environmentId);
+
+    // Wait for OLI to boot and complete initial setup
+    if (serverUrl) {
+        await setupOLI(serverUrl, orgName);
+    }
+
+    console.log(`[railway] Provisioned (shared postgres): ${serverUrl}`);
+
+    return {
+        projectId,
+        environmentId,
+        postgresServiceId: null,
+        mattermostServiceId: mattermostId,
+        serverUrl,
+    };
+}
+
+export async function provisionOrganization(orgName, options = {}) {
     const mode = config.railwayStackMode();
+    if (mode === 'shared') {
+        if (!options.datasource) {
+            throw new Error('datasource is required for shared stack mode');
+        }
+        console.log('[railway] Stack mode: shared (OLI + shared Postgres — one service)');
+        return provisionOLISharedPostgres(orgName, options.datasource);
+    }
     if (mode === 'full') {
-        console.log('[railway] Stack mode: full (Postgres + Mattermost — two services)');
-        return provisionPostgresAndMattermost(orgName);
+        console.log('[railway] Stack mode: full (Postgres + OLI — two services)');
+        return provisionPostgresAndOLI(orgName);
     }
     if (mode !== 'lite') {
         console.warn(`[railway] Unknown OLI_RAILWAY_STACK_MODE="${mode}", using lite`);
     }
     console.log(
-        '[railway] Stack mode: lite (Mattermost + SQLite — one service). Set OLI_RAILWAY_STACK_MODE=full for Postgres.',
+        '[railway] Stack mode: lite (OLI + SQLite — one service). Set OLI_RAILWAY_STACK_MODE=full for Postgres.',
     );
-    return provisionMattermostSqliteOnly(orgName);
+    return provisionOLISqliteOnly(orgName);
 }

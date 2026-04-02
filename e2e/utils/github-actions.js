@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 /* eslint-disable no-console -- Logging is intentional in CI utility scripts */
 
@@ -19,7 +19,7 @@ async function updateInitialStatus({github, context, platforms}) {
             sha: context.sha,
             state: 'pending',
             context: `e2e/${platform.platform}`,
-            description: `E2E tests for Mattermost desktop app on ${platform.platform} have started...`,
+            description: `E2E tests for OLI desktop app on ${platform.platform} have started...`,
             target_url: workflowUrl,
         }),
     ));

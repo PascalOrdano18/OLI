@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {getFocusAssist, isPriority} from 'windows-focus-assist';
@@ -20,7 +20,7 @@ function getWindowsDoNotDisturb() {
     case 2:
         return true;
     case 1:
-        return !(isPriority('Mattermost.Desktop').value);
+        return !(isPriority('OLI.Desktop').value);
     default:
         return false;
     }

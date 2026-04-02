@@ -13,14 +13,15 @@ const config = {
     railwayApiToken: () => required('RAILWAY_API_TOKEN'),
     supabaseUrl: () => required('SUPABASE_URL'),
     supabaseServiceKey: () => required('SUPABASE_SERVICE_KEY'),
-    oliMattermostImage: () =>
+    oliOLIImage: () =>
         process.env.OLI_MATTERMOST_IMAGE || 'docker.io/vosv/oli-mattermost:latest',
     /**
      * Railway free tier usually allows only one *service* per new project before upgrades.
-     * - lite: one Mattermost container + SQLite + one volume (works on free tier)
-     * - full: Postgres service + Mattermost service (needs a plan that allows 2+ services per project)
+     * - lite: one OLI container + SQLite + one volume (works on free tier)
+     * - full: Postgres service + OLI service (needs a plan that allows 2+ services per project)
      */
     railwayStackMode: () => (process.env.OLI_RAILWAY_STACK_MODE || 'lite').toLowerCase(),
+    sharedPostgresUrl: () => process.env.SHARED_POSTGRES_URL || null,
 
     // Shared AI service — all orgs use the same hosted instance
     aiServiceUrl: () => required('OLI_AI_SERVICE_URL'),
