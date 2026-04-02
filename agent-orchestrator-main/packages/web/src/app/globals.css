@@ -3361,3 +3361,35 @@ html.light .xterm .xterm-viewport:hover::-webkit-scrollbar-thumb:active {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+/* ── Chat UI ──────────────────────────────────────────────────────── */
+
+@keyframes chat-pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+.chat-markdown p { margin-bottom: 0.5em; }
+.chat-markdown p:last-child { margin-bottom: 0; }
+.chat-markdown ul { padding-left: 1.25em; margin: 0.5em 0; display: flex; flex-direction: column; gap: 0.375em; }
+.chat-markdown strong { font-weight: 600; }
+
+.chat-inline-code {
+  font-family: var(--font-jetbrains-mono);
+  font-size: 12px;
+  background: var(--color-bg-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--color-accent);
+}
+
+.chat-code-block {
+  font-family: var(--font-jetbrains-mono);
+  font-size: 12px;
+  background: var(--color-bg-subtle);
+  padding: 12px 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+  line-height: 1.5;
+}

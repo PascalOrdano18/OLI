@@ -8,6 +8,7 @@ import {
   recordApiObservation,
   resolveProjectIdForSessionId,
 } from "@/lib/observability";
+import agentProcessManager from "../../../../../../server/agent-process-manager";
 
 const MAX_MESSAGE_LENGTH = 10_000;
 
@@ -42,6 +43,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { config, sessionManager } = await getServices();
     const projectId = resolveProjectIdForSessionId(config, id);
+
+    // Route to AgentProcessManager for chat-mode sessions
+    const session = await sessionManager.get(id);
+    if (session?.metadata?.["useChatUI"] === "true") {
+      await agentProcessManager.send(id, message);
+      recordApiObservation({
+        config,
+        method: "POST",
+        path: "/api/sessions/[id]/send",
+        correlationId,
+        startedAt,
+        outcome: "success",
+        statusCode: 200,
+        projectId,
+        sessionId: id,
+        data: { messageLength: message.length, chatMode: true },
+      });
+      return jsonWithCorrelation(
+        { ok: true, sessionId: id, message },
+        { status: 200 },
+        correlationId,
+      );
+    }
+
     await sessionManager.send(id, message);
     recordApiObservation({
       config,

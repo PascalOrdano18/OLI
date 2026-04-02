@@ -157,6 +157,7 @@
     "webpack-merge": "5.8.0"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "^2.1.87",
     "@emotion/react": "11.11.4",
     "@floating-ui/react": "0.26.28",
     "@mattermost/compass-icons": "0.1.45",

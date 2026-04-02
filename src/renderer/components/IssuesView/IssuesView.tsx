@@ -2,10 +2,6 @@
 // See LICENSE.txt for license information.
 
 import React, {useEffect, useState, useCallback, useRef} from 'react';
-import {Terminal} from 'xterm';
-import {FitAddon} from 'xterm-addon-fit';
-import 'xterm/css/xterm.css';
-
 import './IssuesView.scss';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -261,145 +257,121 @@ const CreateIssueModal: React.FC<{
     );
 };
 
-// ── EmbeddedTerminal ───────────────────────────────────────────────────────
+// ── AgentChat ─────────────────────────────────────────────────────────────
 
-const EmbeddedTerminal: React.FC<{projectId: string}> = ({projectId}) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const termRef = useRef<Terminal | null>(null);
-    const fitRef = useRef<FitAddon | null>(null);
+interface AgentEvent {
+    id: string;
+    sessionId: string;
+    timestamp: string;
+    type: string;
+    data: any;
+}
+
+const AgentChat: React.FC<{projectId: string}> = ({projectId}) => {
+    const [events, setEvents] = useState<AgentEvent[]>([]);
+    const [input, setInput] = useState('');
+    const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!containerRef.current) { return; }
-        const term = new Terminal({
-            theme: {
-                background: '#f5f5f7',
-                foreground: '#1d1d1f',
-                cursor: '#000000',
-                cursorAccent: '#ffffff',
-                selectionBackground: 'rgba(178, 215, 255, 0.5)',
-                selectionInactiveBackground: 'rgba(180, 180, 200, 0.2)',
-                black: '#000000', red: '#c91b00', green: '#00a600', yellow: '#c7c400',
-                blue: '#0225c7', magenta: '#c930c7', cyan: '#00a6b2', white: '#c7c7c7',
-                brightBlack: '#676767', brightRed: '#ff6d67', brightGreen: '#5ff967',
-                brightYellow: '#fefb67', brightBlue: '#6871ff', brightMagenta: '#ff76ff',
-                brightCyan: '#5ffdff', brightWhite: '#feffff',
-            },
-            fontFamily: '"Menlo", "Monaco", "Courier New", monospace',
-            fontSize: 13,
-            lineHeight: 1.3,
-            cursorBlink: true,
-            scrollback: 10000,
-            allowProposedApi: true,
-            disableStdin: false,
-            allowTransparency: false,
-            fastScrollModifier: 'alt',
-        });
-        const fit = new FitAddon();
-        term.loadAddon(fit);
-        term.open(containerRef.current);
-        fit.fit();
-        termRef.current = term;
-        fitRef.current = fit;
-
-        // XDA handler so tmux enables clipboard (OSC 52) support
-        term.parser.registerCsiHandler({prefix: '>', final: 'q'}, () => {
-            term.write('\x1bP>|XTerm(370)\x1b\\');
-            return true;
-        });
-
-        // OSC 52 handler — write tmux-copied text to clipboard
-        term.parser.registerOscHandler(52, (data) => {
-            const parts = data.split(';');
-            if (parts.length < 2) { return false; }
-            try {
-                const binary = atob(parts[parts.length - 1]);
-                const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-                navigator.clipboard?.writeText(new TextDecoder().decode(bytes)).catch(() => { /* ignore */ });
-            } catch { /* ignore */ }
-            return true;
-        });
-
-        // Cmd+C / Ctrl+Shift+C to copy selection
-        term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
-            if (e.type !== 'keydown') { return true; }
-            const isCopy =
-                (e.metaKey && !e.ctrlKey && !e.altKey && e.code === 'KeyC') ||
-                (e.ctrlKey && e.shiftKey && e.code === 'KeyC');
-            if (isCopy && term.hasSelection()) {
-                navigator.clipboard?.writeText(term.getSelection()).catch(() => { /* ignore */ });
-                term.clearSelection();
-                return false;
-            }
-            return true;
-        });
-
-        // Buffer writes while selection is active so highlights aren't wiped
-        const writeBuffer: string[] = [];
-        let selectionActive = false;
-        let safetyTimer: ReturnType<typeof setTimeout> | null = null;
-
-        const flushBuffer = () => {
-            if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
-            if (writeBuffer.length > 0) {
-                term.write(writeBuffer.join(''));
-                writeBuffer.length = 0;
-            }
+        const handleEvent = (event: AgentEvent) => {
+            setEvents((prev) => [...prev, event]);
         };
-
-        const selDisposable = term.onSelectionChange(() => {
-            if (term.hasSelection()) {
-                selectionActive = true;
-                if (!safetyTimer) {
-                    safetyTimer = setTimeout(() => { selectionActive = false; flushBuffer(); }, 5000);
-                }
-            } else {
-                selectionActive = false;
-                flushBuffer();
-            }
-        });
-
-        // Sync terminal size to tmux on resize
-        const syncSize = () => {
-            if (!fitRef.current || !termRef.current) { return; }
-            fitRef.current.fit();
-            window.desktop.ao.resizeTerminal(projectId, termRef.current.cols, termRef.current.rows).catch(() => { /* ignore */ });
-        };
-        term.onResize(({cols, rows}) => {
-            window.desktop.ao.resizeTerminal(projectId, cols, rows).catch(() => { /* ignore */ });
-        });
-
-        // Forward keystrokes to tmux
-        const inputDisposable = term.onData((input) => {
-            window.desktop.ao.sendRawInput(projectId, input).catch(() => { /* ignore */ });
-        });
-
-        // Receive streaming data from main process
-        const handleOutput = (data: {data: string; isInitial?: boolean}) => {
-            const chunk = data.data;
-            if (selectionActive) {
-                writeBuffer.push(chunk);
-            } else {
-                term.write(chunk);
-            }
-        };
-        window.desktop.ao.onOutputUpdate(handleOutput);
-
-        const ro = new ResizeObserver(syncSize);
-        if (containerRef.current) { ro.observe(containerRef.current); }
-
-        syncSize();
-
+        window.desktop.ao.onOutputUpdate(handleEvent);
         return () => {
-            inputDisposable.dispose();
-            selDisposable.dispose();
-            if (safetyTimer) { clearTimeout(safetyTimer); }
-            window.desktop.ao.offOutputUpdate(handleOutput);
-            ro.disconnect();
-            term.dispose();
+            window.desktop.ao.offOutputUpdate(handleEvent);
         };
     }, [projectId]);
 
-    return <div ref={containerRef} className='IV__terminal'/>;
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({behavior: 'smooth'});
+    }, [events]);
+
+    const handleSend = () => {
+        if (!input.trim()) {
+            return;
+        }
+        window.desktop.ao.sendMessage(projectId, input.trim()).catch(() => { /* ignore */ });
+        setInput('');
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    };
+
+    const renderEvent = (event: AgentEvent) => {
+        switch (event.type) {
+        case 'user_message':
+            return (
+                <div key={event.id} className='IV__chatMsg IV__chatMsg--user'>
+                    <div className='IV__chatMsgLabel'>{'You'}</div>
+                    <div className='IV__chatMsgText'>{event.data.text}</div>
+                </div>
+            );
+        case 'assistant_message':
+            return (
+                <div key={event.id} className='IV__chatMsg IV__chatMsg--assistant'>
+                    <div className='IV__chatMsgLabel'>{'Claude'}</div>
+                    <pre className='IV__chatMsgText'>{event.data.text}</pre>
+                </div>
+            );
+        case 'thinking':
+            return (
+                <div key={event.id} className='IV__chatMsg IV__chatMsg--thinking'>
+                    <div className='IV__chatMsgLabel'>{'Thinking'}</div>
+                    <div className='IV__chatMsgText IV__chatMsgText--dim'>{event.data.text}</div>
+                </div>
+            );
+        case 'tool_use':
+            return (
+                <div key={event.id} className='IV__chatToolUse'>
+                    <span className='IV__chatToolName'>{event.data.toolName}</span>
+                    <span className='IV__chatToolSummary'>{event.data.summary}</span>
+                </div>
+            );
+        case 'error':
+            return (
+                <div key={event.id} className='IV__chatMsg IV__chatMsg--error'>
+                    <div className='IV__chatMsgText'>{event.data.message}</div>
+                </div>
+            );
+        case 'status':
+            return (
+                <div key={event.id} className='IV__chatStatus'>
+                    {event.data.status === 'active' ? 'Agent is working...' :
+                        event.data.status === 'idle' ? 'Agent finished.' :
+                            event.data.status === 'spawning' ? 'Starting agent...' :
+                                event.data.status === 'error' ? 'Agent encountered an error.' : ''}
+                </div>
+            );
+        default:
+            return null;
+        }
+    };
+
+    return (
+        <div className='IV__agentChat'>
+            <div className='IV__chatMessages'>
+                {events.map(renderEvent)}
+                <div ref={bottomRef}/>
+            </div>
+            <div className='IV__chatInputArea'>
+                <textarea
+                    className='IV__chatInput'
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder='Send a message...'
+                    rows={2}
+                />
+                <button className='IV__btn IV__btn--primary IV__chatSendBtn' onClick={handleSend} disabled={!input.trim()}>
+                    {'Send'}
+                </button>
+            </div>
+        </div>
+    );
 };
 
 // ── SubTabBar ──────────────────────────────────────────────────────────────
@@ -794,19 +766,17 @@ const WorkArea: React.FC<{
         );
     }
 
-    // Agent running — show terminal
+    // Agent running — show chat
     if (sessionId) {
         return (
             <div className='IV__workArea'>
-                <div className='IV__terminalHeader'>
-                    <span className='IV__terminalSessionId'>{sessionId}</span>
-                    <span className='IV__terminalPulse'>{'● running'}</span>
-                    <span className='IV__terminalTimer'>{fmtTime(elapsedSecs)}</span>
+                <div className='IV__chatHeader'>
+                    <span className='IV__chatSessionId'>{sessionId}</span>
+                    <span className='IV__chatPulse'>{'● running'}</span>
+                    <span className='IV__chatTimer'>{fmtTime(elapsedSecs)}</span>
                     <button className='IV__btn IV__btn--danger IV__btn--sm' onClick={handleKill}>{'■ Kill'}</button>
                 </div>
-                <div className='IV__terminalBody'>
-                    <EmbeddedTerminal projectId={activeProjectId}/>
-                </div>
+                <AgentChat projectId={activeProjectId}/>
             </div>
         );
     }

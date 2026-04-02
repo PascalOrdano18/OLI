@@ -2,23 +2,24 @@
 // See LICENSE.txt for license information.
 
 import {createHash} from 'crypto';
-import {execFile, spawn} from 'child_process';
-import {createReadStream, existsSync, mkdirSync, ReadStream, readFileSync, unlinkSync, writeFileSync} from 'fs';
+import {execFile, spawn, ChildProcess} from 'child_process';
+import {existsSync, mkdirSync, readFileSync, writeFileSync, rmSync} from 'fs';
 import {join, resolve} from 'path';
-import {tmpdir} from 'os';
 import {promisify} from 'util';
+import {createInterface} from 'readline';
 
-import {app, BrowserWindow, dialog, WebContents} from 'electron';
+import {app, BrowserWindow, dialog} from 'electron';
 
 import {Logger} from 'common/log';
 import ServerManager from 'common/servers/serverManager';
-
 import {AO_OUTPUT_UPDATE} from 'common/communication';
+import {createAgentEvent} from 'common/agentEvents';
+import type {AgentEvent, AgentStatus} from 'common/agentEvents';
 
 const log = new Logger('AoManager');
 const execFileAsync = promisify(execFile);
 
-const AO_CLI_PATH = resolve(app.getAppPath(), '../agent-orchestrator-main/packages/cli/dist/index.js');
+const CLAUDE_CLI_PATH = resolve(app.getAppPath(), '../node_modules/@anthropic-ai/claude-code/cli.js');
 
 interface AoIssue {
     id: string;
@@ -29,64 +30,156 @@ interface AoIssue {
 
 interface SessionEntry {
     sessionId: string;
-    tmuxName: string;
     projectId: string;
-    pollInterval: ReturnType<typeof setInterval> | null;
-    pipeStream: ReadStream | null;
-    pipePath: string | null;
-    lastOutput: string;
+    claudeProcess: ChildProcess | null;
+    status: AgentStatus;
+    history: AgentEvent[];
     webContentsId: number;
+    repoPath: string;
+    worktreePath: string | null;
 }
 
 interface ProjectPaths {
     [key: string]: string;
 }
 
-interface PersistedSessions {
-    [projectId: string]: {sessionId: string; tmuxName: string};
-}
-
 export class AoManager {
     private sessions: Map<string, SessionEntry> = new Map();
 
-    private getSessionsFile(): string {
-        const dir = join(app.getPath('userData'), 'ao');
-        mkdirSync(dir, {recursive: true});
-        return join(dir, 'sessions.json');
-    }
+    // ─── Broadcast helpers ───────────────────────────────────────────
 
-    private loadPersistedSessions(): PersistedSessions {
-        try {
-            const file = this.getSessionsFile();
-            if (!existsSync(file)) {
-                return {};
+    private broadcastEvent(entry: SessionEntry, event: AgentEvent): void {
+        entry.history.push(event);
+        const allWindows = BrowserWindow.getAllWindows();
+        for (const win of allWindows) {
+            if (!win.webContents.isDestroyed()) {
+                win.webContents.send(AO_OUTPUT_UPDATE, event);
             }
-            return JSON.parse(readFileSync(file, 'utf-8'));
-        } catch {
-            return {};
         }
     }
 
-    private persistSession(projectId: string, sessionId: string, tmuxName: string): void {
-        const sessions = this.loadPersistedSessions();
-        sessions[projectId] = {sessionId, tmuxName};
-        writeFileSync(this.getSessionsFile(), JSON.stringify(sessions, null, 2));
-    }
+    // ─── SDK event processing ────────────────────────────────────────
 
-    private removePersistedSession(projectId: string): void {
-        const sessions = this.loadPersistedSessions();
-        delete sessions[projectId];
-        writeFileSync(this.getSessionsFile(), JSON.stringify(sessions, null, 2));
-    }
-
-    private getTmuxName(projectId: string): string | null {
-        const entry = this.sessions.get(projectId);
-        if (entry) {
-            return entry.tmuxName;
+    private processSDKEvent(entry: SessionEntry, sdkEvent: any): void {
+        if (sdkEvent.type === 'assistant' && sdkEvent.message?.content) {
+            for (const block of sdkEvent.message.content) {
+                if (block.type === 'text') {
+                    const event = createAgentEvent(entry.sessionId, 'assistant_message', {
+                        text: block.text,
+                    });
+                    this.broadcastEvent(entry, event);
+                } else if (block.type === 'thinking') {
+                    const event = createAgentEvent(entry.sessionId, 'thinking', {
+                        text: block.thinking,
+                    });
+                    this.broadcastEvent(entry, event);
+                } else if (block.type === 'tool_use') {
+                    const event = createAgentEvent(entry.sessionId, 'tool_use', {
+                        toolName: block.name,
+                        summary: this.summarizeToolInput(block.name, block.input),
+                        callId: block.id,
+                    });
+                    this.broadcastEvent(entry, event);
+                }
+            }
         }
-        const persisted = this.loadPersistedSessions()[projectId];
-        return persisted?.tmuxName ?? null;
     }
+
+    private summarizeToolInput(toolName: string, input: any): string {
+        if (!input) {
+            return toolName;
+        }
+        if (typeof input.file_path === 'string') {
+            const filename = input.file_path.split('/').pop() ?? input.file_path;
+            return `${filename}`;
+        }
+        if (typeof input.command === 'string') {
+            const cmd = input.command.length > 60 ?
+                input.command.slice(0, 57) + '...' :
+                input.command;
+            return cmd;
+        }
+        if (typeof input.pattern === 'string') {
+            return input.pattern;
+        }
+        if (typeof input.query === 'string') {
+            return input.query;
+        }
+        return toolName;
+    }
+
+    // ─── Claude CLI runner ────────────────────────────────────────────
+
+    private runClaude(entry: SessionEntry, prompt: string, resumeSessionId?: string): void {
+        entry.status = 'active';
+        this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'active' as AgentStatus}));
+
+        const args = [
+            CLAUDE_CLI_PATH,
+            '--print',
+            '--output-format', 'stream-json',
+            '--verbose',
+            '--dangerously-skip-permissions',
+        ];
+
+        if (resumeSessionId) {
+            args.push('--resume', resumeSessionId);
+        }
+
+        args.push(prompt);
+
+        const proc = spawn('node', args, {
+            cwd: entry.repoPath,
+            env: {...process.env},
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        entry.claudeProcess = proc;
+
+        // Parse newline-delimited JSON from stdout
+        const rl = createInterface({input: proc.stdout!});
+        rl.on('line', (line: string) => {
+            if (!line.trim()) {
+                return;
+            }
+            try {
+                const sdkEvent = JSON.parse(line);
+                this.processSDKEvent(entry, sdkEvent);
+
+                // Capture the session ID from the init event for future --resume
+                if (sdkEvent.type === 'system' && sdkEvent.subtype === 'init' && sdkEvent.session_id) {
+                    entry.sessionId = sdkEvent.session_id;
+                }
+            } catch {
+                // Non-JSON output — ignore
+            }
+        });
+
+        proc.stderr?.on('data', (data: Buffer) => {
+            log.warn('Claude CLI stderr', {data: data.toString().slice(0, 200)});
+        });
+
+        proc.on('close', (code) => {
+            entry.claudeProcess = null;
+            if (code === 0 || code === null) {
+                entry.status = 'idle';
+                this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'idle' as AgentStatus}));
+            } else {
+                entry.status = 'error';
+                this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'error', {message: `Claude exited with code ${code}`}));
+                this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'error' as AgentStatus}));
+            }
+        });
+
+        proc.on('error', (err) => {
+            entry.claudeProcess = null;
+            entry.status = 'error';
+            this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'error', {message: err.message}));
+            this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'error' as AgentStatus}));
+        });
+    }
+
+    // ─── Server / path helpers (unchanged) ───────────────────────────
 
     private getServerHash(): string {
         const serverId = ServerManager.getCurrentServerId();
@@ -97,12 +190,6 @@ export class AoManager {
 
     private getServerId(): string {
         return ServerManager.getCurrentServerId() ?? 'default';
-    }
-
-    private getConfigDir(): string {
-        const dir = join(app.getPath('userData'), 'ao', this.getServerHash());
-        mkdirSync(dir, {recursive: true});
-        return dir;
     }
 
     private getPathsFile(): string {
@@ -140,227 +227,118 @@ export class AoManager {
     }
 
     private async detectDefaultBranch(repoPath: string): Promise<string> {
+        // Try origin/HEAD symbolic ref (most reliable)
         try {
             const {stdout} = await execFileAsync('git', [
                 '-C', repoPath, 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD',
             ]);
             return stdout.trim().replace(/^origin\//, '');
-        } catch {
+        } catch { /* origin/HEAD not set */ }
+
+        // Try common default branch names by checking if they exist as remote refs
+        for (const candidate of ['main', 'master']) {
             try {
-                const {stdout} = await execFileAsync('git', [
-                    '-C', repoPath, 'rev-parse', '--abbrev-ref', 'HEAD',
+                await execFileAsync('git', [
+                    '-C', repoPath, 'rev-parse', '--verify', `refs/remotes/origin/${candidate}`,
                 ]);
-                return stdout.trim() || 'main';
+                return candidate;
+            } catch { /* branch doesn't exist */ }
+        }
+
+        return 'main';
+    }
+
+    // ─── Worktree lifecycle ─────────────────────────────────────────
+
+    private sanitizeForBranch(identifier: string): string {
+        return identifier.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    }
+
+    /**
+     * Create an isolated git worktree for an issue.
+     * Path: ~/.worktrees/{projectId}/{sanitized-identifier}/
+     * Branch: oli/{sanitized-identifier} based on origin/{defaultBranch}
+     */
+    private async createWorktree(projectId: string, issueIdentifier: string, repoPath: string): Promise<string> {
+        const homedir = require('os').homedir();
+        const sanitizedId = this.sanitizeForBranch(issueIdentifier);
+        const projectWorktreeDir = join(homedir, '.worktrees', projectId);
+        const worktreePath = join(projectWorktreeDir, sanitizedId);
+
+        // Reuse existing valid worktree
+        if (existsSync(worktreePath)) {
+            try {
+                await execFileAsync('git', ['-C', worktreePath, 'rev-parse', '--is-inside-work-tree']);
+                log.info('Reusing existing worktree', {worktreePath});
+                return worktreePath;
             } catch {
-                return 'main';
+                // Directory exists but isn't a valid worktree — prune and recreate
+                rmSync(worktreePath, {recursive: true, force: true});
+                try {
+                    await execFileAsync('git', ['-C', repoPath, 'worktree', 'prune']);
+                } catch { /* best effort */ }
             }
         }
-    }
 
-    private generateConfig(
-        projectId: string,
-        projectName: string,
-        sessionPrefix: string,
-        repoPath: string,
-        defaultBranch: string,
-    ): string {
-        const configDir = this.getConfigDir();
-        const dataDir = join(configDir, '.ao-data');
-        const worktreeDir = join(configDir, '.worktrees');
+        mkdirSync(projectWorktreeDir, {recursive: true});
 
-        return [
-            `dataDir: ${dataDir}`,
-            `worktreeDir: ${worktreeDir}`,
-            `port: 3100`,
-            '',
-            `projects:`,
-            `  ${projectId}:`,
-            `    repo: local/${projectName}`,
-            `    path: ${repoPath}`,
-            `    defaultBranch: ${defaultBranch}`,
-            `    sessionPrefix: "${sessionPrefix}"`,
-            `    agentRules: |`,
-            `      You are working in an isolated git worktree on a dedicated feature branch.`,
-            `      Your job is to implement the changes described in the issue.`,
-            ``,
-            `      ## Rules`,
-            `      - Do NOT create pull requests or push to any remote.`,
-            `      - Do NOT create new branches — you are already on the correct feature branch.`,
-            `      - Commit your changes locally when the implementation is complete.`,
-            ``,
-            `      ## When finished`,
-            `      Output a clear "## How to Test" section at the end with exact instructions:`,
-            `      how to run the app or script, what commands to execute, and what to look for`,
-            `      to verify your changes work correctly.`,
-            `    scm:`,
-            `      plugin: local`,
-            `    tracker:`,
-            `      plugin: local`,
-        ].join('\n');
-    }
-
-    private writeConfig(
-        projectId: string,
-        projectName: string,
-        sessionPrefix: string,
-        repoPath: string,
-        defaultBranch: string,
-    ): void {
-        const configDir = this.getConfigDir();
-        const yaml = this.generateConfig(projectId, projectName, sessionPrefix, repoPath, defaultBranch);
-        writeFileSync(join(configDir, 'agent-orchestrator.yaml'), yaml);
-        log.debug('Wrote AO config', {configDir, projectId});
-    }
-
-    private runAo(args: string[], cwd: string): Promise<string> {
-        return new Promise((resolve, reject) => {
-            log.debug('Running AO', {args, cwd});
-            const proc = spawn('node', [AO_CLI_PATH, ...args], {
-                cwd,
-                env: {...process.env},
-            });
-
-            let stdout = '';
-            let stderr = '';
-
-            proc.stdout.on('data', (d: Buffer) => {
-                stdout += d.toString();
-            });
-            proc.stderr.on('data', (d: Buffer) => {
-                stderr += d.toString();
-            });
-
-            proc.on('close', (code) => {
-                if (code === 0) {
-                    resolve(stdout);
-                } else {
-                    reject(new Error(`ao ${args[0]} exited ${code}: ${stderr}`));
-                }
-            });
-
-            proc.on('error', reject);
-        });
-    }
-
-    private async autoAcceptBypassPrompt(tmuxName: string): Promise<void> {
-        // Wait for Claude to start, then auto-accept the bypass permissions warning
-        const deadline = Date.now() + 20000;
-        while (Date.now() < deadline) {
-            await new Promise((r) => setTimeout(r, 500));
-            const output = await this.captureTmux(tmuxName);
-            if (/Bypass Permissions mode|bypass.*permissions/i.test(output)) {
-                // Single key "2" selects "Yes, I accept" — no Enter needed for Claude's TUI
-                await execFileAsync('tmux', ['send-keys', '-t', tmuxName, '2']);
-                await new Promise((r) => setTimeout(r, 500));
-                return;
-            }
-            // Claude started without showing the bypass prompt (already accepted before)
-            if (/^\s*❯/.test(output) || /claude code/i.test(output)) {
-                return;
-            }
-        }
-    }
-
-    private async captureTmux(tmuxName: string): Promise<string> {
+        // Fetch latest from remote (non-fatal if offline)
         try {
-            const {stdout} = await execFileAsync('tmux', [
-                'capture-pane', '-t', tmuxName, '-p', '-e', '-S', '-200',
+            await execFileAsync('git', ['-C', repoPath, 'fetch', 'origin', '--quiet']);
+        } catch { /* offline is fine */ }
+
+        const defaultBranch = await this.detectDefaultBranch(repoPath);
+        const branch = `oli/${sanitizedId}`;
+        const baseRef = `origin/${defaultBranch}`;
+
+        try {
+            // Create worktree with a new branch based on the default branch
+            await execFileAsync('git', [
+                '-C', repoPath, 'worktree', 'add', '-b', branch, worktreePath, baseRef,
             ]);
-            return stdout;
-        } catch {
-            return '';
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (!msg.includes('already exists')) {
+                throw new Error(`Failed to create worktree for "${issueIdentifier}": ${msg}`);
+            }
+
+            // Branch already exists — create worktree on base ref, then checkout the branch
+            await execFileAsync('git', ['-C', repoPath, 'worktree', 'add', worktreePath, baseRef]);
+            try {
+                await execFileAsync('git', ['-C', worktreePath, 'checkout', branch]);
+            } catch (checkoutErr: unknown) {
+                // Clean up orphaned worktree before rethrowing
+                try {
+                    await execFileAsync('git', ['-C', repoPath, 'worktree', 'remove', '--force', worktreePath]);
+                } catch { /* best effort */ }
+                const checkoutMsg = checkoutErr instanceof Error ? checkoutErr.message : String(checkoutErr);
+                throw new Error(`Failed to checkout branch "${branch}": ${checkoutMsg}`);
+            }
         }
+
+        log.info('Created worktree', {projectId, branch, worktreePath});
+        return worktreePath;
     }
 
-    private getPipePath(projectId: string): string {
-        const safe = projectId.replace(/[^a-z0-9]/gi, '-');
-        return join(tmpdir(), `ao-term-${safe}.pipe`);
-    }
-
-    private async startStreaming(entry: SessionEntry, webContents: WebContents): Promise<void> {
-        const pipePath = this.getPipePath(entry.projectId);
-        entry.pipePath = pipePath;
-
-        // Clean up any leftover pipe from a previous session
-        if (existsSync(pipePath)) {
-            try { unlinkSync(pipePath); } catch { /* ignore */ }
-        }
-
-        // Send current screen as initial state so the terminal isn't blank
-        const initial = await this.captureTmux(entry.tmuxName);
-        if (!webContents.isDestroyed() && initial) {
-            webContents.send(AO_OUTPUT_UPDATE, {data: '\x1b[H\x1b[2J' + initial, isInitial: true});
-        }
-
-        // Create FIFO for streaming
+    /**
+     * Remove a git worktree. Does NOT delete the branch (can be cleaned up separately).
+     */
+    private async destroyWorktree(worktreePath: string): Promise<void> {
         try {
-            await execFileAsync('mkfifo', [pipePath]);
-        } catch (err) {
-            log.warn('mkfifo failed, falling back to polling', {err});
-            this.startPolling(entry, webContents);
-            return;
-        }
-
-        // Start streaming pipe in background — createReadStream will unblock once
-        // tmux pipe-pane opens the write end via its spawned cat process.
-        const stream = createReadStream(pipePath, {encoding: 'utf8'});
-        entry.pipeStream = stream;
-
-        stream.on('data', (chunk: string | Buffer) => {
-            if (webContents.isDestroyed()) {
-                this.stopStreaming(entry);
-                return;
+            const {stdout} = await execFileAsync('git', [
+                '-C', worktreePath, 'rev-parse', '--path-format=absolute', '--git-common-dir',
+            ]);
+            const repoRoot = resolve(stdout.trim(), '..');
+            await execFileAsync('git', ['-C', repoRoot, 'worktree', 'remove', '--force', worktreePath]);
+        } catch {
+            // If git commands fail, fall back to rm
+            if (existsSync(worktreePath)) {
+                rmSync(worktreePath, {recursive: true, force: true});
             }
-            webContents.send(AO_OUTPUT_UPDATE, {data: chunk.toString()});
-        });
-
-        stream.on('error', (err) => {
-            log.warn('Terminal stream error', {err});
-        });
-
-        // Tell tmux to pipe pane output into the FIFO (-o = output only)
-        execFileAsync('tmux', ['pipe-pane', '-t', entry.tmuxName, '-o', `cat > '${pipePath}'`]).
-            catch((err) => log.warn('pipe-pane failed', {err}));
-    }
-
-    private stopStreaming(entry: SessionEntry): void {
-        if (entry.pipeStream) {
-            entry.pipeStream.destroy();
-            entry.pipeStream = null;
-        }
-        if (entry.tmuxName) {
-            // Stop pipe-pane by calling pipe-pane with no command
-            execFileAsync('tmux', ['pipe-pane', '-t', entry.tmuxName]).catch(() => { /* ignore */ });
-        }
-        if (entry.pipePath) {
-            if (existsSync(entry.pipePath)) {
-                try { unlinkSync(entry.pipePath); } catch { /* ignore */ }
-            }
-            entry.pipePath = null;
         }
     }
 
-    private startPolling(entry: SessionEntry, webContents: WebContents): void {
-        entry.pollInterval = setInterval(async () => {
-            if (webContents.isDestroyed()) {
-                this.stopPolling(entry);
-                return;
-            }
-
-            const output = await this.captureTmux(entry.tmuxName);
-            if (output && output !== entry.lastOutput) {
-                entry.lastOutput = output;
-                webContents.send(AO_OUTPUT_UPDATE, {data: output, isInitial: true});
-            }
-        }, 1000);
-    }
-
-    private stopPolling(entry: SessionEntry): void {
-        if (entry.pollInterval) {
-            clearInterval(entry.pollInterval);
-            entry.pollInterval = null;
-        }
-    }
+    // ─── Public API ──────────────────────────────────────────────────
 
     async pickRepoPath(serverId: string, projectId: string, win?: BrowserWindow): Promise<string | null> {
         log.info('pickRepoPath called', {serverId, projectId, hasWin: Boolean(win)});
@@ -387,114 +365,66 @@ export class AoManager {
 
     async spawnSession(
         projectId: string,
-        projectName: string,
-        sessionPrefix: string,
+        _projectName: string,
+        _sessionPrefix: string,
         issue: AoIssue,
         userPrompt: string,
-        webContents: WebContents,
+        webContents: Electron.WebContents,
     ): Promise<string> {
         const repoPath = this.getRepoPath(projectId);
         if (!repoPath) {
             throw new Error('No repo linked. Use the folder picker to link a local git repo first.');
         }
 
-        const defaultBranch = await this.detectDefaultBranch(repoPath);
-        this.writeConfig(projectId, projectName, sessionPrefix, repoPath, defaultBranch);
+        // Create an isolated worktree for this issue
+        const worktreePath = await this.createWorktree(projectId, issue.identifier, repoPath);
 
-        const configDir = this.getConfigDir();
-        const spawnOutput = await this.runAo(['spawn'], configDir);
-
-        const match = spawnOutput.match(/SESSION=(\S+)/);
-        if (!match) {
-            throw new Error(`Could not parse session ID from ao spawn output: ${spawnOutput}`);
-        }
-        const sessionId = match[1];
-
-        const tmuxMatch = spawnOutput.match(/tmux attach -t (\S+)/);
-        const tmuxName = tmuxMatch ? tmuxMatch[1] : sessionId;
-
-        // Auto-accept bypass permissions warning (single key "2" = Yes I accept, no Enter needed)
-        await this.autoAcceptBypassPrompt(tmuxName);
-
-        // Capture baseline output so polling only shows new content
-        const baseline = await this.captureTmux(tmuxName);
+        const sessionId = `${projectId}-${Date.now()}`;
 
         const prompt = [
-            `Issue context:`,
+            'Issue context:',
             `- ID: ${issue.id}`,
             `- Identifier: ${issue.identifier}`,
             `- Title: ${issue.title}`,
             issue.description ? `- Description: ${issue.description}` : '',
-            ``,
+            '',
             `Task: ${userPrompt}`,
         ].filter(Boolean).join('\n');
 
-        // Use ao send so AO handles timing/delivery properly
-        await this.runAo(['send', sessionId, prompt], configDir);
-
         const entry: SessionEntry = {
             sessionId,
-            tmuxName,
             projectId,
-            pollInterval: null,
-            pipeStream: null,
-            pipePath: null,
-            lastOutput: baseline,
+            claudeProcess: null,
+            status: 'spawning',
+            history: [],
             webContentsId: webContents.id,
+            repoPath: worktreePath,
+            worktreePath,
         };
 
         this.sessions.set(projectId, entry);
-        this.persistSession(projectId, sessionId, tmuxName);
-        this.startStreaming(entry, webContents);
+
+        // Broadcast user message and spawning status
+        this.broadcastEvent(entry, createAgentEvent(sessionId, 'user_message', {text: prompt}));
+        this.broadcastEvent(entry, createAgentEvent(sessionId, 'status', {status: 'spawning' as AgentStatus}));
+
+        // Spawn Claude CLI in the worktree
+        this.runClaude(entry, prompt);
 
         return sessionId;
     }
 
-    async resizeTerminal(projectId: string, cols: number, rows: number): Promise<void> {
-        const tmuxName = this.getTmuxName(projectId);
-        if (!tmuxName) { return; }
-        try {
-            await execFileAsync('tmux', ['resize-window', '-t', tmuxName, '-x', String(cols), '-y', String(rows)]);
-        } catch { /* ignore if session is gone */ }
-    }
-
-    async sendRawInput(projectId: string, input: string): Promise<void> {
-        const tmuxName = this.getTmuxName(projectId);
-        if (!tmuxName) {
-            throw new Error(`No active session for project ${projectId}`);
-        }
-        // Use -l (literal) so xterm's raw bytes (arrows, ctrl sequences, etc.) pass through unchanged
-        await execFileAsync('tmux', ['send-keys', '-t', tmuxName, '-l', input]);
-    }
-
     async sendMessage(projectId: string, message: string): Promise<void> {
         const entry = this.sessions.get(projectId);
-        const tmuxName = this.getTmuxName(projectId);
-        if (!tmuxName) {
+        if (!entry) {
             throw new Error(`No active session for project ${projectId}`);
         }
 
-        if (message.trim() === '') {
-            await execFileAsync('tmux', ['send-keys', '-t', tmuxName, 'C-m']);
-        } else if (/^\d$/.test(message.trim())) {
-            // Single digit for Claude's permission TUI — no Enter needed
-            await execFileAsync('tmux', ['send-keys', '-t', tmuxName, message.trim()]);
-        } else if (entry) {
-            // Use ao send for proper delivery with timing
-            const configDir = this.getConfigDir();
-            await this.runAo(['send', entry.sessionId, message], configDir);
-        } else {
-            await execFileAsync('tmux', ['send-keys', '-t', tmuxName, message, 'C-m']);
-        }
-    }
+        // Broadcast user message
+        this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'user_message', {text: message}));
 
-    async openTerminal(projectId: string): Promise<void> {
-        const tmuxName = this.getTmuxName(projectId);
-        if (!tmuxName) {
-            throw new Error('No active session to open');
-        }
-        const script = `tell application "Terminal" to do script "tmux attach -t ${tmuxName}"`;
-        await execFileAsync('osascript', ['-e', script]);
+        // Resume the Claude session with the follow-up message
+        this.runClaude(entry, message, entry.sessionId);
     }
 
     async killSession(projectId: string): Promise<void> {
@@ -503,60 +433,26 @@ export class AoManager {
             return;
         }
 
-        this.stopPolling(entry);
-        this.stopStreaming(entry);
+        if (entry.claudeProcess) {
+            entry.claudeProcess.kill('SIGTERM');
+            entry.claudeProcess = null;
+        }
         this.sessions.delete(projectId);
-        this.removePersistedSession(projectId);
-
-        try {
-            const configDir = this.getConfigDir();
-            await this.runAo(['session', 'kill', entry.sessionId], configDir);
-        } catch (err) {
-            log.warn('Failed to kill session (may already be dead)', {err});
-        }
     }
 
-    async getDiff(projectId: string): Promise<string> {
-        const wtPath = this.getWorktreePath(projectId);
-        if (!wtPath) {
-            return '';
-        }
+    getSessionStatus(projectId: string): {sessionId: string | null; hasRepoPath: boolean; repoPath: string | null} {
+        const entry = this.sessions.get(projectId);
+        const sessionId = entry?.sessionId ?? null;
+        const repoPath = this.getRepoPath(projectId);
 
-        try {
-            const repoPath = this.getRepoPath(projectId);
-            const defaultBranch = repoPath ? await this.detectDefaultBranch(repoPath) : 'main';
-
-            // Compare the default branch directly against the worktree's current state
-            // (committed + uncommitted changes). This is a straight diff of master..HEAD
-            // plus any working tree changes.
-            try {
-                // First: committed changes vs default branch
-                const {stdout: committedDiff} = await execFileAsync('git', [
-                    '-C', wtPath, 'diff', defaultBranch + '..HEAD',
-                ], {maxBuffer: 10 * 1024 * 1024});
-                if (committedDiff.trim()) {
-                    return committedDiff;
-                }
-            } catch { /* default branch ref may not exist in worktree */ }
-
-            // Try origin/defaultBranch as fallback
-            try {
-                const {stdout} = await execFileAsync('git', [
-                    '-C', wtPath, 'diff', `origin/${defaultBranch}..HEAD`,
-                ], {maxBuffer: 10 * 1024 * 1024});
-                if (stdout.trim()) {
-                    return stdout;
-                }
-            } catch { /* fall through */ }
-
-            // Last resort: show all changes in the worktree (uncommitted)
-            const {stdout} = await execFileAsync('git', ['-C', wtPath, 'diff', 'HEAD'], {maxBuffer: 10 * 1024 * 1024});
-            return stdout;
-        } catch (err) {
-            log.warn('Failed to get diff', {err, wtPath});
-            return '';
-        }
+        return {
+            sessionId,
+            hasRepoPath: Boolean(repoPath),
+            repoPath,
+        };
     }
+
+    // ─── Git methods (unchanged) ─────────────────────────────────────
 
     private getWorktreePath(projectId: string): string | null {
         const homedir = require('os').homedir();
@@ -576,6 +472,49 @@ export class AoManager {
             return null;
         }
         return join(projectWorktreeDir, entries[entries.length - 1]);
+    }
+
+    async getDiff(projectId: string): Promise<string> {
+        const wtPath = this.getWorktreePath(projectId);
+        const repoPath = this.getRepoPath(projectId);
+
+        // Use worktree if available, otherwise fall back to the linked repo path
+        const gitPath = wtPath ?? repoPath;
+        if (!gitPath) {
+            return '';
+        }
+
+        try {
+            const defaultBranch = repoPath ? await this.detectDefaultBranch(repoPath) : 'main';
+
+            // Use `git diff <ref>` (without ..HEAD) to compare against the working tree,
+            // which captures committed branch changes AND uncommitted modifications.
+            try {
+                const {stdout} = await execFileAsync('git', [
+                    '-C', gitPath, 'diff', defaultBranch,
+                ], {maxBuffer: 10 * 1024 * 1024});
+                if (stdout.trim()) {
+                    return stdout;
+                }
+            } catch { /* default branch ref may not exist in worktree */ }
+
+            // Try origin/defaultBranch as fallback
+            try {
+                const {stdout} = await execFileAsync('git', [
+                    '-C', gitPath, 'diff', `origin/${defaultBranch}`,
+                ], {maxBuffer: 10 * 1024 * 1024});
+                if (stdout.trim()) {
+                    return stdout;
+                }
+            } catch { /* fall through */ }
+
+            // Last resort: show uncommitted changes vs HEAD
+            const {stdout} = await execFileAsync('git', ['-C', gitPath, 'diff', 'HEAD'], {maxBuffer: 10 * 1024 * 1024});
+            return stdout;
+        } catch (err) {
+            log.warn('Failed to get diff', {err, gitPath});
+            return '';
+        }
     }
 
     async getGitFiles(projectId: string): Promise<{name: string; type: 'file' | 'dir'}[]> {
@@ -621,11 +560,11 @@ export class AoManager {
             const repoPath = this.getRepoPath(projectId);
             const defaultBranch = repoPath ? await this.detectDefaultBranch(repoPath) : 'main';
 
-            // Try to get numstat from default branch
+            // Use `git diff <ref>` (without ..HEAD) to capture committed + uncommitted changes
             let diffOutput = '';
             try {
                 const {stdout} = await execFileAsync('git', [
-                    '-C', wtPath, 'diff', '--numstat', `${defaultBranch}..HEAD`,
+                    '-C', wtPath, 'diff', '--numstat', defaultBranch,
                 ], {maxBuffer: 10 * 1024 * 1024});
                 diffOutput = stdout;
             } catch { /* ignore */ }
@@ -633,7 +572,7 @@ export class AoManager {
             if (!diffOutput.trim()) {
                 try {
                     const {stdout} = await execFileAsync('git', [
-                        '-C', wtPath, 'diff', '--numstat', `origin/${defaultBranch}..HEAD`,
+                        '-C', wtPath, 'diff', '--numstat', `origin/${defaultBranch}`,
                     ], {maxBuffer: 10 * 1024 * 1024});
                     diffOutput = stdout;
                 } catch { /* ignore */ }
@@ -650,7 +589,7 @@ export class AoManager {
             let statusOutput = '';
             try {
                 const {stdout} = await execFileAsync('git', [
-                    '-C', wtPath, 'diff', '--name-status', `${defaultBranch}..HEAD`,
+                    '-C', wtPath, 'diff', '--name-status', defaultBranch,
                 ], {maxBuffer: 10 * 1024 * 1024});
                 statusOutput = stdout;
             } catch { /* ignore */ }
@@ -658,7 +597,7 @@ export class AoManager {
             if (!statusOutput.trim()) {
                 try {
                     const {stdout} = await execFileAsync('git', [
-                        '-C', wtPath, 'diff', '--name-status', `origin/${defaultBranch}..HEAD`,
+                        '-C', wtPath, 'diff', '--name-status', `origin/${defaultBranch}`,
                     ], {maxBuffer: 10 * 1024 * 1024});
                     statusOutput = stdout;
                 } catch { /* ignore */ }
@@ -831,35 +770,6 @@ export class AoManager {
         default:
             throw new Error(`Unknown git action: ${action}`);
         }
-    }
-
-    getSessionStatus(projectId: string, webContents?: WebContents): {sessionId: string | null; hasRepoPath: boolean; repoPath: string | null} {
-        const entry = this.sessions.get(projectId);
-        const persisted = this.loadPersistedSessions()[projectId];
-        const sessionId = entry?.sessionId ?? persisted?.sessionId ?? null;
-        const repoPath = this.getRepoPath(projectId);
-
-        // Restart polling if there's a persisted session but no active polling
-        if (!entry && persisted && webContents && !webContents.isDestroyed()) {
-            const restoredEntry: SessionEntry = {
-                sessionId: persisted.sessionId,
-                tmuxName: persisted.tmuxName,
-                projectId,
-                pollInterval: null,
-                pipeStream: null,
-                pipePath: null,
-                lastOutput: '',
-                webContentsId: webContents.id,
-            };
-            this.sessions.set(projectId, restoredEntry);
-            this.startStreaming(restoredEntry, webContents);
-        }
-
-        return {
-            sessionId,
-            hasRepoPath: Boolean(repoPath),
-            repoPath,
-        };
     }
 }
 

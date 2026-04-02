@@ -27,6 +27,7 @@
     "screenshot:install": "npx playwright install chromium"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "^2.1.87",
     "@composio/ao-core": "workspace:*",
     "@composio/ao-plugin-agent-claude-code": "workspace:*",
     "@composio/ao-plugin-agent-opencode": "workspace:*",
