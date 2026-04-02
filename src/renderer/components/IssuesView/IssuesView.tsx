@@ -332,6 +332,7 @@ const AgentChat: React.FC<{projectId: string}> = ({projectId}) => {
                 </div>
             );
         case 'error':
+            console.error('[AO Agent Error]', event.data.message, event);
             return (
                 <div key={event.id} className='IV__chatMsg IV__chatMsg--error'>
                     <div className='IV__chatMsgText'>{event.data.message}</div>
