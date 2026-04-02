@@ -40,6 +40,8 @@ import {
     GET_AUTH_TOKEN,
     ISSUES_API_REQUEST,
     NAVIGATE_TO_ISSUE,
+    PROXY_FETCH,
+    SET_SERVER_AUTH_COOKIE,
     SET_VIEW_MODE,
     AO_PICK_REPO_PATH,
     AO_SPAWN_SESSION,
@@ -392,6 +394,48 @@ function initializeInterCommunicationEventListeners() {
             return null;
         }
         return response.json();
+    });
+
+    ipcMain.handle(PROXY_FETCH, async (_event, url: string, options: {method?: string; headers?: Record<string, string>; body?: string}) => {
+        const response = await net.fetch(url, {
+            method: options.method || 'GET',
+            headers: options.headers,
+            ...(options.body ? {body: options.body} : {}),
+        });
+
+        const responseHeaders: Record<string, string> = {};
+        response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+        });
+
+        const text = await response.text();
+        return {
+            ok: response.ok,
+            status: response.status,
+            headers: responseHeaders,
+            body: text,
+        };
+    });
+
+    ipcMain.handle(SET_SERVER_AUTH_COOKIE, async (_event, serverUrl: string, token: string, userId: string) => {
+        const url = new URL(serverUrl);
+        await session.defaultSession.cookies.set({
+            url: serverUrl,
+            name: 'MMAUTHTOKEN',
+            value: token,
+            domain: url.hostname,
+            path: '/',
+            httpOnly: true,
+            secure: url.protocol === 'https:',
+        });
+        await session.defaultSession.cookies.set({
+            url: serverUrl,
+            name: 'MMUSERID',
+            value: userId,
+            domain: url.hostname,
+            path: '/',
+            secure: url.protocol === 'https:',
+        });
     });
 
     ipcMain.on(NAVIGATE_TO_ISSUE, (_event, issueId: string) => {
