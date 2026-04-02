@@ -69,9 +69,7 @@ func (p *Plugin) OnActivate() error {
 		p.API.LogInfo("[ConversationMonitor] AI analysis disabled (missing configuration)")
 	}
 
-	// Seed sample data (projects, issues, labels, cycles, company info).
-	// Idempotent — skips if projects already exist.
-	p.seedSampleData()
+	p.cleanupSeedSampleData()
 
 	p.conversationMonitor = NewConversationMonitor(p.API, p.botUserID, p.oliAgentUserID, notifChannel.Id, p.onConversationEnd)
 
@@ -159,9 +157,9 @@ func (p *Plugin) onConversationEnd(conv *conversationState, usernameCache map[st
 			username = username[1:]
 		}
 		messages[i] = ConversationMessagePayload{
-			UserID:   msg.UserID,
-			Username: username,
-			Message:  msg.Message,
+			UserID:    msg.UserID,
+			Username:  username,
+			Message:   msg.Message,
 			Timestamp: msg.Timestamp,
 		}
 	}

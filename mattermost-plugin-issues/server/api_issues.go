@@ -12,8 +12,12 @@ import (
 
 func (p *Plugin) handleListIssues(w http.ResponseWriter, r *http.Request) {
 	projectID := mux.Vars(r)["id"]
-	q := r.URL.Query()
+	if _, err := p.getProjectForRequest(r, projectID); err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
 
+	q := r.URL.Query()
 	params := IssueFilterParams{
 		Status:      q.Get("status"),
 		Priority:    q.Get("priority"),
@@ -28,14 +32,15 @@ func (p *Plugin) handleListIssues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, IssueListResponse{
-		Issues:     issues,
-		TotalCount: len(issues),
-	})
+	respondJSON(w, http.StatusOK, IssueListResponse{Issues: issues, TotalCount: len(issues)})
 }
 
 func (p *Plugin) handleCreateIssue(w http.ResponseWriter, r *http.Request) {
 	projectID := mux.Vars(r)["id"]
+	if _, err := p.getProjectForRequest(r, projectID); err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
 
 	var req CreateIssueRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -90,7 +95,7 @@ func (p *Plugin) handleCreateIssue(w http.ResponseWriter, r *http.Request) {
 
 func (p *Plugin) handleGetIssue(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	issue, err := p.store.GetIssue(id)
+	issue, err := p.getIssueForRequest(r, id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
@@ -101,7 +106,7 @@ func (p *Plugin) handleGetIssue(w http.ResponseWriter, r *http.Request) {
 func (p *Plugin) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	issue, err := p.store.GetIssue(id)
+	issue, err := p.getIssueForRequest(r, id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
@@ -122,7 +127,6 @@ func (p *Plugin) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
 	if req.Status != nil {
 		oldStatus := issue.Status
 		issue.Status = *req.Status
-		// Track completion time.
 		if !oldStatus.IsCompleted() && issue.Status.IsCompleted() {
 			issue.CompletedAt = nowMillis()
 		} else if oldStatus.IsCompleted() && !issue.Status.IsCompleted() {
@@ -167,13 +171,12 @@ func (p *Plugin) handleUpdateIssue(w http.ResponseWriter, r *http.Request) {
 func (p *Plugin) handleDeleteIssue(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	issue, err := p.store.GetIssue(id)
+	issue, err := p.getIssueForRequest(r, id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
-	// Only creator or sysadmin can delete.
 	userID := getUserID(r)
 	if issue.CreatedBy != userID {
 		user, appErr := p.API.GetUser(userID)
