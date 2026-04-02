@@ -510,11 +510,11 @@ class MainPage extends React.PureComponent<Props, State> {
                 errorState={errorState}
                 errorMessage={tabStatus?.extra?.error}
                 errorUrl={tabStatus?.extra?.url}
-                activeMode={activeServer ? this.state.activeMode : undefined}
-                onModeChange={activeServer ? this.handleModeChange : undefined}
+                activeMode={activeServer?.isLoggedIn && !this.state.modalOpen ? this.state.activeMode : undefined}
+                onModeChange={activeServer?.isLoggedIn && !this.state.modalOpen ? this.handleModeChange : undefined}
                 issuesContent={<IssuesView/>}
             >
-                {activeServer && (
+                {activeServer?.isLoggedIn && !this.state.modalOpen && (
                     <>
                         <ServerDropdownButton
                             isDisabled={this.state.modalOpen}
@@ -523,10 +523,12 @@ class MainPage extends React.PureComponent<Props, State> {
                         />
                     </>
                 )}
-                {tabsRow}
-                <DeveloperModeIndicator
-                    developerMode={this.state.developerMode}
-                />
+                {activeServer?.isLoggedIn && !this.state.modalOpen && tabsRow}
+                {activeServer?.isLoggedIn && !this.state.modalOpen && (
+                    <DeveloperModeIndicator
+                        developerMode={this.state.developerMode}
+                    />
+                )}
                 {downloadsDropdownButton}
             </BasePage>
         );
