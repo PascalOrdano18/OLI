@@ -1,7 +1,9 @@
 // Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import { claude } from "@anthropic-ai/claude-code";
+import { spawn, type ChildProcess } from "child_process";
+import { createInterface } from "readline";
+import { resolve } from "path";
 import {
   createAgentEvent,
   type AgentEvent,
@@ -13,14 +15,19 @@ import {
   type StatusData,
 } from "../src/lib/agent-events";
 
+const CLAUDE_CLI_PATH = resolve(
+  process.cwd(),
+  "node_modules/@anthropic-ai/claude-code/cli.js",
+);
+
 interface AgentProcess {
   sessionId: string;
+  claudeSessionId: string | null;
   status: AgentStatus;
   history: AgentEvent[];
   subscribers: Set<(event: AgentEvent) => void>;
-  abortController: AbortController | null;
+  childProcess: ChildProcess | null;
   workspacePath: string;
-  conversationHistory: Array<{ role: string; content: string }>;
 }
 
 export interface SpawnConfig {
@@ -45,12 +52,12 @@ export class AgentProcessManager {
     if (!agent) {
       const placeholder: AgentProcess = {
         sessionId,
+        claudeSessionId: null,
         status: "idle",
         history: [],
         subscribers: new Set([callback]),
-        abortController: null,
+        childProcess: null,
         workspacePath: "",
-        conversationHistory: [],
       };
       this.agents.set(sessionId, placeholder);
       return () => { placeholder.subscribers.delete(callback); };
@@ -68,12 +75,12 @@ export class AgentProcessManager {
     const existing = this.agents.get(sessionId);
     const agent: AgentProcess = {
       sessionId,
+      claudeSessionId: existing?.claudeSessionId ?? null,
       status: "spawning",
       history: existing?.history ?? [],
       subscribers: existing?.subscribers ?? new Set(),
-      abortController: new AbortController(),
+      childProcess: null,
       workspacePath: config.workspacePath,
-      conversationHistory: [],
     };
     this.agents.set(sessionId, agent);
     this.broadcastStatus(sessionId, "spawning");
@@ -85,37 +92,78 @@ export class AgentProcessManager {
 
     this.addUserEvent(sessionId, message);
 
-    agent.abortController = new AbortController();
     agent.status = "active";
     this.broadcastStatus(sessionId, "active");
 
-    try {
-      const stream = claude(message, {
-        cwd: agent.workspacePath,
-        abortController: agent.abortController,
+    const args = [
+      CLAUDE_CLI_PATH,
+      "--print",
+      "--output-format", "stream-json",
+      "--verbose",
+      "--dangerously-skip-permissions",
+    ];
+
+    if (agent.claudeSessionId) {
+      args.push("--resume", agent.claudeSessionId);
+    }
+
+    args.push(message);
+
+    const proc = spawn("node", args, {
+      cwd: agent.workspacePath,
+      env: { ...process.env },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    agent.childProcess = proc;
+
+    const rl = createInterface({ input: proc.stdout! });
+    rl.on("line", (line: string) => {
+      if (!line.trim()) return;
+      try {
+        const sdkEvent = JSON.parse(line);
+        this.processSDKEvent(sessionId, sdkEvent);
+
+        if (sdkEvent.type === "system" && sdkEvent.subtype === "init" && sdkEvent.session_id) {
+          agent.claudeSessionId = sdkEvent.session_id;
+        }
+      } catch {
+        // Non-JSON output — ignore
+      }
+    });
+
+    proc.stderr?.on("data", (data: Buffer) => {
+      console.warn(`[AgentProcessManager] Claude CLI stderr: ${data.toString().slice(0, 200)}`);
+    });
+
+    return new Promise<void>((resolvePromise) => {
+      proc.on("close", () => {
+        agent.childProcess = null;
+        if (agent.status !== "error") {
+          agent.status = "idle";
+          this.broadcastStatus(sessionId, "idle");
+        }
+        resolvePromise();
       });
 
-      for await (const event of stream) {
-        if (agent.abortController?.signal.aborted) break;
-        this.processSDKEvent(sessionId, event);
-      }
-
-      agent.status = "idle";
-      this.broadcastStatus(sessionId, "idle");
-    } catch (err) {
-      if (agent.abortController?.signal.aborted) return;
-      agent.status = "error";
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      const errorEvent = createAgentEvent(sessionId, "error", { message: errorMsg });
-      this.appendAndBroadcast(sessionId, errorEvent);
-      this.broadcastStatus(sessionId, "error");
-    }
+      proc.on("error", (err) => {
+        agent.childProcess = null;
+        agent.status = "error";
+        const errorEvent = createAgentEvent(sessionId, "error", { message: err.message });
+        this.appendAndBroadcast(sessionId, errorEvent);
+        this.broadcastStatus(sessionId, "error");
+        resolvePromise();
+      });
+    });
   }
 
   kill(sessionId: string): void {
     const agent = this.agents.get(sessionId);
     if (!agent) return;
-    agent.abortController?.abort();
+    if (agent.childProcess) {
+      agent.childProcess.kill("SIGTERM");
+      agent.childProcess = null;
+    }
     agent.status = "idle";
     this.broadcastStatus(sessionId, "idle");
   }
@@ -174,12 +222,12 @@ export class AgentProcessManager {
     if (!agent) {
       agent = {
         sessionId,
+        claudeSessionId: null,
         status: "idle",
         history: [],
         subscribers: new Set(),
-        abortController: null,
+        childProcess: null,
         workspacePath: "",
-        conversationHistory: [],
       };
       this.agents.set(sessionId, agent);
     }
