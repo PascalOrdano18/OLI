@@ -19,7 +19,18 @@ import type {AgentEvent, AgentStatus} from 'common/agentEvents';
 const log = new Logger('AoManager');
 const execFileAsync = promisify(execFile);
 
-const CLAUDE_CLI_PATH = resolve(app.getAppPath(), '../node_modules/@anthropic-ai/claude-code/cli.js');
+// Resolve the Claude CLI binary — prefer the locally installed SDK module,
+// fall back to the global `claude` command on PATH.
+function resolveClaudeCli(): string {
+    const localCli = resolve(app.getAppPath(), '../node_modules/@anthropic-ai/claude-code/cli.js');
+    if (existsSync(localCli)) {
+        return localCli;
+    }
+    // Global CLI — will be spawned directly (not via node)
+    return 'claude';
+}
+
+const CLAUDE_CLI_PATH = resolveClaudeCli();
 
 interface AoIssue {
     id: string;
@@ -114,8 +125,7 @@ export class AoManager {
         entry.status = 'active';
         this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'active' as AgentStatus}));
 
-        const args = [
-            CLAUDE_CLI_PATH,
+        const cliArgs = [
             '--print',
             '--output-format', 'stream-json',
             '--verbose',
@@ -123,12 +133,19 @@ export class AoManager {
         ];
 
         if (resumeSessionId) {
-            args.push('--resume', resumeSessionId);
+            cliArgs.push('--resume', resumeSessionId);
         }
 
-        args.push(prompt);
+        cliArgs.push(prompt);
 
-        const proc = spawn('node', args, {
+        // If CLAUDE_CLI_PATH is a .js file, run it via node; otherwise spawn the binary directly
+        const isLocalModule = CLAUDE_CLI_PATH.endsWith('.js');
+        const command = isLocalModule ? 'node' : CLAUDE_CLI_PATH;
+        const args = isLocalModule ? [CLAUDE_CLI_PATH, ...cliArgs] : cliArgs;
+
+        log.info('Spawning Claude CLI', {command, cliPath: CLAUDE_CLI_PATH, cwd: entry.repoPath});
+
+        const proc = spawn(command, args, {
             cwd: entry.repoPath,
             env: {...process.env},
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -156,22 +173,27 @@ export class AoManager {
         });
 
         proc.stderr?.on('data', (data: Buffer) => {
-            log.warn('Claude CLI stderr', {data: data.toString().slice(0, 200)});
+            const text = data.toString().slice(0, 500);
+            log.warn('Claude CLI stderr', {data: text});
         });
 
         proc.on('close', (code) => {
+            log.info('Claude CLI process closed', {code, sessionId: entry.sessionId});
             entry.claudeProcess = null;
             if (code === 0 || code === null) {
                 entry.status = 'idle';
                 this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'idle' as AgentStatus}));
             } else {
                 entry.status = 'error';
-                this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'error', {message: `Claude exited with code ${code}`}));
+                const msg = `Claude exited with code ${code}`;
+                log.error(msg, {sessionId: entry.sessionId, command, cliPath: CLAUDE_CLI_PATH});
+                this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'error', {message: msg}));
                 this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'status', {status: 'error' as AgentStatus}));
             }
         });
 
         proc.on('error', (err) => {
+            log.error('Claude CLI spawn error', {error: err.message, command, cliPath: CLAUDE_CLI_PATH});
             entry.claudeProcess = null;
             entry.status = 'error';
             this.broadcastEvent(entry, createAgentEvent(entry.sessionId, 'error', {message: err.message}));

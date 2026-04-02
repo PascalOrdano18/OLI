@@ -108,6 +108,12 @@ export class ServerHub {
                 }
             }
 
+            // Replace existing server if one exists (single-org model)
+            const existingServers = ServerManager.getAllServers();
+            for (const server of existingServers) {
+                ServerManager.removeServer(server.id);
+            }
+
             ServerManager.addServer(data, initialLoadURL);
         }).catch((e) => {
             // e is undefined for user cancellation

@@ -519,10 +519,6 @@ class MainPage extends React.PureComponent<Props, State> {
                         <ServerDropdownButton
                             isDisabled={this.state.modalOpen}
                             activeServerName={activeServer.name}
-                            totalMentionCount={totalMentionCount}
-                            currentMentions={this.state.mentionsPerServer[this.state.activeServerId!]}
-                            currentUnread={this.state.unreadsPerServer[this.state.activeServerId!]}
-                            hasUnreads={hasAnyUnreads}
                             isMenuOpen={this.state.isMenuOpen}
                         />
                     </>
