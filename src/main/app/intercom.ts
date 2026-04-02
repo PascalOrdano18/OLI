@@ -23,6 +23,8 @@ import {handleAppBeforeQuit} from './app';
 
 const log = new Logger('App.Intercom');
 
+let hasShownOrgSelectionOnStartup = false;
+
 export function handleAppVersion() {
     return {
         name: app.getName(),
@@ -70,8 +72,8 @@ export function handleMainWindowIsShown() {
     // eslint-disable-next-line no-undef
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    const showWelcomeScreen = () => !Boolean(__SKIP_ONBOARDING_SCREENS__);
-    const showNewServerModal = () => !ServerManager.hasServers();
+    const showWelcomeScreen = () => !Boolean(__SKIP_ONBOARDING_SCREENS__) && !hasShownOrgSelectionOnStartup;
+    const showNewServerModal = () => !ServerManager.hasServers() && !hasShownOrgSelectionOnStartup;
 
     /**
      * The 2 lines above need to be functions, otherwise the mainWindow.once() callback from previous
@@ -121,6 +123,7 @@ export function handleWelcomeScreenModal(prefillURL?: string) {
             }
 
             ServerManager.addServer(data, initialLoadURL);
+            hasShownOrgSelectionOnStartup = true;
         }).catch((e) => {
             // e is undefined for user cancellation
             if (e) {
