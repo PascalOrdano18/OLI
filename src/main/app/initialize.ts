@@ -32,6 +32,7 @@ import {
     TOGGLE_SECURE_INPUT,
     GET_APP_INFO,
     SHOW_SETTINGS_WINDOW,
+    SHOW_CHANGE_ORGANIZATION,
     DEVELOPER_MODE_UPDATED,
     SERVER_ADDED,
     GET_FULL_SCREEN_STATUS,
@@ -109,6 +110,7 @@ import {
     handlePingDomain,
     handleToggleSecureInput,
     handleShowSettingsModal,
+    handleWelcomeScreenModal,
 } from './intercom';
 import {
     clearAppCache,
@@ -312,6 +314,10 @@ function initializeInterCommunicationEventListeners() {
     if (process.env.NODE_ENV === 'test') {
         ipcMain.on(SHOW_SETTINGS_WINDOW, handleShowSettingsModal);
     }
+
+    ipcMain.on(SHOW_CHANGE_ORGANIZATION, () => {
+        handleWelcomeScreenModal();
+    });
 
     ipcMain.handle(GET_FULL_SCREEN_STATUS, (event: IpcMainInvokeEvent) => {
         return BrowserWindow.fromWebContents(event.sender)?.isFullScreen();

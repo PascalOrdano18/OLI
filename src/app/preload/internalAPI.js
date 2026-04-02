@@ -61,6 +61,7 @@ import {
     SHOW_NEW_SERVER_MODAL,
     SHOW_EDIT_SERVER_MODAL,
     SHOW_REMOVE_SERVER_MODAL,
+    SHOW_CHANGE_ORGANIZATION,
     RECEIVE_DOWNLOADS_DROPDOWN_SIZE,
     REQUEST_CLEAR_DOWNLOADS_DROPDOWN,
     REQUEST_DOWNLOADS_DROPDOWN_INFO,
@@ -164,6 +165,7 @@ contextBridge.exposeInMainWorld('timers', {
 contextBridge.exposeInMainWorld('desktop', {
     quit: (reason, stack) => ipcRenderer.send(QUIT, reason, stack),
     openAppMenu: () => ipcRenderer.send(OPEN_APP_MENU),
+    showChangeOrganization: () => ipcRenderer.send(SHOW_CHANGE_ORGANIZATION),
     closeServersDropdown: () => ipcRenderer.send(CLOSE_SERVERS_DROPDOWN),
     openServersDropdown: () => ipcRenderer.send(OPEN_SERVERS_DROPDOWN),
     switchTab: (viewId) => ipcRenderer.send(SWITCH_TAB, viewId),
