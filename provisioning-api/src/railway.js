@@ -6,21 +6,36 @@ import config from './config.js';
 
 const RAILWAY_API = 'https://backboard.railway.com/graphql/v2';
 
-async function railwayQuery(query, variables = {}) {
-    const res = await fetch(RAILWAY_API, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.railwayApiToken()}`,
-        },
-        body: JSON.stringify({query, variables}),
-    });
+async function railwayQuery(query, variables = {}, retries = 3) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        const res = await fetch(RAILWAY_API, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${config.railwayApiToken()}`,
+            },
+            body: JSON.stringify({query, variables}),
+        });
 
-    const json = await res.json();
-    if (json.errors) {
-        throw new Error(`Railway API error: ${JSON.stringify(json.errors)}`);
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await res.text();
+            console.error(`[railway] API returned non-JSON (status ${res.status}, attempt ${attempt}/${retries}): ${text.slice(0, 300)}`);
+            if (attempt < retries) {
+                const delay = attempt * 2000;
+                console.log(`[railway] Retrying in ${delay}ms...`);
+                await new Promise((r) => setTimeout(r, delay));
+                continue;
+            }
+            throw new Error(`Railway API returned non-JSON response (status ${res.status})`);
+        }
+
+        const json = await res.json();
+        if (json.errors) {
+            throw new Error(`Railway API error: ${JSON.stringify(json.errors)}`);
+        }
+        return json.data;
     }
-    return json.data;
 }
 
 // Step 1: Create a new Railway project for this organization

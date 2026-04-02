@@ -496,6 +496,13 @@ export class OLIWebContentsView extends EventEmitter {
         });
         this.webContentsView.webContents.on('did-navigate-in-page', () => this.handlePageTitleUpdated(this.webContentsView.webContents.getTitle()));
         this.webContentsView.webContents.on('page-title-updated', (_, newTitle) => this.handlePageTitleUpdated(newTitle));
+        this.webContentsView.webContents.on('did-navigate', (_event, url) => this.handleDidNavigate(url));
+        this.webContentsView.webContents.on('did-finish-load', () => {
+            const url = this.webContentsView.webContents.getURL();
+            if (url.includes('/login')) {
+                this.injectCustomLoginUI();
+            }
+        });
 
         if (!DeveloperMode.get('disableContextMenu')) {
             this.contextMenu = new ContextMenu(this.generateContextMenu(), this.webContentsView.webContents);
@@ -527,6 +534,310 @@ export class OLIWebContentsView extends EventEmitter {
     get webContentsId() {
         return this.webContentsView.webContents.id;
     }
+
+    private handleDidNavigate = (url: string) => {
+        if (url.includes('/login')) {
+            this.injectCustomLoginUI();
+        }
+    };
+
+    private injectCustomLoginUI = () => {
+        const server = ServerManager.getServer(this.view.serverId);
+        const serverName = server?.name || 'your organization';
+        const HARDCODED_PASSWORD = 'OliUser123!';
+
+        const script = `
+(() => {
+    if (document.getElementById('oli-custom-login')) return;
+
+    const rootEl = document.getElementById('root');
+    if (rootEl) rootEl.style.display = 'none';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'oli-custom-login';
+    overlay.innerHTML = \`
+        <style>
+            html, body {
+                background: #0f1117 !important;
+                margin: 0;
+                padding: 0;
+            }
+            #oli-custom-login {
+                position: fixed;
+                inset: 0;
+                z-index: 99999;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: #0f1117;
+                background-image: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(74,124,232,0.08) 0%, transparent 70%);
+                font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+                gap: 20px;
+                padding: 24px;
+                overflow: hidden;
+            }
+            #oli-custom-login::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background-image:
+                    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+                background-size: 48px 48px;
+                pointer-events: none;
+            }
+            #oli-custom-login > * { position: relative; z-index: 1; }
+            #oli-custom-login .oli-logo {
+                width: 64px;
+                height: 64px;
+                border-radius: 16px;
+                background: linear-gradient(135deg, #4a7ce8 0%, #6c5ce7 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 4px;
+                box-shadow: 0 8px 32px rgba(74,124,232,0.3), 0 0 0 1px rgba(74,124,232,0.1);
+            }
+            #oli-custom-login .oli-logo span {
+                font-size: 28px;
+                font-weight: 800;
+                color: #fff;
+                letter-spacing: -1px;
+            }
+            #oli-custom-login h1 {
+                font-size: 28px;
+                font-weight: 700;
+                color: #f0f0f3;
+                margin: 0;
+                letter-spacing: -0.5px;
+            }
+            #oli-custom-login .oli-subtitle {
+                font-size: 15px;
+                color: rgba(240,240,243,0.5);
+                margin: 0 0 4px;
+                text-align: center;
+                line-height: 1.6;
+            }
+            #oli-custom-login .oli-org-name {
+                color: #7c9ef5;
+                font-weight: 600;
+            }
+            #oli-custom-login .oli-card {
+                width: 100%;
+                max-width: 400px;
+                background: rgba(255,255,255,0.03);
+                border: 1px solid rgba(255,255,255,0.06);
+                border-radius: 16px;
+                padding: 28px;
+                backdrop-filter: blur(12px);
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                box-sizing: border-box;
+            }
+            #oli-custom-login input {
+                width: 100%;
+                padding: 12px 16px;
+                border-radius: 10px;
+                border: 1px solid rgba(255,255,255,0.08);
+                font-size: 14px;
+                line-height: 20px;
+                outline: none;
+                background: rgba(255,255,255,0.04);
+                color: #f0f0f3;
+                box-sizing: border-box;
+                transition: all 0.2s ease;
+                font-family: inherit;
+            }
+            #oli-custom-login input::placeholder {
+                color: rgba(240,240,243,0.3);
+            }
+            #oli-custom-login input:hover {
+                border-color: rgba(255,255,255,0.12);
+                background: rgba(255,255,255,0.05);
+            }
+            #oli-custom-login input:focus {
+                border-color: rgba(74,124,232,0.5);
+                background: rgba(255,255,255,0.05);
+                box-shadow: 0 0 0 3px rgba(74,124,232,0.1);
+            }
+            #oli-custom-login input.input-error {
+                border-color: rgba(218,108,110,0.5);
+            }
+            #oli-custom-login input.input-error:focus {
+                box-shadow: 0 0 0 3px rgba(218,108,110,0.1);
+            }
+            #oli-custom-login .oli-hint {
+                font-size: 13px;
+                color: rgba(240,240,243,0.35);
+                margin: 0;
+                line-height: 1.5;
+            }
+            #oli-custom-login .oli-error {
+                font-size: 12px;
+                color: #da6c6e;
+                margin: 0;
+                line-height: 1.4;
+            }
+            #oli-custom-login .oli-global-error {
+                color: #da6c6e;
+                font-size: 13px;
+                background: rgba(218,108,110,0.08);
+                border: 1px solid rgba(218,108,110,0.12);
+                padding: 12px 16px;
+                border-radius: 10px;
+                width: 100%;
+                max-width: 400px;
+                box-sizing: border-box;
+                text-align: center;
+            }
+            #oli-custom-login button {
+                width: 100%;
+                margin-top: 4px;
+                border-radius: 10px;
+                height: 46px;
+                font-size: 15px;
+                cursor: pointer;
+                border: 0;
+                background: linear-gradient(135deg, #4a7ce8 0%, #6c5ce7 100%);
+                color: #fff;
+                font-weight: 600;
+                font-family: inherit;
+                transition: all 0.2s ease;
+                box-shadow: 0 4px 16px rgba(74,124,232,0.25);
+            }
+            #oli-custom-login button:hover:not(:disabled) {
+                box-shadow: 0 6px 24px rgba(74,124,232,0.35);
+                transform: translateY(-1px);
+            }
+            #oli-custom-login button:active:not(:disabled) {
+                transform: translateY(0);
+            }
+            #oli-custom-login button:disabled {
+                background: rgba(255,255,255,0.04);
+                color: rgba(240,240,243,0.2);
+                box-shadow: none;
+                cursor: not-allowed;
+            }
+            #oli-custom-login .oli-spinner-wrap {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 16px;
+                padding: 48px 24px;
+            }
+            #oli-custom-login .oli-spinner {
+                width: 48px;
+                height: 48px;
+                border: 3px solid rgba(255,255,255,0.06);
+                border-top-color: #4a7ce8;
+                border-radius: 50%;
+                animation: oli-spin 0.8s linear infinite;
+            }
+            @keyframes oli-spin { to { transform: rotate(360deg); } }
+        </style>
+        <div class="oli-logo"><span>O</span></div>
+        <h1>Welcome back</h1>
+        <p class="oli-subtitle">Log in to <span class="oli-org-name">${serverName.replace(/'/g, "\\'")}</span></p>
+        <div id="oli-error-banner" style="display:none" class="oli-global-error"></div>
+        <div class="oli-card" id="oli-login-form">
+            <input id="oli-username" type="text" placeholder="Enter username" autocomplete="off" autofocus />
+            <div id="oli-validation" class="oli-hint">3-22 characters. Lowercase letters, numbers, dots, dashes, underscores.</div>
+            <button id="oli-continue" disabled>Continue</button>
+        </div>
+        <div id="oli-spinner-view" style="display:none" class="oli-spinner-wrap">
+            <div class="oli-spinner"></div>
+            <h1 style="font-size:22px">Logging in...</h1>
+            <p class="oli-subtitle">Almost there, hang tight.</p>
+        </div>
+    \`;
+    document.body.appendChild(overlay);
+
+    const input = document.getElementById('oli-username');
+    const btn = document.getElementById('oli-continue');
+    const validation = document.getElementById('oli-validation');
+    const errorBanner = document.getElementById('oli-error-banner');
+    const loginForm = document.getElementById('oli-login-form');
+    const spinnerView = document.getElementById('oli-spinner-view');
+    const PASS = '${HARDCODED_PASSWORD}';
+
+    function validate(val) {
+        const errors = [];
+        if (val.length > 0 && val.length < 3) errors.push('Username must be at least 3 characters');
+        if (val.length > 22) errors.push('Username must be at most 22 characters');
+        if (val.length > 0 && !/^[a-z0-9._-]+$/.test(val)) errors.push('Only lowercase letters, numbers, dots, dashes, and underscores allowed');
+        return errors;
+    }
+
+    input.addEventListener('input', () => {
+        const val = input.value.toLowerCase();
+        input.value = val;
+        const errors = validate(val);
+        const valid = val.length >= 3 && val.length <= 22 && /^[a-z0-9._-]+$/.test(val);
+        btn.disabled = !valid;
+        if (errors.length > 0) {
+            validation.innerHTML = errors.map(e => '<p class="oli-error">' + e + '</p>').join('');
+            input.classList.add('input-error');
+        } else {
+            validation.innerHTML = '<p class="oli-hint">3-22 characters. Lowercase letters, numbers, dots, dashes, underscores.</p>';
+            input.classList.remove('input-error');
+        }
+        errorBanner.style.display = 'none';
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !btn.disabled) doLogin();
+    });
+    btn.addEventListener('click', doLogin);
+
+    async function doLogin() {
+        const username = input.value.trim();
+        if (!username) return;
+
+        loginForm.style.display = 'none';
+        spinnerView.style.display = 'flex';
+        errorBanner.style.display = 'none';
+
+        const email = username + '@oli.local';
+
+        try {
+            // 1. Try to create user (ignore 409 = already exists)
+            const createRes = await fetch('/api/v4/users', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, email, password: PASS }),
+            });
+            if (!createRes.ok && createRes.status !== 409) {
+                let msg = 'Failed to create user';
+                try { const e = await createRes.json(); if (e.message) msg = e.message; } catch {}
+                throw new Error(msg);
+            }
+
+            // 2. Login
+            const loginRes = await fetch('/api/v4/users/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ login_id: email, password: PASS }),
+            });
+            if (!loginRes.ok) {
+                throw new Error('Failed to log in. Username may already be taken by another account.');
+            }
+
+            // Login sets cookies automatically (same origin), reload to enter the app
+            window.location.href = '/';
+        } catch (err) {
+            loginForm.style.display = 'flex';
+            spinnerView.style.display = 'none';
+            errorBanner.textContent = err.message || 'Something went wrong';
+            errorBanner.style.display = 'block';
+        }
+    }
+})();
+`;
+
+        void this.webContentsView.webContents.executeJavaScript(script);
+    };
 
     getWebContentsView = () => {
         return this.webContentsView;

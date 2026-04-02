@@ -12,6 +12,10 @@ import (
 
 func (p *Plugin) handleListLabels(w http.ResponseWriter, r *http.Request) {
 	projectID := mux.Vars(r)["id"]
+	if _, err := p.getProjectForRequest(r, projectID); err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
 	labels, err := p.store.ListLabels(projectID)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
@@ -22,6 +26,10 @@ func (p *Plugin) handleListLabels(w http.ResponseWriter, r *http.Request) {
 
 func (p *Plugin) handleCreateLabel(w http.ResponseWriter, r *http.Request) {
 	projectID := mux.Vars(r)["id"]
+	if _, err := p.getProjectForRequest(r, projectID); err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
 
 	var req CreateLabelRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -29,13 +37,7 @@ func (p *Plugin) handleCreateLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	label := &IssueLabel{
-		ID:        uuid.New().String(),
-		ProjectID: projectID,
-		Name:      req.Name,
-		Color:     req.Color,
-	}
-
+	label := &IssueLabel{ID: uuid.New().String(), ProjectID: projectID, Name: req.Name, Color: req.Color}
 	if err := label.IsValid(); err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
@@ -53,7 +55,7 @@ func (p *Plugin) handleCreateLabel(w http.ResponseWriter, r *http.Request) {
 func (p *Plugin) handleUpdateLabel(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	label, err := p.store.GetLabel(id)
+	label, err := p.getLabelForRequest(r, id)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
@@ -88,8 +90,7 @@ func (p *Plugin) handleUpdateLabel(w http.ResponseWriter, r *http.Request) {
 
 func (p *Plugin) handleDeleteLabel(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-
-	if _, err := p.store.GetLabel(id); err != nil {
+	if _, err := p.getLabelForRequest(r, id); err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
 	}
