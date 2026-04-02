@@ -6,7 +6,7 @@ import config from './config.js';
 
 /** Columns returned to clients (never includes `password`). */
 const PUBLIC_ORG_COLUMNS =
-    'id, name, created_by, is_private, server_url, railway_project_id, status, db_mode, created_at, updated_at';
+    'id, name, created_by, is_private, server_url, railway_project_id, status, db_mode, provision_error, created_at, updated_at';
 
 let client;
 function getClient() {
