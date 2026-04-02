@@ -128,8 +128,10 @@ async function provisionInBackground(orgId, orgName) {
             console.error(err.stack);
         }
 
+        const errorMessage = err instanceof Error ? err.message : String(err);
         await updateOrganization(orgId, {
             status: 'failed',
+            provision_error: errorMessage,
         }).catch((e) => console.error('[provision] Failed to update status:', e));
     }
 }

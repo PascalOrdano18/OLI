@@ -256,6 +256,8 @@ async function configureOLISharedPostgres(projectId, serviceId, environmentId, s
                 variables: {
                     MM_SQLSETTINGS_DRIVERNAME: 'postgres',
                     MM_SQLSETTINGS_DATASOURCE: datasource,
+                    MM_SQLSETTINGS_MAXOPENCONNS: '10',
+                    MM_SQLSETTINGS_MAXIDLECONNS: '5',
                     MM_SERVICESETTINGS_SITEURL: siteUrl,
                     MM_SERVICESETTINGS_LISTENADDRESS: ':8065',
                     MM_SERVICESETTINGS_ENABLELOCALMODE: 'true',
@@ -354,7 +356,7 @@ async function setupOLI(serverUrl, orgName) {
         }
         if (i === maxAttempts - 1) {
             console.error('[setup] OLI never became stable, skipping setup');
-            return;
+            throw new Error('OLI server never became stable after deployment');
         }
         await new Promise((r) => setTimeout(r, 5000));
     }
