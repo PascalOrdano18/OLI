@@ -70,7 +70,7 @@ export function handleMainWindowIsShown() {
     // eslint-disable-next-line no-undef
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    const showWelcomeScreen = () => !(Boolean(__SKIP_ONBOARDING_SCREENS__) || ServerManager.hasServers());
+    const showWelcomeScreen = () => !Boolean(__SKIP_ONBOARDING_SCREENS__);
     const showNewServerModal = () => !ServerManager.hasServers();
 
     /**
@@ -112,6 +112,12 @@ export function handleWelcomeScreenModal(prefillURL?: string) {
                 if (parsedServerURL) {
                     initialLoadURL = parseURL(`${parsedServerURL.origin}${prefillURL.substring(prefillURL.indexOf('/'))}`);
                 }
+            }
+
+            // Replace existing server if one exists (single-org model)
+            const existingServers = ServerManager.getAllServers();
+            for (const server of existingServers) {
+                ServerManager.removeServer(server.id);
             }
 
             ServerManager.addServer(data, initialLoadURL);
