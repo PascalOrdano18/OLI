@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {
@@ -28,7 +28,7 @@ import {
 import Config from 'common/config';
 import JsonFileManager from 'common/JsonFileManager';
 import {Logger} from 'common/log';
-import type {MattermostServer} from 'common/servers/MattermostServer';
+import type {OLIServer} from 'common/servers/OLIServer';
 import {isTrustedURL, parseURL} from 'common/utils/url';
 import {t} from 'common/utils/util';
 import {permissionsJson} from 'main/constants';
@@ -90,11 +90,11 @@ export class PermissionsManager extends JsonFileManager<PermissionsByOrigin> {
         ));
     };
 
-    getForServer = (server: MattermostServer): Permissions | undefined => {
+    getForServer = (server: OLIServer): Permissions | undefined => {
         return this.getValue(server.url.origin);
     };
 
-    setForServer = (server: MattermostServer, permissions: Permissions) => {
+    setForServer = (server: OLIServer, permissions: Permissions) => {
         if (permissions.media?.allowed && (process.platform === 'win32' || process.platform === 'darwin')) {
             this.checkMediaAccess('microphone');
             this.checkMediaAccess('camera');

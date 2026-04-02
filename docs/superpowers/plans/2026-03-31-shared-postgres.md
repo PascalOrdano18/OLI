@@ -4,7 +4,7 @@
 
 **Goal:** Replace per-org Postgres provisioning with a single shared Postgres server, creating logical databases via `CREATE DATABASE` to speed up org creation.
 
-**Architecture:** The provisioning API gets a new `pg`-based module (`database.js`) that connects to a shared Postgres server and creates a database per org. A new stack mode `shared` in `railway.js` creates only the Mattermost service (no Postgres service/volume) and wires it to the shared Postgres using a direct connection string. The Supabase `organizations` table gets a `db_mode` column to distinguish legacy orgs from new shared-DB orgs.
+**Architecture:** The provisioning API gets a new `pg`-based module (`database.js`) that connects to a shared Postgres server and creates a database per org. A new stack mode `shared` in `railway.js` creates only the OLI service (no Postgres service/volume) and wires it to the shared Postgres using a direct connection string. The Supabase `organizations` table gets a `db_mode` column to distinguish legacy orgs from new shared-DB orgs.
 
 **Tech Stack:** Node.js, `pg` (node-postgres), Railway GraphQL API, Supabase, Express
 
@@ -100,7 +100,7 @@ function parsePostgresUrl(url) {
 
 /**
  * Create a new logical database for an organization on the shared Postgres server.
- * Returns the connection string that Mattermost should use.
+ * Returns the connection string that OLI should use.
  */
 export async function createOrgDatabase(orgId) {
     const sharedUrl = config.sharedPostgresUrl();
@@ -134,7 +134,7 @@ export async function createOrgDatabase(orgId) {
         await client.end();
     }
 
-    // Build the connection string for Mattermost
+    // Build the connection string for OLI
     return `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${dbName}?sslmode=disable`;
 }
 
@@ -177,13 +177,13 @@ git commit -m "feat: add database.js for shared postgres database management"
 **Files:**
 - Modify: `provisioning-api/src/railway.js`
 
-- [ ] **Step 1: Add `configureMattermostSharedPostgres` function**
+- [ ] **Step 1: Add `configureOLISharedPostgres` function**
 
-Add this function after `configureMattermostSqlite` (around line 228) in `provisioning-api/src/railway.js`:
+Add this function after `configureOLISqlite` (around line 228) in `provisioning-api/src/railway.js`:
 
 ```js
-// Mattermost with shared Postgres — connection string points to pre-existing shared server.
-async function configureMattermostSharedPostgres(projectId, serviceId, environmentId, siteUrl, datasource) {
+// OLI with shared Postgres — connection string points to pre-existing shared server.
+async function configureOLISharedPostgres(projectId, serviceId, environmentId, siteUrl, datasource) {
     await railwayQuery(
         `mutation($input: VariableCollectionUpsertInput!) {
             variableCollectionUpsert(input: $input)
@@ -211,32 +211,32 @@ async function configureMattermostSharedPostgres(projectId, serviceId, environme
 }
 ```
 
-- [ ] **Step 2: Add `provisionMattermostSharedPostgres` function**
+- [ ] **Step 2: Add `provisionOLISharedPostgres` function**
 
-Add this function after `provisionMattermostSqliteOnly` (around line 535) in `provisioning-api/src/railway.js`:
+Add this function after `provisionOLISqliteOnly` (around line 535) in `provisioning-api/src/railway.js`:
 
 ```js
-/** Mattermost service only — connects to shared Postgres (fast provisioning). */
-async function provisionMattermostSharedPostgres(orgName, datasource) {
+/** OLI service only — connects to shared Postgres (fast provisioning). */
+async function provisionOLISharedPostgres(orgName, datasource) {
     console.log(`[railway] Creating project for org: ${orgName}`);
     const {projectId, environmentId} = await createProject(orgName);
 
-    console.log(`[railway] Creating Mattermost service (shared Postgres)...`);
-    const mattermostId = await createMattermost(projectId);
+    console.log(`[railway] Creating OLI service (shared Postgres)...`);
+    const mattermostId = await createOLI(projectId);
 
     // Get domain BEFORE configuring so SITEURL is correct on first boot
     const domain = await exposeService(projectId, mattermostId, environmentId);
     const serverUrl = domain ? `https://${domain}` : null;
     console.log(`[railway] Assigned domain: ${domain}`);
 
-    await configureMattermostSharedPostgres(projectId, mattermostId, environmentId, serverUrl, datasource);
+    await configureOLISharedPostgres(projectId, mattermostId, environmentId, serverUrl, datasource);
 
-    console.log(`[railway] Deploying Mattermost...`);
+    console.log(`[railway] Deploying OLI...`);
     await deployService(mattermostId, environmentId);
 
-    // Wait for Mattermost to boot and complete initial setup
+    // Wait for OLI to boot and complete initial setup
     if (serverUrl) {
-        await setupMattermost(serverUrl, orgName);
+        await setupOLI(serverUrl, orgName);
     }
 
     console.log(`[railway] Provisioned (shared postgres): ${serverUrl}`);
@@ -262,20 +262,20 @@ export async function provisionOrganization(orgName, options = {}) {
         if (!options.datasource) {
             throw new Error('datasource is required for shared stack mode');
         }
-        console.log('[railway] Stack mode: shared (Mattermost + shared Postgres — one service)');
-        return provisionMattermostSharedPostgres(orgName, options.datasource);
+        console.log('[railway] Stack mode: shared (OLI + shared Postgres — one service)');
+        return provisionOLISharedPostgres(orgName, options.datasource);
     }
     if (mode === 'full') {
-        console.log('[railway] Stack mode: full (Postgres + Mattermost — two services)');
-        return provisionPostgresAndMattermost(orgName);
+        console.log('[railway] Stack mode: full (Postgres + OLI — two services)');
+        return provisionPostgresAndOLI(orgName);
     }
     if (mode !== 'lite') {
         console.warn(`[railway] Unknown OLI_RAILWAY_STACK_MODE="${mode}", using lite`);
     }
     console.log(
-        '[railway] Stack mode: lite (Mattermost + SQLite — one service). Set OLI_RAILWAY_STACK_MODE=full for Postgres.',
+        '[railway] Stack mode: lite (OLI + SQLite — one service). Set OLI_RAILWAY_STACK_MODE=full for Postgres.',
     );
-    return provisionMattermostSqliteOnly(orgName);
+    return provisionOLISqliteOnly(orgName);
 }
 ```
 
@@ -447,7 +447,7 @@ SHARED_POSTGRES_URL=postgres://mmuser:<password>@<public-domain>:5432/postgres
 Create a new organization via the API or the desktop app. Verify:
 1. The provisioning API logs show `Creating database for org...` and `Database created`
 2. No Postgres Railway service is created in the new project
-3. The Mattermost service starts and connects to the shared Postgres
+3. The OLI service starts and connects to the shared Postgres
 4. The org record in Supabase has `db_mode = 'shared'`
 5. Provisioning completes faster than before
 

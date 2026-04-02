@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {BrowserWindow, Input, MenuItem, MenuItemConstructorOptions} from 'electron';
@@ -6,7 +6,7 @@ import {clipboard, Menu} from 'electron';
 
 import WebContentsManager from 'app/views/webContentsManager';
 import PopoutManager from 'app/windows/popoutManager';
-import {ViewType} from 'common/views/MattermostView';
+import {ViewType} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
 import {localizeMessage} from 'main/i18nManager';
 

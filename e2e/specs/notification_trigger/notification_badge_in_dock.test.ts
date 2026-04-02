@@ -1,15 +1,15 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {triggerTestNotification, verifyNotificationReceivedInDM} from './helpers';
 
 import {test, expect} from '../../fixtures/index';
-import {demoMattermostConfig} from '../../helpers/config';
+import {demoOLIConfig} from '../../helpers/config';
 import {acquireExclusiveLock} from '../../helpers/exclusiveLock';
-import {loginToMattermost} from '../../helpers/login';
+import {loginToOLI} from '../../helpers/login';
 
 test.describe('Trigger Notification From desktop', () => {
-    test.use({appConfig: demoMattermostConfig});
+    test.use({appConfig: demoOLIConfig});
     test.setTimeout(120_000);
 
     test('should receive a notification on macOS', {tag: ['@P2', '@darwin']}, async ({electronApp, serverMap}) => {
@@ -24,13 +24,13 @@ test.describe('Trigger Notification From desktop', () => {
 
         const releaseLock = await acquireExclusiveLock('notification-state');
         try {
-            const firstServer = serverMap[demoMattermostConfig.servers[0].name]?.[0]?.win;
+            const firstServer = serverMap[demoOLIConfig.servers[0].name]?.[0]?.win;
             if (!firstServer) {
                 test.skip(true, 'No server view available');
                 return;
             }
 
-            await loginToMattermost(firstServer);
+            await loginToOLI(firstServer);
             const textbox = await firstServer.waitForSelector('#post_textbox');
             await textbox.focus();
 

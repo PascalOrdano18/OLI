@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {Event, WebContentsConsoleMessageEventParams} from 'electron';
@@ -7,7 +7,7 @@ import type {Logger} from 'common/log';
 import {getLevel} from 'common/log';
 import {parseURL} from 'common/utils/url';
 
-import {generateHandleConsoleMessage, isCustomProtocol, isMattermostProtocol} from './webContentEventsCommon';
+import {generateHandleConsoleMessage, isCustomProtocol, isOLIProtocol} from './webContentEventsCommon';
 
 // Mock the electron-builder.json protocols
 jest.mock('common/constants', () => ({
@@ -264,39 +264,39 @@ describe('webContentEventsCommon', () => {
         });
     });
 
-    describe('isMattermostProtocol', () => {
+    describe('isOLIProtocol', () => {
         it('should return true for mattermost protocol URLs', () => {
-            expect(isMattermostProtocol(new URL('mattermost://server1'))).toBe(true);
+            expect(isOLIProtocol(new URL('mattermost://server1'))).toBe(true);
         });
 
         it('should return false for http URLs', () => {
-            expect(isMattermostProtocol(new URL('http://example.com'))).toBe(false);
+            expect(isOLIProtocol(new URL('http://example.com'))).toBe(false);
         });
 
         it('should return false for https URLs', () => {
-            expect(isMattermostProtocol(new URL('https://example.com'))).toBe(false);
+            expect(isOLIProtocol(new URL('https://example.com'))).toBe(false);
         });
 
         it('should return false for other custom protocol URLs', () => {
-            expect(isMattermostProtocol(new URL('custom://example.com'))).toBe(false);
+            expect(isOLIProtocol(new URL('custom://example.com'))).toBe(false);
         });
 
         it('should return false for file protocol URLs', () => {
-            expect(isMattermostProtocol(new URL('file:///path/to/file'))).toBe(false);
+            expect(isOLIProtocol(new URL('file:///path/to/file'))).toBe(false);
         });
 
         it('should handle URLs with different case mattermost protocol', () => {
-            expect(isMattermostProtocol(new URL('MATTERMOST://server1'))).toBe(true);
+            expect(isOLIProtocol(new URL('MATTERMOST://server1'))).toBe(true);
         });
 
         it('should handle mattermost URLs with paths and query parameters', () => {
-            expect(isMattermostProtocol(new URL('mattermost://server1/path?param=value'))).toBe(true);
+            expect(isOLIProtocol(new URL('mattermost://server1/path?param=value'))).toBe(true);
         });
 
         it('should handle mattermost URLs with different servers', () => {
-            expect(isMattermostProtocol(new URL('mattermost://server1'))).toBe(true);
-            expect(isMattermostProtocol(new URL('mattermost://server2'))).toBe(true);
-            expect(isMattermostProtocol(new URL('mattermost://my-server.com'))).toBe(true);
+            expect(isOLIProtocol(new URL('mattermost://server1'))).toBe(true);
+            expect(isOLIProtocol(new URL('mattermost://server2'))).toBe(true);
+            expect(isOLIProtocol(new URL('mattermost://my-server.com'))).toBe(true);
         });
     });
 });

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {type IpcMainEvent, app, BrowserWindow, ipcMain} from 'electron';
@@ -6,7 +6,7 @@ import EventEmitter from 'events';
 
 import MainWindow from 'app/mainWindow/mainWindow';
 import ModalManager from 'app/mainWindow/modals/modalManager';
-import type {MattermostWebContentsView} from 'app/views/MattermostWebContentsView';
+import type {OLIWebContentsView} from 'app/views/OLIWebContentsView';
 import WebContentsManager from 'app/views/webContentsManager';
 import {
     ACTIVE_TAB_CHANGED,
@@ -43,8 +43,8 @@ import {
 } from 'common/communication';
 import {Logger} from 'common/log';
 import ServerManager from 'common/servers/serverManager';
-import type {MattermostView} from 'common/views/MattermostView';
-import {ViewType} from 'common/views/MattermostView';
+import type {OLIView} from 'common/views/OLIView';
+import {ViewType} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
 import {getAdjustedWindowBoundaries, getWindowBoundaries} from 'main/utils';
 
@@ -238,7 +238,7 @@ export class TabManager extends EventEmitter {
         }
     };
 
-    private setupTab = (view: MattermostView, webContentsView: MattermostWebContentsView) => {
+    private setupTab = (view: OLIView, webContentsView: OLIWebContentsView) => {
         const mainWindow = MainWindow.window;
         if (!mainWindow) {
             log.error('setupListeners: No main window found');

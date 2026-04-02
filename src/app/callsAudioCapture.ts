@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {net, session} from 'electron';
@@ -396,7 +396,7 @@ export async function stopCallAudioCapture(win: BrowserWindow): Promise<Buffer |
 }
 
 /**
- * Uploads the recorded call audio to the Mattermost Issues plugin.
+ * Uploads the recorded call audio to the OLI Issues plugin.
  */
 export async function uploadCallAudio(
     serverURL: string,

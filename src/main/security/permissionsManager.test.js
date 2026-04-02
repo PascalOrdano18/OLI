@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {dialog, shell, systemPreferences} from 'electron';
@@ -18,7 +18,7 @@ jest.mock('fs', () => ({
 
 jest.mock('electron', () => ({
     app: {
-        name: 'Mattermost',
+        name: 'OLI',
     },
     ipcMain: {
         on: jest.fn(),

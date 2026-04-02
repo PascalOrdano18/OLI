@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 'use strict';
@@ -271,7 +271,7 @@ describe('main/views/webContentsEvents', () => {
             });
 
             it('should allow OneNote URLs with backslashes', () => {
-                const onenoteUrl = String.raw`onenote:///D:\OneNote\Apps\Mattermost.one#Sch%C3%B6ne%20neue%20Seite&page-id={840EDD0C-B6FB-481E-A342-E39AEDA50EE6}`;
+                const onenoteUrl = String.raw`onenote:///D:\OneNote\Apps\OLI.one#Sch%C3%B6ne%20neue%20Seite&page-id={840EDD0C-B6FB-481E-A342-E39AEDA50EE6}`;
                 expect(newWindow({url: onenoteUrl})).toStrictEqual({action: 'deny'});
                 expect(allowProtocolDialog.handleDialogEvent).toBeCalledWith(new URL(onenoteUrl));
             });

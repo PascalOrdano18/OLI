@@ -1,4 +1,4 @@
-# Copyright 2022 Mattermost, Inc.
+# Copyright 2022 OLI, Inc.
 name: "test-ci"
 description: This action used to run universal tests for all OS
 

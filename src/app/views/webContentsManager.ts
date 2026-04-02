@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {IpcMainEvent, IpcMainInvokeEvent} from 'electron';
@@ -33,19 +33,19 @@ import Config from 'common/config';
 import {DEFAULT_CHANGELOG_LINK} from 'common/constants';
 import {Logger} from 'common/log';
 import ServerManager from 'common/servers/serverManager';
-import {ViewType, type MattermostView} from 'common/views/MattermostView';
+import {ViewType, type OLIView} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
 import {flushCookiesStore} from 'main/app/utils';
 import PermissionsManager from 'main/security/permissionsManager';
 import ThemeManager from 'main/themeManager';
 
-import {MattermostWebContentsView} from './MattermostWebContentsView';
+import {OLIWebContentsView} from './OLIWebContentsView';
 
 const log = new Logger('WebContentsManager');
 
 export class WebContentsManager {
-    private webContentsViews: Map<string, MattermostWebContentsView>;
-    private webContentsIdToView: Map<number, MattermostWebContentsView>;
+    private webContentsViews: Map<string, OLIWebContentsView>;
+    private webContentsIdToView: Map<number, OLIWebContentsView>;
     private focusedWebContentsView?: string;
 
     constructor() {
@@ -105,7 +105,7 @@ export class WebContentsManager {
         return this.webContentsIdToView.get(webContentsId);
     };
 
-    getFocusedView = (): MattermostWebContentsView | undefined => {
+    getFocusedView = (): OLIWebContentsView | undefined => {
         if (!this.focusedWebContentsView) {
             return undefined;
         }
@@ -120,8 +120,8 @@ export class WebContentsManager {
         });
     };
 
-    createView = (view: MattermostView, parentWindow: BaseWindow): MattermostWebContentsView => {
-        const webContentsView = new MattermostWebContentsView(view, {webPreferences: {spellcheck: Config.useSpellChecker}}, parentWindow.browserWindow);
+    createView = (view: OLIView, parentWindow: BaseWindow): OLIWebContentsView => {
+        const webContentsView = new OLIWebContentsView(view, {webPreferences: {spellcheck: Config.useSpellChecker}}, parentWindow.browserWindow);
         webContentsView.getWebContentsView().webContents.on('focus', () => {
             this.focusedWebContentsView = view.id;
         });
@@ -153,7 +153,7 @@ export class WebContentsManager {
         view?.reload(view.currentURL);
     };
 
-    private addViewToMap = (view: MattermostWebContentsView): void => {
+    private addViewToMap = (view: OLIWebContentsView): void => {
         log.debug('addViewToMap', {viewId: view.id, webContentsId: view.webContentsId});
 
         this.webContentsViews.set(view.id, view);
@@ -199,7 +199,7 @@ export class WebContentsManager {
         this.setLoggedIn(view, loggedIn);
     };
 
-    private setLoggedIn = (view: MattermostWebContentsView, loggedIn: boolean) => {
+    private setLoggedIn = (view: OLIWebContentsView, loggedIn: boolean) => {
         ServerManager.setLoggedIn(view.serverId, loggedIn);
         if (!loggedIn) {
             const primaryView = ViewManager.getPrimaryView(view.serverId);

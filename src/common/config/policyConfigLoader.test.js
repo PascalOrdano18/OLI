@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {getPreferenceValue as getCFPreferenceValue} from 'cf-prefs';
@@ -20,7 +20,7 @@ jest.mock('registry-js', () => {
                         {name: 'server-lm-2', data: 'http://server-lm-2.com'},
                     ];
                 }
-                if (key.includes('SOFTWARE\\Policies\\Mattermost')) {
+                if (key.includes('SOFTWARE\\Policies\\OLI')) {
                     return [
                         {name: 'EnableServerManagement', data: 1},
                         {name: 'EnableAutoUpdater', data: 0},
@@ -35,7 +35,7 @@ jest.mock('registry-js', () => {
                         {name: 'server-cu-2', data: 'http://server-cu-2.com'},
                     ];
                 }
-                if (key.includes('SOFTWARE\\Policies\\Mattermost')) {
+                if (key.includes('SOFTWARE\\Policies\\OLI')) {
                     return [
                         {name: 'EnableServerManagement', data: 0},
                         {name: 'EnableAutoUpdater', data: 1},
@@ -97,7 +97,7 @@ describe('common/config/policyConfigLoader', () => {
 
             it('handles undefined from one hive', () => {
                 enumerateValues.mockImplementation((hive, key) => {
-                    if (key.includes('Mattermost') && !key.includes('DefaultServerList')) {
+                    if (key.includes('OLI') && !key.includes('DefaultServerList')) {
                         return hive === 'HKEY_LOCAL_MACHINE' ? [{name: 'EnableServerManagement', data: 1}] : [];
                     }
                     return [];
@@ -108,10 +108,10 @@ describe('common/config/policyConfigLoader', () => {
 
             it('handles registry error in one hive', () => {
                 enumerateValues.mockImplementation((hive, key) => {
-                    if (key.includes('Mattermost') && hive === 'HKEY_CURRENT_USER') {
+                    if (key.includes('OLI') && hive === 'HKEY_CURRENT_USER') {
                         throw new Error('Registry access error');
                     }
-                    if (key.includes('Mattermost') && !key.includes('DefaultServerList')) {
+                    if (key.includes('OLI') && !key.includes('DefaultServerList')) {
                         return [{name: 'EnableServerManagement', data: 1}];
                     }
                     if (key.endsWith('DefaultServerList')) {

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {shell, app, clipboard, type MenuItemConstructorOptions} from 'electron';
@@ -44,7 +44,7 @@ export default function createHelpMenu(): MenuItemConstructorOptions {
     const academyLink = Config.academyLink;
     if (isHttpLink(academyLink)) {
         submenu.push({
-            label: localizeMessage('main.menus.app.help.academy', 'Mattermost Academy'),
+            label: localizeMessage('main.menus.app.help.academy', 'OLI Academy'),
             click() {
                 shell.openExternal(academyLink);
             },

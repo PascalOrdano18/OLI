@@ -190,7 +190,7 @@ case "${1}" in
     *)
         print_info "Mattermmost Desktop Release Helper"
         print_info "Usage: $0 <start|rc|pre-final|final|patch> [esr]\n"
-        print_info "This script will help you create a new release for the Mattermost Desktop App."
+        print_info "This script will help you create a new release for the OLI Desktop App."
         print_info "Must be run on a release branch (release-X.Y)\n"
         print_info "Commands:"
         print_info "  start: Start a new release using the current version"

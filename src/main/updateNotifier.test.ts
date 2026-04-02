@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {ipcMain as notMockedIpcMain, app as notMockedApp, net as notMockedNet} from 'electron';
@@ -21,7 +21,7 @@ jest.mock('electron', () => ({
     app: {
         getAppPath: jest.fn(() => '/path/to/app'),
         getVersion: jest.fn(() => '5.0.0'),
-        name: 'Mattermost',
+        name: 'OLI',
     },
     nativeImage: {
         createFromPath: jest.fn(),

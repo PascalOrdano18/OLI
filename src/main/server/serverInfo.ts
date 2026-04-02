@@ -1,7 +1,7 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import type {MattermostServer} from 'common/servers/MattermostServer';
+import type {OLIServer} from 'common/servers/OLIServer';
 import {parseURL} from 'common/utils/url';
 
 import type {ClientConfig, RemoteInfo} from 'types/server';
@@ -9,10 +9,10 @@ import type {ClientConfig, RemoteInfo} from 'types/server';
 import {getServerAPI} from './serverAPI';
 
 export class ServerInfo {
-    private server: MattermostServer;
+    private server: OLIServer;
     private remoteInfo: RemoteInfo;
 
-    constructor(server: MattermostServer) {
+    constructor(server: OLIServer) {
         this.server = server;
         this.remoteInfo = {};
     }

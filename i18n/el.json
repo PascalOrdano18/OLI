@@ -28,7 +28,7 @@
   "main.app.app.handleAppCertificateError.certError.button.cancelConnection": "Ακύρωση Σύνδεσης",
   "main.app.app.handleAppCertificateError.certError.button.moreDetails": "Περισσότερες Λεπτομέρειες",
   "main.app.app.handleAppCertificateError.certError.dialog.detail": "{extraDetail}πηγή: {origin}\nΣφάλμα: {error}",
-  "main.app.app.handleAppCertificateError.certError.dialog.message": "Υπάρχει ένα πρόβλημα ρύθμισης παραμέτρων με αυτόν τον διακομιστή Mattermost, ή κάποιος προσπαθεί να υποκλέψει τη σύνδεσή σας. Μπορεί επίσης να χρειαστεί να συνδεθείτε στο Wi-Fi στο οποίο είστε συνδεδεμένοι χρησιμοποιώντας το πρόγραμμα περιήγησής σας.",
+  "main.app.app.handleAppCertificateError.certError.dialog.message": "Υπάρχει ένα πρόβλημα ρύθμισης παραμέτρων με αυτόν τον διακομιστή OLI, ή κάποιος προσπαθεί να υποκλέψει τη σύνδεσή σας. Μπορεί επίσης να χρειαστεί να συνδεθείτε στο Wi-Fi στο οποίο είστε συνδεδεμένοι χρησιμοποιώντας το πρόγραμμα περιήγησής σας.",
   "main.app.app.handleAppCertificateError.certError.dialog.title": "Σφάλμα Πιστοποιητικού",
   "main.app.app.handleAppCertificateError.certNotTrusted.button.cancelConnection": "Ακύρωση Σύνδεσης",
   "main.app.app.handleAppCertificateError.certNotTrusted.button.trustInsecureCertificate": "Εμπιστευτείτε το Ανασφαλές Πιστοποιητικό",

@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {IpcMainEvent, Rectangle, Event, IpcMainInvokeEvent} from 'electron';
@@ -8,7 +8,7 @@ import {startCallAudioCapture, stopCallAudioCapture, uploadCallAudio} from 'app/
 import MainWindow from 'app/mainWindow/mainWindow';
 import NavigationManager from 'app/navigationManager';
 import TabManager from 'app/tabs/tabManager';
-import type {MattermostWebContentsView} from 'app/views/MattermostWebContentsView';
+import type {OLIWebContentsView} from 'app/views/OLIWebContentsView';
 import webContentsEventManager from 'app/views/webContentEvents';
 import WebContentsManager from 'app/views/webContentsManager';
 import {
@@ -56,7 +56,7 @@ const log = new Logger('CallsWidgetWindow');
 
 export class CallsWidgetWindow {
     private win?: BrowserWindow;
-    private mainView?: MattermostWebContentsView;
+    private mainView?: OLIWebContentsView;
     private options?: CallsWidgetWindowConfig;
     private missingScreensharePermissions?: boolean;
     private seenErrorMessage?: boolean;
@@ -156,7 +156,7 @@ export class CallsWidgetWindow {
         return u.toString();
     };
 
-    private init = (view: MattermostWebContentsView, options: CallsWidgetWindowConfig) => {
+    private init = (view: OLIWebContentsView, options: CallsWidgetWindowConfig) => {
         this.win = new BrowserWindow({
             width: MINIMUM_CALLS_WIDGET_WIDTH,
             height: MINIMUM_CALLS_WIDGET_HEIGHT,

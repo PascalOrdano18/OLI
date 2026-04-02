@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import prettyBytes from 'pretty-bytes';
@@ -48,7 +48,7 @@ const getDownloadingFileStatus = (item: DownloadedItem) => {
 
 const getIconClassName = (file: DownloadedItem) => {
     if (file.type === 'update') {
-        return 'mattermost';
+        return 'oli';
     }
 
     if (!file.mimeType) {

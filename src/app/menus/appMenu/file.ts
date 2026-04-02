@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import type {MenuItemConstructorOptions, BaseWindow, MenuItem} from 'electron';
@@ -10,7 +10,7 @@ import TabManager from 'app/tabs/tabManager';
 import PopoutManager from 'app/windows/popoutManager';
 import Config from 'common/config';
 import ServerManager from 'common/servers/serverManager';
-import {ViewType} from 'common/views/MattermostView';
+import {ViewType} from 'common/views/OLIView';
 import ViewManager from 'common/views/viewManager';
 import {handleShowSettingsModal} from 'main/app/intercom';
 import {localizeMessage} from 'main/i18nManager';

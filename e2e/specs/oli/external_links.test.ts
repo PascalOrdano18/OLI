@@ -1,16 +1,16 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import {test, expect} from '../../fixtures/index';
 import type {AppConfig} from '../../helpers/config';
-import {demoMattermostConfig} from '../../helpers/config';
-import {loginToMattermost} from '../../helpers/login';
+import {demoOLIConfig} from '../../helpers/config';
+import {loginToOLI} from '../../helpers/login';
 
 const EXTERNAL_URL = 'https://github.com/';
 
 const externalLinksConfig: AppConfig = {
-    ...demoMattermostConfig,
-    servers: demoMattermostConfig.servers.filter((server) => !server.url.includes('github.com')),
+    ...demoOLIConfig,
+    servers: demoOLIConfig.servers.filter((server) => !server.url.includes('github.com')),
 };
 
 test.describe('external_links', () => {
@@ -27,9 +27,9 @@ test.describe('external_links', () => {
         }
 
         const firstServer = serverMap[externalLinksConfig.servers[0].name]?.[0]?.win;
-        expect(firstServer, 'Mattermost server view should exist').toBeTruthy();
+        expect(firstServer, 'OLI server view should exist').toBeTruthy();
 
-        await loginToMattermost(firstServer!);
+        await loginToOLI(firstServer!);
         await firstServer!.waitForSelector('#post_textbox', {timeout: 15_000});
 
         await electronApp.evaluate(({shell}) => {
@@ -81,7 +81,7 @@ test.describe('external_links', () => {
         });
     });
 
-    test('MM-T_EL_2 clicking an internal Mattermost channel link stays in the app', {tag: ['@P2', '@all']}, async ({electronApp, serverMap}) => {
+    test('MM-T_EL_2 clicking an internal OLI channel link stays in the app', {tag: ['@P2', '@all']}, async ({electronApp, serverMap}) => {
         if (process.platform === 'linux') {
             test.skip(true, 'Linux not supported');
             return;
@@ -92,9 +92,9 @@ test.describe('external_links', () => {
         }
 
         const firstServer = serverMap[externalLinksConfig.servers[0].name]?.[0]?.win;
-        expect(firstServer, 'Mattermost server view should exist').toBeTruthy();
+        expect(firstServer, 'OLI server view should exist').toBeTruthy();
 
-        await loginToMattermost(firstServer!);
+        await loginToOLI(firstServer!);
         await firstServer!.waitForSelector('#post_textbox', {timeout: 15_000});
 
         await electronApp.evaluate(({shell}) => {

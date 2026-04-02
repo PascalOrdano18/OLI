@@ -1,4 +1,4 @@
-// Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
+// Copyright (c) 2016-present OLI, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
 import * as path from 'path';
@@ -7,9 +7,9 @@ import {_electron as electron} from 'playwright';
 
 import {test, expect} from '../../fixtures/index';
 import {waitForAppReady} from '../../helpers/appReadiness';
-import {electronBinaryPath, appDir, demoMattermostConfig, writeConfigFile} from '../../helpers/config';
+import {electronBinaryPath, appDir, demoOLIConfig, writeConfigFile} from '../../helpers/config';
 import {waitForLockFileRelease} from '../../helpers/cleanup';
-import {loginToMattermost} from '../../helpers/login';
+import {loginToOLI} from '../../helpers/login';
 import {buildServerMap} from '../../helpers/serverMap';
 
 test(
@@ -24,7 +24,7 @@ test(
         const {mkdirSync} = await import('fs');
         const userDataDir = path.join(testInfo.outputDir, 'persistent-userdata');
         mkdirSync(userDataDir, {recursive: true});
-        writeConfigFile(userDataDir, demoMattermostConfig);
+        writeConfigFile(userDataDir, demoOLIConfig);
 
         // --- First launch: log in ---
         const app1 = await electron.launch({
@@ -41,7 +41,7 @@ test(
             expect(serverWin1).toBeDefined();
 
             // Log in
-            await loginToMattermost(serverWin1!);
+            await loginToOLI(serverWin1!);
 
             // Verify we reached the app (not login page)
             await serverWin1!.waitForSelector('#sidebarItem_town-square', {timeout: 30_000});
