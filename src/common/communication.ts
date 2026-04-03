@@ -104,6 +104,7 @@ export const ISSUES_API_REQUEST = 'issues-api-request';
 export const NAVIGATE_TO_ISSUE = 'navigate-to-issue';
 export const PROXY_FETCH = 'proxy-fetch';
 export const SET_SERVER_AUTH_COOKIE = 'set-server-auth-cookie';
+export const STORE_AUTO_LOGIN = 'store-auto-login';
 
 export const UPDATE_PATHS = 'update-paths';
 

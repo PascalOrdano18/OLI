@@ -43,6 +43,7 @@ import {
     NAVIGATE_TO_ISSUE,
     PROXY_FETCH,
     SET_SERVER_AUTH_COOKIE,
+    STORE_AUTO_LOGIN,
     SET_VIEW_MODE,
     AO_PICK_REPO_PATH,
     AO_SPAWN_SESSION,
@@ -58,6 +59,7 @@ import {
 import Config from 'common/config';
 import buildConfig from 'common/config/buildConfig';
 import {MATTERMOST_PROTOCOL} from 'common/constants';
+import {storeAutoLogin} from 'common/autoLogin';
 import {Logger} from 'common/log';
 import ServerManager from 'common/servers/serverManager';
 import {parseURL} from 'common/utils/url';
@@ -439,6 +441,11 @@ function initializeInterCommunicationEventListeners() {
             path: '/',
             secure: url.protocol === 'https:',
         });
+    });
+
+    ipcMain.handle(STORE_AUTO_LOGIN, (_event, serverUrl: string, email: string, password: string) => {
+        log.info(`[auto-login] Storing credentials for ${serverUrl}, email: ${email}`);
+        storeAutoLogin(serverUrl, email, password);
     });
 
     ipcMain.on(NAVIGATE_TO_ISSUE, (_event, issueId: string) => {

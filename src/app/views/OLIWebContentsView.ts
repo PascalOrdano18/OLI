@@ -26,6 +26,7 @@ import {
     RELOAD_VIEW,
 } from 'common/communication';
 import type {Logger} from 'common/log';
+import {getAutoLogin, consumeAutoLogin} from 'common/autoLogin';
 import ServerManager from 'common/servers/serverManager';
 import {RELOAD_INTERVAL, MAX_SERVER_RETRIES, SECOND, MAX_LOADING_SCREEN_SECONDS} from 'common/utils/constants';
 import {isInternalURL, parseURL} from 'common/utils/url';
@@ -500,7 +501,7 @@ export class OLIWebContentsView extends EventEmitter {
         this.webContentsView.webContents.on('did-finish-load', () => {
             const url = this.webContentsView.webContents.getURL();
             if (url.includes('/login')) {
-                this.injectCustomLoginUI();
+                this.handleDidNavigate(url);
             }
         });
 
@@ -537,8 +538,53 @@ export class OLIWebContentsView extends EventEmitter {
 
     private handleDidNavigate = (url: string) => {
         if (url.includes('/login')) {
+            // Check if we have auto-login credentials from the org setup flow
+            const server = ServerManager.getServer(this.view.serverId);
+            const serverUrl = server?.url?.toString()?.replace(/\/+$/, '');
+            this.log.info(`[auto-login] Login page detected. serverUrl=${serverUrl}`);
+            if (serverUrl) {
+                const creds = getAutoLogin(serverUrl);
+                this.log.info(`[auto-login] Credentials found: ${creds ? 'yes' : 'no'}`);
+                if (creds) {
+                    this.autoLoginSilently(serverUrl, creds.email, creds.password);
+                    return;
+                }
+            }
             this.injectCustomLoginUI();
         }
+    };
+
+    private autoLoginSilently = (serverUrl: string, email: string, password: string) => {
+        const script = `
+(() => {
+    // Hide all Mattermost UI immediately
+    const rootEl = document.getElementById('root');
+    if (rootEl) rootEl.style.display = 'none';
+    document.body.style.background = '#0f1117';
+
+    async function doAutoLogin() {
+        try {
+            const loginRes = await fetch('/api/v4/users/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ login_id: ${JSON.stringify(email)}, password: ${JSON.stringify(password)} }),
+            });
+            if (loginRes.ok) {
+                // Login sets cookies automatically (same origin), reload to enter the app
+                window.location.href = '/';
+            } else {
+                // If auto-login fails, show the root again so user can manually login
+                if (rootEl) rootEl.style.display = '';
+            }
+        } catch {
+            if (rootEl) rootEl.style.display = '';
+        }
+    }
+    doAutoLogin();
+})();
+`;
+        consumeAutoLogin(serverUrl);
+        void this.webContentsView.webContents.executeJavaScript(script);
     };
 
     private injectCustomLoginUI = () => {

@@ -15,6 +15,7 @@ export type UniqueServer = Server & {
     id?: string;
     isPredefined?: boolean;
     isLoggedIn?: boolean;
+    initialPath?: string;
 }
 
 export type UniqueView = {

@@ -307,6 +307,31 @@ export class WebContentsEventManager {
         const willNavigate = this.generateWillNavigate(contents.id);
         contents.on('will-navigate', willNavigate);
 
+        // Intercept Mattermost landing/login/signup pages — these should never be visible to the user
+        const skipLandingPages = (event: Event, url: string) => {
+            try {
+                const parsed = new URL(url);
+                const path = parsed.pathname.toLowerCase().replace(/\/+$/, '');
+                if (path.endsWith('/landing') || path === '/signup_user_complete' || path === '/signup_email') {
+                    this.log(contents.id).info(`Intercepted Mattermost page: ${path}, redirecting to app`);
+                    event.preventDefault();
+
+                    // Extract redirect_to param if present, otherwise go to root
+                    const redirectTo = parsed.searchParams.get('redirect_to');
+                    if (redirectTo && redirectTo.startsWith('/')) {
+                        contents.loadURL(`${parsed.origin}${redirectTo}`, {userAgent: composeUserAgent()});
+                    } else {
+                        // Go to /channels which auto-redirects to last team/channel with auth cookie
+                        contents.loadURL(`${parsed.origin}/channels`, {userAgent: composeUserAgent()});
+                    }
+                }
+            } catch {
+                // ignore parse errors
+            }
+        };
+        contents.on('will-redirect', skipLandingPages);
+        contents.on('did-navigate', skipLandingPages);
+
         const spellcheck = Config.useSpellChecker;
         const newWindow = this.generateNewWindowListener(contents.id, spellcheck);
         contents.setWindowOpenHandler(newWindow);
@@ -323,6 +348,8 @@ export class WebContentsEventManager {
         const removeWebContentsListeners = () => {
             try {
                 contents.removeListener('will-navigate', willNavigate);
+                contents.removeListener('will-redirect', skipLandingPages);
+                contents.removeListener('did-navigate', skipLandingPages);
                 contents.removeListener('console-message', consoleMessage);
                 removeListeners?.(contents);
             } catch (e) {

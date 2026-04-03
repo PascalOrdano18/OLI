@@ -108,12 +108,13 @@ export function handleWelcomeScreenModal(prefillURL?: string) {
     const modalPromise = ModalManager.addModal<{prefillURL?: string}, UniqueServer>(ModalConstants.WELCOME_SCREEN_MODAL, html, preload, {prefillURL}, mainWindow, !ServerManager.hasServers());
     if (modalPromise) {
         modalPromise.then(async (data) => {
+            const parsedServerURL = parseURL(data.url);
             let initialLoadURL;
-            if (prefillURL) {
-                const parsedServerURL = parseURL(data.url);
-                if (parsedServerURL) {
-                    initialLoadURL = parseURL(`${parsedServerURL.origin}${prefillURL.substring(prefillURL.indexOf('/'))}`);
-                }
+
+            if (data.initialPath && parsedServerURL) {
+                initialLoadURL = parseURL(`${parsedServerURL.origin}${data.initialPath}`);
+            } else if (prefillURL && parsedServerURL) {
+                initialLoadURL = parseURL(`${parsedServerURL.origin}${prefillURL.substring(prefillURL.indexOf('/'))}`);
             }
 
             // Replace existing server if one exists (single-org model)

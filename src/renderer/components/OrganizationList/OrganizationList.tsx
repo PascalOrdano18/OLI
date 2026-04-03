@@ -276,11 +276,14 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
                 throw new Error('Invalid login response');
             }
 
+            console.log('[org-setup] login response headers:', JSON.stringify(loginRes.headers));
+            console.log('[org-setup] token extracted:', token ? `${token.substring(0, 8)}...` : 'NONE');
+
             if (!token) {
                 throw new Error('Login succeeded but no auth token received');
             }
 
-            // 3. Create team (or get existing)
+            // 3. Create team or join existing one
             const teamName = sanitizeTeamName(resolvedOrg.name);
             let teamId: string;
 
@@ -301,19 +304,38 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
                 const team = JSON.parse(createTeamRes.body);
                 teamId = team.id;
             } else {
-                // Team may already exist (409) or user lacks permission to create (403) — try to join existing
-                const getTeamRes = await proxyFetch(`${serverUrl}/api/v4/teams/name/${teamName}`, {
+                // Team already exists — get all teams user can join and find it
+                const allTeamsRes = await proxyFetch(`${serverUrl}/api/v4/teams?page=0&per_page=200`, {
                     headers: {'Authorization': `Bearer ${token}`},
                 });
-                if (!getTeamRes.ok) {
-                    throw new Error('Failed to find existing team');
+
+                if (!allTeamsRes.ok) {
+                    throw new Error('Failed to list teams');
                 }
-                const team = JSON.parse(getTeamRes.body);
-                teamId = team.id;
+
+                const allTeams = JSON.parse(allTeamsRes.body);
+                const match = allTeams.find((t: {name: string}) => t.name === teamName);
+
+                if (match) {
+                    teamId = match.id;
+                } else {
+                    // Last resort: extract team ID from the detailed_error in the create response
+                    try {
+                        const err = JSON.parse(createTeamRes.body);
+                        const idMatch = err.detailed_error?.match(/id=([a-z0-9]+)/);
+                        if (idMatch) {
+                            teamId = idMatch[1];
+                        } else {
+                            throw new Error('Could not find team');
+                        }
+                    } catch {
+                        throw new Error('Team exists but could not be found. Ask an admin to invite you.');
+                    }
+                }
             }
 
             // 4. Join team
-            await proxyFetch(`${serverUrl}/api/v4/teams/${teamId}/members`, {
+            const joinRes = await proxyFetch(`${serverUrl}/api/v4/teams/${teamId}/members`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -325,11 +347,46 @@ function OrganizationList({provisioningApiUrl, onConnect}: OrganizationListProps
                 }),
             });
 
+            console.log('[org-setup] join team response:', joinRes.status);
+
             // 5. Set auth cookie so the Mattermost web app loads already logged in
             await window.desktop.setServerAuthCookie(serverUrl, token, user.id);
 
-            // 6. Done
-            onConnect({url: serverUrl, name: resolvedOrg.name});
+            // 6. Skip all Mattermost onboarding/landing pages via preferences API
+            const authHeaders = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            };
+
+            // Mark tutorial as completed, skip "tips", skip landing page
+            await proxyFetch(`${serverUrl}/api/v4/users/${user.id}/preferences`, {
+                method: 'PUT',
+                headers: authHeaders,
+                body: JSON.stringify([
+                    {user_id: user.id, category: 'tutorial_step', name: user.id, value: '999'},
+                    {user_id: user.id, category: 'insights', name: 'insights_tutorial_state', value: '{"insights_modal_viewed":true}'},
+                    {user_id: user.id, category: 'recommended_next_steps', name: 'hide', value: 'true'},
+                    {user_id: user.id, category: 'drafts', name: 'drafts_tour_tip_showed', value: '{"drafts_tour_tip_showed":true}'},
+                    {user_id: user.id, category: 'crt_thread_pane_step', name: user.id, value: '999'},
+                ]),
+            });
+
+            // Also complete onboarding via the dedicated endpoint
+            await proxyFetch(`${serverUrl}/api/v4/users/${user.id}/preferences`, {
+                method: 'PUT',
+                headers: authHeaders,
+                body: JSON.stringify([
+                    {user_id: user.id, category: 'system_notice', name: 'GMasDM', value: 'true'},
+                    {user_id: user.id, category: 'onboarding_task_list', name: 'onboarding_task_list_show', value: 'false'},
+                    {user_id: user.id, category: 'onboarding_task_list', name: 'onboarding_task_list_open', value: 'false'},
+                ]),
+            });
+
+            // 7. Store auto-login credentials so the server view can log in automatically
+            await window.desktop.storeAutoLogin(serverUrl, email, HARDCODED_PASSWORD);
+
+            // 8. Done — pass server URL and initial path to skip Mattermost landing pages
+            onConnect({url: serverUrl, name: resolvedOrg.name, initialPath: `/${teamName}/channels/town-square`});
         } catch (err) {
             setSetupError(err instanceof Error ? err.message : 'Something went wrong');
             setStep('username');

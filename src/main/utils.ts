@@ -75,7 +75,7 @@ export function composeUserAgent(browserMode?: boolean) {
         return filteredUserAgent.join(' ');
     }
 
-    return `${filteredUserAgent.join(' ')} OLI/${app.getVersion()}`;
+    return `${filteredUserAgent.join(' ')} Mattermost/${app.getVersion()} OLI/${app.getVersion()}`;
 }
 
 export function isStringWithLength(string: unknown): boolean {
