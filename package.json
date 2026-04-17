@@ -1,7 +1,7 @@
 {
   "name": "mattermost-desktop",
   "productName": "OLI",
-  "version": "6.2.0-develop.1",
+  "version": "6.2.0-nightly.20260417",
   "description": "OLI",
   "main": "dist/index.js",
   "author": "OLI, Inc. <feedback@mattermost.com>",
